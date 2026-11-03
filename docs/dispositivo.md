@@ -128,6 +128,36 @@ del Switch Pro se tomarán en la Fase 2.
 - *Cargar núcleo → Instalar o restaurar un núcleo* instala un `.so` desde `/storage/emulated/0/RetroArch/downloads`
   (`core_assets_directory`). Es una forma de instalar núcleos sin root a partir de un `adb push`.
 
+### Pruebas de juego (2026-11-03)
+
+Lanzados con el mismo intent que usará Daijishō:
+```bash
+adb shell am start -n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture \
+  -e ROM "/storage/emulated/0/ROMs/<consola>/<juego>" \
+  -e LIBRETRO /data/user/0/com.retroarch.ra32/cores/<núcleo>_libretro_android.so \
+  -e CONFIGFILE /storage/emulated/0/Android/data/com.retroarch.ra32/files/retroarch.cfg
+```
+Núcleos: `gambatte_libretro_android.so`, `mgba_libretro_android.so`, `pcsx_rearmed_libretro_android.so`.
+
+FPS medidos con `dumpsys SurfaceFlinger --latency 'com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture#0'`
+(pantalla a 60 Hz):
+
+| Juego | Núcleo | Escala | Sin mezcla | Con opciones del repo |
+|---|---|---|---|---|
+| Zelda Oracle of Ages (GBC) | Gambatte | ×7 (1120×1008) | 58,5 FPS | 59,5 FPS |
+| Zelda The Minish Cap (GBA) | mGBA | ×6 (1440×960) | 59,0 FPS | 58,1 FPS |
+
+- Al salir con Escape ×2 (`input_exit_emulator`, `quit_press_twice = true`) se crean `<juego>.srm` en `/Partidas/saves` y
+  `<juego>.state.auto` en `/Partidas/states`. **Nada en `/ROMs`.** `am force-stop` no guarda.
+- `aspect_ratio_index = "22"` es `ASPECT_RATIO_CORE` (`gfx/video_defines.h`): la proporción la da el núcleo. Es lo correcto.
+- Opciones de núcleo del repo (`stick/retroarch/core-options/`), copias completas de los `.opt` generados con estos cambios:
+  - Gambatte: `gambatte_gb_colorization = "internal"` + `gambatte_gb_internal_palette = "GB - DMG"` (verde clásico; con
+    `disabled` los juegos de GB salen en gris), `gambatte_mix_frames = "mix"`, `gambatte_gbc_color_correction = "GBC only"`.
+    Alternativas de mezcla: `lcd_ghosting`, `lcd_ghosting_fast`. Gambatte no tiene opción de bordes.
+  - mGBA: `mgba_color_correction = "GBA"`, `mgba_interframe_blending = "mix"` (alternativas: `mix_smart`, `lcd_ghosting`,
+    `lcd_ghosting_fast`).
+  - RetroArch no reescribe los `.opt` al salir (comprobado).
+
 ### Manejar el menú de RetroArch por ADB
 
 `adb shell input keyevent <código>` y `adb exec-out screencap -p > captura.png` para ver dónde se está:
@@ -155,4 +185,6 @@ del Switch Pro se tomarán en la Fase 2.
 | 6.2 | Valor de Start + Select en `input_menu_toggle_gamepad_combo` | ✅ `4` = `INPUT_COMBO_START_SELECT` (`input/input_defines.h`, v1.22.2) |
 | 5.2 | Paquetes de Daijishō y FolderSync | ⏳ Fase 3 (al instalarlos) |
 | 5.3 / 8.2 | Intent público de sincronización de FolderSync | ⏳ Fase 3 |
-| 6.3 | Nombres de opciones de núcleo y BIOS de PCSX ReARMed | ⏳ Fase 2 (código del núcleo / `.opt` generado) |
+| 6.3 | Opciones de Gambatte y mGBA | ✅ Sacadas de los `.opt` generados y de los valores en el código de cada núcleo (ver "Pruebas de juego") |
+| 6.3 | RTC de mGBA (Pokémon) | ✅ No hay opción: mGBA lo activa solo para `AXVE/AXVS`, `AXPE/AXPS` y `BPEE/BPES` (`src/gba/overrides.c`) |
+| 6.3 | Opciones y BIOS de PCSX ReARMed | ⏳ Falta un juego de PS1 para generar su `.opt` |
