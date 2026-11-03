@@ -137,6 +137,21 @@ h2 { font-size: 20px; font-weight: 800; }
 .save > .actions { margin-top: 0; }
 .file { font-size: 12px; color: var(--text-3); word-break: break-all; margin-bottom: 4px; }
 
+/* Search (archive.org) */
+.search { display: flex; gap: 8px; margin-top: 14px; }
+.search input {
+  flex: 1; min-width: 0; padding: 13px 14px; border-radius: 14px; border: 1px solid var(--border);
+  background: var(--surface); font-size: 15px;
+}
+.search input:focus { outline: 2px solid var(--accent); border-color: transparent; }
+.search button { padding: 0 18px; border-radius: 14px; background: #fff; color: var(--button-text); font-weight: 800; }
+.frow { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--surface); border-radius: 14px; margin-bottom: 8px; }
+.frow .grow { flex: 1; min-width: 0; }
+.frow b { font-size: 13.5px; word-break: break-all; }
+.frow small { display: block; font-size: 12px; color: var(--muted); margin-top: 3px; }
+.frow .prog { margin-top: 7px; }
+.frow .link { margin-top: 0; flex: none; }
+
 /* Upload */
 .drop {
   display: block; margin-top: 14px; border: 2px dashed rgba(157, 140, 255, 0.5); border-radius: 20px; padding: 14px;

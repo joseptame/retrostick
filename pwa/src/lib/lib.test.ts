@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { downloadUrl, proxyPath } from './archive'
 import { consoleForFile } from './consoles'
 import { groupFiles } from './group'
 import { crc32 } from './hash'
@@ -104,5 +105,19 @@ describe('groupFiles', () => {
 describe('crc32', () => {
   it('matches the standard CRC-32', () => {
     expect(crc32(new TextEncoder().encode('123456789'))).toBe('cbf43926')
+  })
+})
+
+describe('archive.org URLs', () => {
+  it('encodes identifier and file name', () => {
+    expect(downloadUrl('pokemon-emerald', 'Pokemon - Emerald Version (U).gba')).toBe(
+      'https://archive.org/download/pokemon-emerald/Pokemon%20-%20Emerald%20Version%20(U).gba',
+    )
+  })
+
+  it('builds the same-origin proxy path', () => {
+    expect(proxyPath('pokemon-emerald', 'Game (U).gba')).toBe(
+      '/api/download?id=pokemon-emerald&file=Game%20(U).gba',
+    )
   })
 })

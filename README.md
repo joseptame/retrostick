@@ -33,6 +33,7 @@ Convertir un **Xiaomi Mi TV Stick** en una consola retro para jugar a **mis prop
 
 - **Nunca** se suben ROMs, imágenes de disco, BIOS ni partidas guardadas al repositorio. Viven solo en el Google Drive del usuario. El `.gitignore` debe bloquear explícitamente `*.gb *.gbc *.gba *.bin *.cue *.chd *.iso *.img *.pbp *.m3u *.srm *.sav *.state* *.zip *.7z`.
 - **No se descarga ni se distribuye ninguna BIOS.** La de PS1 la extrae el usuario de su propia consola. Si no existe, se usa la BIOS HLE integrada en PCSX ReARMed.
+- **Buscar juegos (archive.org):** la pestaña "Buscar" sirve para localizar **copias de seguridad de juegos que el usuario ya posee en formato físico** y subirlas a su Drive. No se usa para descargar juegos que no se tienen: eso puede infringir derechos de autor, y la responsabilidad es del usuario. El código solo consulta la API pública de archive.org y descarga el archivo que el usuario elige explícitamente.
 - Las **portadas** se cargan en tiempo de ejecución desde `libretro-thumbnails` y no se guardan en el repo. Las de `docs/maquetas/img/` son solo para las maquetas.
 - **Idioma:** la interfaz de la PWA y del launcher va en **español**. El código y los comentarios pueden ir en inglés.
 - **Secretos:** nada se escribe en el código ni se sube al repo.
@@ -301,7 +302,7 @@ config_save_on_exit = "false"             # para que la configuración del repo 
 - El token dura unos 60 minutos: renovación silenciosa y, si falla, botón "Volver a iniciar sesión".
 
 ### 7.4 Pantallas (ver `docs/maquetas/pwa-movil.png` y `movil.html`)
-Barra inferior: **Colección · Subir · Partidas · Stick**.
+Barra inferior: **Colección · Buscar · Subir · Partidas · Stick**.
 
 **Colección**
 - Cabecera: número de juegos y "sincronizado hace X" (de `status.json`).
@@ -318,6 +319,19 @@ Barra inferior: **Colección · Subir · Partidas · Stick**.
   - **Descargar:** baja el archivo al móvil.
   - **Restaurar copia anterior:** usa `files.revisions.list` + descarga de la revisión + subida como versión actual. Pedir confirmación y avisar de que el stick debe tener el juego cerrado.
 - Borrar juego de la colección: con doble confirmación. **Nunca** borra partidas.
+
+**Buscar juegos**
+- Buscador de juegos en archive.org por consola (GB/GBC/GBA/PS1), con portadas.
+- Usa la API pública de archive.org (`advancedsearch.php` para buscar elementos `mediatype:software` y
+  `metadata/<id>` para listar sus archivos), ambas con CORS habilitado.
+- Los resultados se muestran en una cuadrícula; al entrar en un elemento se listan sus archivos de juego
+  (`.gb .gbc .gba .chd .cue .bin .m3u .pbp`, según la extensión) y se puede subir el elegido a Drive.
+- **Descarga:** el servidor de archivos de archive.org **no envía cabeceras CORS**, así que el navegador no
+  puede descargar directamente. La PWA usa el proxy del mismo origen `api/download.ts` (Edge Function de
+  Vercel) que hace *streaming* del archivo sin el límite de 4,5 MB de las funciones. Como alternativa, cada
+  archivo tiene un enlace "Abrir" que descarga el archivo con el navegador (sin restricción CORS) para subirlo
+  luego desde "Subir copias".
+- La identificación, el renombrado No-Intro y la subida reanudable son los mismos que en "Subir copias".
 
 **Subir copias**
 - Selector de archivos múltiple (`.gb .gbc .gba .chd .cue .bin .m3u .pbp`; `.zip` opcional).
@@ -507,6 +521,7 @@ retrostick/
 │   │   ├── screens/
 │   │   └── components/
 │   ├── scripts/build-db.ts
+│   ├── api/download.ts      # proxy Vercel para descargar de archive.org (CORS)
 │   ├── public/db/           # generado en build
 │   └── vite.config.ts
 └── .github/workflows/

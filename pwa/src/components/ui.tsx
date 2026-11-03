@@ -61,7 +61,7 @@ export function Banner({ tone = 'info', children }: { tone?: 'info' | 'warn' | '
   return <div className={`banner ${tone}`}>{children}</div>
 }
 
-export type Tab = 'coleccion' | 'subir' | 'partidas' | 'stick'
+export type Tab = 'coleccion' | 'buscar' | 'subir' | 'partidas' | 'stick'
 
 const ICONS: Record<Tab, ReactNode> = {
   coleccion: (
@@ -70,6 +70,12 @@ const ICONS: Record<Tab, ReactNode> = {
       <rect x="14" y="3" width="7" height="7" rx="1.5" />
       <rect x="3" y="14" width="7" height="7" rx="1.5" />
       <rect x="14" y="14" width="7" height="7" rx="1.5" />
+    </>
+  ),
+  buscar: (
+    <>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m21 21-4.3-4.3" />
     </>
   ),
   subir: <path d="M12 16V4M7 9l5-5 5 5M4 20h16" />,
@@ -87,7 +93,7 @@ const ICONS: Record<Tab, ReactNode> = {
   ),
 }
 
-const LABELS: Record<Tab, string> = { coleccion: 'Colección', subir: 'Subir', partidas: 'Partidas', stick: 'Stick' }
+const LABELS: Record<Tab, string> = { coleccion: 'Colección', buscar: 'Buscar', subir: 'Subir', partidas: 'Partidas', stick: 'Stick' }
 
 export function BottomNav({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
   return (

@@ -4,6 +4,7 @@ import { accountEmail, isConfigured, isSignedIn, setAccountEmail, signOut, Signe
 import { ensureFolders, fetchAccountEmail, forgetFolders, type Folders } from './lib/drive'
 import { cachedLibrary, loadLibrary, type Library } from './lib/library'
 import { Coleccion } from './screens/Coleccion'
+import { Buscar } from './screens/Buscar'
 import { Ficha } from './screens/Ficha'
 import { Login } from './screens/Login'
 import { Partidas } from './screens/Partidas'
@@ -118,6 +119,7 @@ function Main({ onSignOut }: { onSignOut: () => void }) {
       ) : (
         <>
           {tab === 'coleccion' && <Coleccion state={state} onUpload={() => setTab('subir')} />}
+          {tab === 'buscar' && <Buscar state={state} />}
           {tab === 'subir' && <Subir state={state} />}
           {tab === 'partidas' && <Partidas state={state} />}
           {tab === 'stick' && <Stick state={state} onSignOut={onSignOut} />}
