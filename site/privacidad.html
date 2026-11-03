@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacidad · RetroStick</title>
+  <meta name="description" content="Política de privacidad de RetroStick.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <p class="brand"><a href="./">Retro<span>Stick</span></a></p>
+    <h1>Política de privacidad</h1>
+    <p class="lead">Última actualización: 3 de noviembre de 2026.</p>
+
+    <section>
+      <h2>Resumen</h2>
+      <p>
+        RetroStick es un proyecto personal sin servidores propios. Sus aplicaciones (el menú del Mi TV Stick y la app
+        web del móvil) funcionan en tus dispositivos y hablan directamente con Google Drive en tu nombre.
+        El autor del proyecto <strong>no recibe, guarda ni comparte ningún dato tuyo</strong>.
+      </p>
+    </section>
+
+    <section>
+      <h2>Datos de Google a los que accede</h2>
+      <ul>
+        <li>
+          <strong>Google Drive, permiso <code>drive.file</code>:</strong> solo los archivos y carpetas que crea
+          RetroStick (la carpeta <code>Retro/</code>: juegos que subes, partidas guardadas y un archivo de estado del
+          stick). No puede ver ni modificar ningún otro archivo de tu Drive.
+        </li>
+        <li>
+          <strong>Dirección de correo de la cuenta</strong>, que la API de Drive devuelve con el permiso anterior: se
+          muestra en el menú del stick para que sepas qué cuenta está conectada.
+        </li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Para qué se usan</h2>
+      <p>
+        Únicamente para sincronizar tus juegos y partidas entre tu Google Drive y tus dispositivos. No se usan para
+        publicidad, análisis ni ningún otro fin, y no se venden ni se ceden a terceros.
+      </p>
+    </section>
+
+    <section>
+      <h2>Dónde se guardan</h2>
+      <ul>
+        <li>Tus archivos están en tu propio Google Drive y en tus dispositivos.</li>
+        <li>
+          La autorización de Google (token) se guarda solo en el dispositivo conectado, en el almacenamiento privado de
+          la app. Se borra al pulsar <em>Desconectar</em> en <em>Retro Ajustes → Cuenta de Drive</em>.
+        </li>
+        <li>
+          Puedes retirar el acceso en cualquier momento desde
+          <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.
+        </li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Otros servicios</h2>
+      <p>
+        Las portadas de los juegos se descargan del repositorio público
+        <a href="https://github.com/libretro-thumbnails">libretro-thumbnails</a> en GitHub, a partir del nombre del
+        juego. No se envía ningún otro dato.
+      </p>
+    </section>
+
+    <section>
+      <h2>Uso de los datos de Google</h2>
+      <p>
+        El uso y la transferencia de información recibida de las APIs de Google cumplen la
+        <a href="https://developers.google.com/terms/api-services-user-data-policy">Política de datos de usuario de los
+        servicios de API de Google</a>, incluidos los requisitos de uso limitado.
+      </p>
+    </section>
+
+    <section>
+      <h2>Contacto</h2>
+      <p>
+        Para cualquier duda sobre esta política, abre una
+        <a href="https://github.com/joseptame/retrostick/issues">incidencia en el repositorio de GitHub</a>.
+      </p>
+    </section>
+
+    <footer><a href="./">Inicio</a></footer>
+  </main>
+</body>
+</html>

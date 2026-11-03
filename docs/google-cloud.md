@@ -5,8 +5,9 @@
 > prueba. "Publicar app" está bloqueado hasta añadir página principal y política de privacidad en *Información de la
 > marca*. Mientras siga en Prueba, **Google desconecta el stick cada 7 días** (la cabecera dirá "Drive sin conectar";
 > se vuelve a conectar desde Retro Ajustes). Cliente de TV creado y probado: el stick está conectado.
-> **Decisión del usuario (2026-11-03): se queda en Prueba.** No se crean página principal ni política de privacidad;
-> se acepta reconectar el stick cada 7 días (*Retro Ajustes → Sincronizar ahora*, código nuevo).
+> **Plan (2026-11-03): publicar la app** (pasar a *En producción*) con la página principal y la política de
+> privacidad de GitHub Pages (`site/`, ver paso 3b). Solo cambia el estado del proyecto de Google: no se publica en
+> ninguna tienda.
 
 Necesario para que el stick (y más adelante la app del móvil) usen tu Google Drive. Se hace una vez, en el navegador
 del PC, con tu cuenta de Gmail. Gratis.
@@ -37,6 +38,18 @@ del PC, con tu cuenta de Gmail. Gratis.
      Google clasifica como no sensible: no hace falta revisión de Google. ⚠️ VERIFICAR al publicar que la consola no
      pide verificación.
    - Al conectar, Google puede mostrar un aviso porque la app no está verificada: es tu propia app; acéptalo.
+
+## 3b. Información de la marca (necesaria para publicar)
+
+En **Google Auth Platform → Información de la marca**:
+
+- **Página principal de la aplicación:** `https://joseptame.github.io/retrostick/`
+- **Política de privacidad:** `https://joseptame.github.io/retrostick/privacidad.html`
+- **Dominios autorizados:** `joseptame.github.io`
+- Guardar. Después, **Público → Publicar app**.
+
+Las páginas están en `site/` y las publica `.github/workflows/pages.yml` en GitHub Pages. El contacto es el repositorio
+de GitHub (no se publica ningún correo).
 
 ## 4. Cliente para el stick
 

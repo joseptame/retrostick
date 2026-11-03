@@ -422,7 +422,8 @@ La sincronización lo sube a `Retro/Partidas/.stick/` y la PWA lo lee. Permiso: 
 
 ### Fase 3 – Stick: Google Drive ✅ (cerrada el 2026-11-03)
 - [x] Proyecto de Google Cloud y cliente OAuth de TV (`docs/google-cloud.md`). Se usa un proyecto existente, en modo
-  *Prueba* por decisión del usuario: la conexión caduca cada 7 días y se reconecta desde Retro Ajustes.
+  *Prueba*: la conexión caduca cada 7 días hasta publicar la app (página principal y política de privacidad en
+  GitHub Pages, `site/`).
 - [x] Sincronización en el launcher (`Drive.kt`, `DriveSync.kt`, sección 5.3).
 - [x] Stick conectado (2026-11-03): primera sincronización con 3 juegos, 4 partidas y `status.json`; la ficha muestra
   "✓ Copia en Drive".

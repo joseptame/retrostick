@@ -1,0 +1,59 @@
+/* Design tokens: README section 11 */
+:root {
+  --bg: #0d0b1f;
+  --glow-1: #3b2f8f;
+  --glow-2: #1d1650;
+  --surface: rgba(255, 255, 255, .06);
+  --border: rgba(255, 255, 255, .08);
+  --text: #f2f0ff;
+  --text-2: #bdb6ec;
+  --text-3: #8f88bd;
+  --accent: #9d8cff;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: Inter, system-ui, sans-serif;
+  line-height: 1.6;
+  color: var(--text);
+  background:
+    radial-gradient(900px 600px at 80% 0%, var(--glow-1) 0%, transparent 60%),
+    radial-gradient(700px 500px at 0% 100%, var(--glow-2) 0%, transparent 60%),
+    var(--bg);
+  background-attachment: fixed;
+}
+
+main {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 48px 20px 64px;
+}
+
+.brand { font-weight: 800; font-size: 22px; margin: 0 0 32px; }
+.brand span { color: var(--accent); }
+.brand a { color: inherit; text-decoration: none; }
+
+h1 { font-weight: 800; font-size: clamp(28px, 6vw, 40px); line-height: 1.15; margin: 0 0 16px; }
+h2 { font-weight: 600; font-size: 20px; margin: 0 0 8px; }
+.lead { color: var(--text-2); font-size: 18px; margin: 0 0 32px; }
+
+section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px 22px;
+  margin: 0 0 16px;
+}
+section p, section ul { margin: 0; color: var(--text-2); }
+section p + p { margin-top: 12px; }
+ul { padding-left: 20px; }
+li + li { margin-top: 6px; }
+
+a { color: var(--accent); }
+code { font-size: .92em; background: rgba(255, 255, 255, .08); padding: 1px 6px; border-radius: 6px; }
+.note { color: var(--text-3); font-size: 15px; }
+
+footer { margin-top: 32px; color: var(--text-3); font-size: 15px; }
