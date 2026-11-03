@@ -105,7 +105,7 @@ del Switch Pro se tomarán en la Fase 2.
 ## ADB por red
 
 - `adb connect <IP>:5555` funciona con la depuración USB activada (`service.adb.tcp.port = 5555`).
-- `persist.adb.tcp.port` está vacío. **Pendiente:** comprobar que el puerto sigue abierto tras reiniciar el stick.
+- `persist.adb.tcp.port` está vacío, pero el puerto **sigue abierto tras reiniciar** (comprobado el 2026-11-03 con `adb connect` a los 2 min de arrancar).
 - Recomendado: reservar la IP del stick en el router (DHCP estático).
 
 ## Estado de los ⚠️ VERIFICAR
@@ -114,7 +114,7 @@ del Switch Pro se tomarán en la Fase 2.
 |---|---|---|
 | 2 | Espacio de usuario de 32 bits | ✅ Confirmado `armeabi-v7a` |
 | 2 | GLES 2.0, sin Vulkan | ✅ Confirmado GLES 2.0 |
-| 5.1 | ADB por red en el puerto 5555 | ✅ Funciona; ⏳ falta comprobar tras reinicio |
+| 5.1 | ADB por red en el puerto 5555 | ✅ Funciona y sigue activo tras reiniciar |
 | 5.5 | Paquete del launcher de Google | ✅ `com.google.android.tvlauncher`, ya desactivado; el launcher actual es FLauncher |
 | 5.5 | Abrir Ajustes de Android desde otra app | ✅ `android.settings.SETTINGS` resuelve a `MainSettings` |
 | 8.2 | Intent "Emparejar mando" | ✅ `CONNECT_INPUT` funciona; ❌ la alternativa `BLUETOOTH_SETTINGS` no existe |
