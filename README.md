@@ -356,7 +356,7 @@ https://raw.githubusercontent.com/libretro-thumbnails/<Sistema>/master/Named_Box
 - **Kotlin**, una sola Activity, **Views nativas sin Leanback ni Compose** (lo más ligero para 1 GB de RAM y Mali-450; el diseño es propio).
 - Paquete `com.retrostick.launcher`. `minSdk 26` (fuentes como recurso), `targetSdk 28`. Se instala por sideload, así que se puede apuntar a 28 y usar almacenamiento heredado en Android 9.
 - `AndroidManifest`: categorías `HOME` + `DEFAULT` (pantalla de inicio), `LEANBACK_LAUNCHER` + `LAUNCHER`, banner de TV (320×180), `uses-feature android.software.leanback required=false`, `touchscreen required=false`.
-- Compilación del APK en **GitHub Actions** (artefacto descargable) y en local con `./gradlew assembleRelease` (firma con keystore de debug o una propia guardada fuera del repo).
+- Compilación en local con `./gradlew assembleDebug` (JDK 17). Sin GitHub Actions (descartado, ver fase 4).
 
 ### 8.2 Pantalla de inicio (maqueta `docs/maquetas/inicio.html`)
 - **Cabecera:** marca, mando conectado (`InputDevice` con `SOURCE_GAMEPAD`), estado de sincronización (hora del último cambio en `/Partidas`, o "sin sincronizar"), Wi-Fi y hora.
@@ -436,7 +436,10 @@ La sincronización lo sube a `Retro/Partidas/.stick/` y la PWA lo lee. Permiso: 
   Drive; la ficha del juego muestra "✓ Copia en Drive".
 
 ### Fase 4 – RetroStick Launcher (APK)
-- [ ] App Kotlin (sección 8) + workflow de GitHub Actions que publique el APK.
+- [x] App Kotlin (sección 8).
+- [ ] ~~Workflow de GitHub Actions que publique el APK~~: **descartado** (2026-11-03). El repo es público, el APK
+  llevaría el cliente OAuth y se firmaría con otra clave que la del PC. Se compila e instala desde el PC
+  (`android/`, `./gradlew assembleDebug`, JDK 17).
 - [ ] Fijarla como pantalla de inicio (5.5), con FLauncher como respaldo.
 - **Aceptación:** al encender el stick se abre el launcher con el aspecto de la maqueta; los juegos de `/ROMs` aparecen con portada y se lanzan en RetroArch; la pestaña Retro Ajustes funciona con el mando; `status.json` llega a Drive.
 
