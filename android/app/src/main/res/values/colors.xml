@@ -19,4 +19,9 @@
     <color name="ok">#4ADE80</color>
     <color name="off">#8F88BD</color>
     <color name="button_text">#1B1446</color>
+    <!-- Xbox face button colours -->
+    <color name="xbox_a">#5DC21E</color>
+    <color name="xbox_b">#E5383B</color>
+    <color name="xbox_x">#2D7DD2</color>
+    <color name="xbox_y">#F2C80F</color>
 </resources>

@@ -17,16 +17,36 @@ import java.util.TimeZone
 // ⚠️ Package names to confirm when FolderSync is installed (phase 3).
 private val FOLDERSYNC_PACKAGES = listOf("dk.tacit.android.foldersync.full", "dk.tacit.android.foldersync.lite")
 
+/** Which button glyphs to show: follows the controller family (USB/BT vendor id). */
+enum class PadStyle { PLAYSTATION, NINTENDO, XBOX, REMOTE }
+
+private const val VENDOR_SONY = 0x054C
+private const val VENDOR_NINTENDO = 0x057E
+
 object StickStatus {
 
     /**
-     * Names of connected game controllers, in player order. The stick's remote is not a gamepad, and the
-     * system "virtual-search" device claims SOURCE_GAMEPAD but has no USB/BT vendor id.
+     * The stick's remote is not a gamepad, and the system "virtual-search" device claims SOURCE_GAMEPAD
+     * but has no USB/BT vendor id.
      */
-    fun controllers(): List<String> = InputDevice.getDeviceIds().toList()
-        .mapNotNull { InputDevice.getDevice(it) }
-        .filter { !it.isVirtual && it.vendorId != 0 && (it.sources and InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD }
-        .map { it.name }
+    fun isGamepad(device: InputDevice?) = device != null && !device.isVirtual && device.vendorId != 0 &&
+        (device.sources and InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD
+
+    fun gamepads(): List<InputDevice> =
+        InputDevice.getDeviceIds().toList().mapNotNull { InputDevice.getDevice(it) }.filter(::isGamepad)
+
+    /** Names of connected game controllers, in player order. */
+    fun controllers(): List<String> = gamepads().map { it.name }
+
+    /** Unknown brands (8BitDo, generic pads...) follow Android's own A/B/X/Y naming, i.e. the Xbox layout. */
+    fun padStyle(device: InputDevice?): PadStyle = when {
+        !isGamepad(device) -> PadStyle.REMOTE
+        device!!.vendorId == VENDOR_SONY || device.name.startsWith("DualSense") -> PadStyle.PLAYSTATION
+        device.vendorId == VENDOR_NINTENDO || device.name.contains("Pro Controller") -> PadStyle.NINTENDO
+        else -> PadStyle.XBOX
+    }
+
+    fun firstPadStyle() = gamepads().firstOrNull()?.let(::padStyle) ?: PadStyle.REMOTE
 
     fun shortControllerName(name: String) = when {
         name.startsWith("DualSense") -> "DualSense"

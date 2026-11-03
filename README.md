@@ -363,7 +363,8 @@ https://raw.githubusercontent.com/libretro-thumbnails/<Sistema>/master/Named_Box
   - *Partida guardada:* "Copia en Drive" si FolderSync la ha subido (⚠️ VERIFICAR cómo saberlo en la fase 3); si no, "Solo en el stick".
   - Botón **Continuar partida** o **Jugar** (si no hay partida).
 - **Estante** con las portadas de la consola, marca "Jugando" en el último jugado y tarjeta final "+ Añade juegos desde la app del móvil".
-- **Ayudas de botones** abajo: ✕ Jugar · ○ Atrás · △ Favorito · □ Detalles · L1/R1 Cambiar consola.
+- **Ayudas de botones** abajo, con los símbolos del mando que se está usando (por *vendor id*: Sony, Nintendo, Microsoft u otros con el esquema A/B/X/Y de Android):
+  PlayStation ✕ Jugar · ○ Atrás · △ Favorito · □ Detalles · L1/R1 · Xbox A/B/Y/X (colores) · LB/RB · Switch A/B/X/Y · L/R (con mando Nintendo, confirmar = botón derecho; ⚠️ VERIFICAR al emparejar el Pro Controller) · sin mando: OK Jugar · ↑ Consolas.
 - **Lanzar un juego:** intent a `com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture` con `ROM`, `LIBRETRO` y `CONFIGFILE` (verificado, ver `docs/dispositivo.md`).
 - **Portadas:** libretro-thumbnails (misma regla que la PWA, 7.5), con caché en disco y tarjeta de degradado si no hay portada o no hay red.
 

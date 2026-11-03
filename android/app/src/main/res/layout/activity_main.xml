@@ -187,10 +187,29 @@
                 android:paddingEnd="20dp"
                 android:paddingBottom="9dp">
 
-                <ImageView
+                <!-- Confirm button glyph: PlayStation cross, or a letter (A / OK) for other controllers -->
+                <FrameLayout
                     android:layout_width="20dp"
-                    android:layout_height="20dp"
-                    android:src="@drawable/ic_btn_play_cross" />
+                    android:layout_height="20dp">
+
+                    <ImageView
+                        android:id="@+id/playIcon"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:src="@drawable/ic_btn_play_cross" />
+
+                    <TextView
+                        android:id="@+id/playLetter"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:background="@drawable/bg_play_disc"
+                        android:fontFamily="@font/inter_extrabold"
+                        android:gravity="center"
+                        android:includeFontPadding="false"
+                        android:textColor="#FFFFFF"
+                        android:textSize="10sp"
+                        android:visibility="gone" />
+                </FrameLayout>
 
                 <TextView
                     android:id="@+id/playText"

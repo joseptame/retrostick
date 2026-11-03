@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
@@ -16,6 +17,7 @@ import android.os.Looper
 import android.provider.Settings
 import android.text.format.Formatter
 import android.util.TypedValue
+import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
@@ -98,9 +100,20 @@ class MainActivity : Activity() {
     private val settingViews = mutableListOf<View>()
     private lateinit var settings: List<Setting>
 
+    /** Button glyphs follow the controller in use: set on connect and on every key press. */
+    private var padStyle = PadStyle.REMOTE
+    /** Debug builds: style forced with the debugPadStyle extra, until a real key is pressed. */
+    private var forcedPadStyle: PadStyle? = null
+
     private val inputListener = object : InputManager.InputDeviceListener {
-        override fun onInputDeviceAdded(deviceId: Int) = refreshStatus()
-        override fun onInputDeviceRemoved(deviceId: Int) = refreshStatus()
+        override fun onInputDeviceAdded(deviceId: Int) {
+            InputDevice.getDevice(deviceId)?.takeIf(StickStatus::isGamepad)?.let { setPadStyle(StickStatus.padStyle(it)) }
+            refreshStatus()
+        }
+        override fun onInputDeviceRemoved(deviceId: Int) {
+            setPadStyle(StickStatus.firstPadStyle())
+            refreshStatus()
+        }
         override fun onInputDeviceChanged(deviceId: Int) = refreshStatus()
     }
     // Wi-Fi comes up a few seconds after boot: refresh the top bar as soon as the network changes.
@@ -214,6 +227,7 @@ class MainActivity : Activity() {
                 PERMISSION_REQUEST,
             )
         }
+        padStyle = forcedPadStyle ?: StickStatus.firstPadStyle()
         reload()
         getSystemService(InputManager::class.java).registerInputDeviceListener(inputListener, main)
         getSystemService(ConnectivityManager::class.java).registerDefaultNetworkCallback(networkCallback)
@@ -233,6 +247,12 @@ class MainActivity : Activity() {
         super.onNewIntent(intent)
         // Home pressed while already here
         zone = Zone.CONTENT
+        // Debug builds only: preview the glyphs of a controller that is not connected
+        // (adb shell am start -n com.retrostick.launcher/.MainActivity --es debugPadStyle XBOX).
+        val debuggable = applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
+        intent?.getStringExtra("debugPadStyle")?.takeIf { debuggable }?.let { name ->
+            forcedPadStyle = PadStyle.values().firstOrNull { it.name == name }
+        }
         render()
     }
 
@@ -514,31 +534,90 @@ class MainActivity : Activity() {
 
     // ---- Hints ----
 
-    private fun renderHints() {
-        hints.removeAllViews()
-        when {
-            settingsTab -> addHint(R.drawable.ic_hint_cross, R.string.hint_open)
-            currentGame != null -> {
-                addHint(R.drawable.ic_hint_cross, R.string.hint_play)
-                addHint(R.drawable.ic_hint_circle, R.string.hint_back)
-                addHint(R.drawable.ic_hint_triangle, R.string.hint_favorite)
-                addHint(R.drawable.ic_hint_square, R.string.hint_details)
-            }
-        }
-        addHint(null, R.string.hint_switch)
+    private sealed class Glyph {
+        class Icon(val res: Int) : Glyph()
+        class Letter(val text: String, val color: Int) : Glyph()
+        class Pill(val text: String) : Glyph()
     }
 
-    /** [icon] is a PlayStation button glyph; null draws the "L1 / R1" pill. */
-    private fun addHint(icon: Int?, label: Int) {
+    /** confirm / back / top button (favourite) / left button (details) / shoulders, per controller family. */
+    private class Glyphs(val confirm: Glyph, val back: Glyph?, val top: Glyph?, val left: Glyph?, val shoulders: Glyph)
+
+    private fun glyphs(style: PadStyle): Glyphs {
+        val plain = getColor(R.color.chip_text)
+        return when (style) {
+            PadStyle.PLAYSTATION -> Glyphs(
+                Glyph.Icon(R.drawable.ic_hint_cross), Glyph.Icon(R.drawable.ic_hint_circle),
+                Glyph.Icon(R.drawable.ic_hint_triangle), Glyph.Icon(R.drawable.ic_hint_square), Glyph.Pill("L1 / R1"),
+            )
+            PadStyle.XBOX -> Glyphs(
+                Glyph.Letter("A", getColor(R.color.xbox_a)), Glyph.Letter("B", getColor(R.color.xbox_b)),
+                Glyph.Letter("Y", getColor(R.color.xbox_y)), Glyph.Letter("X", getColor(R.color.xbox_x)), Glyph.Pill("LB / RB"),
+            )
+            // Nintendo: top button is X, left button is Y
+            PadStyle.NINTENDO -> Glyphs(
+                Glyph.Letter("A", plain), Glyph.Letter("B", plain),
+                Glyph.Letter("X", plain), Glyph.Letter("Y", plain), Glyph.Pill("L / R"),
+            )
+            // The remote only has OK, the arrows and Back
+            PadStyle.REMOTE -> Glyphs(Glyph.Pill("OK"), null, null, null, Glyph.Pill("↑"))
+        }
+    }
+
+    private fun renderHints() {
+        hints.removeAllViews()
+        val g = glyphs(padStyle)
+        when {
+            settingsTab -> addHint(g.confirm, R.string.hint_open)
+            currentGame != null -> {
+                addHint(g.confirm, R.string.hint_play)
+                g.back?.let { addHint(it, R.string.hint_back) }
+                g.top?.let { addHint(it, R.string.hint_favorite) }
+                g.left?.let { addHint(it, R.string.hint_details) }
+            }
+        }
+        addHint(g.shoulders, if (padStyle == PadStyle.REMOTE) R.string.hint_consoles else R.string.hint_switch)
+    }
+
+    /** Glyph inside the "Continuar partida" button. */
+    private fun renderPlayGlyph() {
+        val icon = findViewById<View>(R.id.playIcon)
+        val letter = findViewById<TextView>(R.id.playLetter)
+        when (val confirm = glyphs(padStyle).confirm) {
+            is Glyph.Icon -> {
+                icon.visibility = View.VISIBLE
+                letter.visibility = View.GONE
+            }
+            is Glyph.Letter, is Glyph.Pill -> {
+                icon.visibility = View.GONE
+                letter.visibility = View.VISIBLE
+                letter.text = if (confirm is Glyph.Letter) confirm.text else (confirm as Glyph.Pill).text
+                letter.setTextColor(if (confirm is Glyph.Letter && padStyle == PadStyle.XBOX) confirm.color else Color.WHITE)
+                letter.setTextSize(TypedValue.COMPLEX_UNIT_SP, if (confirm is Glyph.Pill) 7f else 10f)
+            }
+        }
+    }
+
+    private fun addHint(glyph: Glyph, label: Int) {
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = android.view.Gravity.CENTER_VERTICAL
         }
-        if (icon != null) {
-            row.addView(ImageView(this).apply { setImageResource(icon) }, LinearLayout.LayoutParams(dp(17), dp(17)))
-        } else {
-            row.addView(TextView(this).apply {
-                text = "L1 / R1"
+        when (glyph) {
+            is Glyph.Icon -> row.addView(
+                ImageView(this).apply { setImageResource(glyph.res) }, LinearLayout.LayoutParams(dp(17), dp(17)),
+            )
+            is Glyph.Letter -> row.addView(TextView(this).apply {
+                text = glyph.text
+                gravity = android.view.Gravity.CENTER
+                includeFontPadding = false
+                setTextColor(glyph.color)
+                setBackgroundResource(R.drawable.bg_hint_circle)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 8.5f)
+                typeface = resources.getFont(R.font.inter_bold)
+            }, LinearLayout.LayoutParams(dp(17), dp(17)))
+            is Glyph.Pill -> row.addView(TextView(this).apply {
+                text = glyph.text
                 setTextColor(getColor(R.color.chip_text))
                 setBackgroundResource(R.drawable.bg_hint_pill)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 8f)
@@ -558,8 +637,32 @@ class MainActivity : Activity() {
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.keyCode !in HANDLED_KEYS) return super.dispatchKeyEvent(event)
-        if (event.action == KeyEvent.ACTION_DOWN && splash.visibility != View.VISIBLE) onKey(event.keyCode)
+        if (event.action == KeyEvent.ACTION_DOWN && splash.visibility != View.VISIBLE) {
+            val style = StickStatus.padStyle(event.device)
+            forcedPadStyle = null
+            setPadStyle(style)
+            onKey(semanticKey(event.keyCode, style))
+        }
         return true
+    }
+
+    /**
+     * Android reports face buttons by position (BUTTON_A = bottom, BUTTON_B = right). Nintendo confirms with
+     * the right button (labelled A) and goes back with the bottom one (B), so those two are swapped.
+     * ⚠️ To verify with the Pro Controller paired: assumes Android 9 sends positional codes for it.
+     */
+    private fun semanticKey(code: Int, style: PadStyle) = when {
+        style != PadStyle.NINTENDO -> code
+        code == KeyEvent.KEYCODE_BUTTON_A -> KeyEvent.KEYCODE_BUTTON_B
+        code == KeyEvent.KEYCODE_BUTTON_B -> KeyEvent.KEYCODE_BUTTON_A
+        else -> code
+    }
+
+    private fun setPadStyle(style: PadStyle) {
+        if (style == padStyle) return
+        padStyle = style
+        renderHints()
+        renderPlayGlyph()
     }
 
     private fun onKey(code: Int) {
@@ -653,6 +756,7 @@ class MainActivity : Activity() {
         renderShelf()
         renderSettings()
         renderHints()
+        renderPlayGlyph()
     }
 
     // ---- Helpers ----

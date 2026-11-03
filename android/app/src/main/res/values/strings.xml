@@ -31,6 +31,7 @@
     <string name="hint_favorite">Favorito</string>
     <string name="hint_details">Detalles</string>
     <string name="hint_switch">Cambiar consola</string>
+    <string name="hint_consoles">Consolas</string>
 
     <string name="need_storage">RetroStick necesita permiso de almacenamiento para ver tus juegos.</string>
     <string name="retroarch_missing">RetroArch (32 bits) no está instalado.</string>
