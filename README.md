@@ -426,7 +426,9 @@ La sincronización lo sube a `Retro/Partidas/.stick/` y la PWA lo lee. Permiso: 
 - [x] Sincronización en el launcher (`Drive.kt`, `DriveSync.kt`, sección 5.3).
 - [x] Stick conectado (2026-11-03): primera sincronización con 3 juegos, 4 partidas y `status.json`; la ficha muestra
   "✓ Copia en Drive".
-- [ ] Probar quitar/devolver un juego de `JugandoAhora` y el reposo del stick (se duerme a los 30 min).
+- [x] Quitar/devolver un juego (2026-11-03): mover Oracle of Seasons a `Coleccion/gbc` lo borró del stick; devolverlo
+  a `JugandoAhora/gbc` lo volvió a descargar (MD5 idéntico al original). Su partida no se tocó.
+- [ ] Reposo del stick: se duerme a los 30 min (`sleep_timeout = 1800000`) y entonces no sincroniza.
 - **Aceptación:** al conectar se crea `Retro/` en Drive y suben las partidas y los juegos del stick; un archivo nuevo en
   `Retro/JugandoAhora/<c>` aparece en el menú tras sincronizar; quitarlo de ahí lo borra del stick y su partida sigue en
   Drive; la ficha del juego muestra "✓ Copia en Drive".

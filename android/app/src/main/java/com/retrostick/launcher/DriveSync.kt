@@ -24,6 +24,8 @@ object DriveSync {
     @Volatile var lastError: String? = null
         private set
     @Volatile private var cancelRequested = false
+    /** A sync was requested while the running one was being cancelled: run again when it ends. */
+    @Volatile private var rerun = false
 
     private val executor = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
@@ -41,7 +43,13 @@ object DriveSync {
     fun sync(context: Context) {
         val app = context.applicationContext
         val auth = DriveAuth(app)
-        if (!auth.isConfigured || !auth.isConnected || phase == Phase.SYNCING) return
+        if (!auth.isConfigured || !auth.isConnected) return
+        if (phase == Phase.SYNCING) {
+            // Paused and resumed quickly (Home, a short dialog): keep going instead of dropping this request.
+            if (cancelRequested) rerun = true
+            cancelRequested = false
+            return
+        }
         phase = Phase.SYNCING
         cancelRequested = false
         notifyListeners()
@@ -59,7 +67,10 @@ object DriveSync {
                 lastError = e.message
                 phase = Phase.ERROR
             } finally {
+                val again = rerun
+                rerun = false
                 notifyListeners()
+                if (again) main.post { sync(app) }
             }
         }
     }
