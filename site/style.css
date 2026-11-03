@@ -56,4 +56,9 @@ a { color: var(--accent); }
 code { font-size: .92em; background: rgba(255, 255, 255, .08); padding: 1px 6px; border-radius: 6px; }
 .note { color: var(--text-3); font-size: 15px; }
 
+.button {
+  display: inline-block; margin: 0 0 32px; padding: 13px 22px; border-radius: 14px;
+  background: #fff; color: #1b1446; font-weight: 800; text-decoration: none;
+}
+
 footer { margin-top: 32px; color: var(--text-3); font-size: 15px; }

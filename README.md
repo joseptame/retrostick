@@ -453,10 +453,12 @@ La sincronización lo sube a `Retro/Partidas/.stick/` y la PWA lo lee. Permiso: 
 - **Aceptación:** al encender el stick se abre el launcher con el aspecto de la maqueta; los juegos de `/ROMs` aparecen con portada y se lanzan en RetroArch; la pestaña Retro Ajustes funciona con el mando; `status.json` llega a Drive.
 
 ### Fase 5 – PWA
-- [ ] Proyecto Vite + React + TS + PWA, login con Google y capa Drive.
-- [ ] Pantallas Colección, Ficha, Subir, Partidas y Stick.
-- [ ] Base de datos No-Intro/Redump generada en *build*.
-- [ ] Despliegue en GitHub Pages.
+- [x] Proyecto Vite + React + TS + PWA, login con código (mismo cliente que el stick) y capa Drive.
+- [x] Pantallas Colección, Ficha, Subir, Partidas y Stick.
+- [x] Base de datos No-Intro/Redump (`npm run build-db`, guardada en `pwa/public/db/`).
+- [x] Despliegue en **Vercel**: <https://retrostick.vercel.app> (`vercel deploy --prod` desde `pwa/`; variables
+  `VITE_GOOGLE_CLIENT_ID` y `VITE_GOOGLE_CLIENT_SECRET` en el proyecto de Vercel).
+- [ ] Probar en el móvil (login, interruptor, subir, partidas, restaurar).
 - **Aceptación:** desde el móvil, instalada en la pantalla de inicio: subir un `.gba` con nombre raro lo renombra al nombre No-Intro y muestra portada; el interruptor "En el stick" hace que aparezca o desaparezca en la TV tras sincronizar; las partidas se ven, se descargan y se restaura una revisión anterior.
 
 ### Fase 6 – Pulido
