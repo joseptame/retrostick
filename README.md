@@ -33,7 +33,6 @@ Convertir un **Xiaomi Mi TV Stick** en una consola retro para jugar a **mis prop
 
 - **Nunca** se suben ROMs, imágenes de disco, BIOS ni partidas guardadas al repositorio. Viven solo en el Google Drive del usuario. El `.gitignore` debe bloquear explícitamente `*.gb *.gbc *.gba *.bin *.cue *.chd *.iso *.img *.pbp *.m3u *.srm *.sav *.state* *.zip *.7z`.
 - **No se descarga ni se distribuye ninguna BIOS.** La de PS1 la extrae el usuario de su propia consola. Si no existe, se usa la BIOS HLE integrada en PCSX ReARMed.
-- **Todo el contenido son copias de juegos que posee el usuario.**
 - Las **portadas** se cargan en tiempo de ejecución desde `libretro-thumbnails` y no se guardan en el repo. Las de `docs/maquetas/img/` son solo para las maquetas.
 - **Idioma:** la interfaz de la PWA y del launcher va en **español**. El código y los comentarios pueden ir en inglés.
 - **Secretos:** el *Client ID* de OAuth no es secreto, pero se configura por variable de entorno (`VITE_GOOGLE_CLIENT_ID`), no se escribe en el código. No hay *client secret*: la PWA usa el flujo de token en el navegador.
