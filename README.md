@@ -321,16 +321,17 @@ Barra inferior: **Colección · Buscar · Subir · Partidas · Stick**.
 - Borrar juego de la colección: con doble confirmación. **Nunca** borra partidas.
 
 **Buscar juegos**
-- Buscador de juegos en archive.org por consola (GB/GBC/GBA/PS1), con portadas.
-- Usa la API pública de archive.org (`advancedsearch.php` para buscar elementos `mediatype:software` y
-  `metadata/<id>` para listar sus archivos), ambas con CORS habilitado.
-- Los resultados se muestran en una cuadrícula; al entrar en un elemento se listan sus archivos de juego
-  (`.gb .gbc .gba .chd .cue .bin .m3u .pbp`, según la extensión) y se puede subir el elegido a Drive.
-- **Descarga:** el servidor de archivos de archive.org **no envía cabeceras CORS**, así que el navegador no
-  puede descargar directamente. La PWA usa el proxy del mismo origen `api/download.ts` (Edge Function de
-  Vercel) que hace *streaming* del archivo sin el límite de 4,5 MB de las funciones. Como alternativa, cada
-  archivo tiene un enlace "Abrir" que descarga el archivo con el navegador (sin restricción CORS) para subirlo
-  luego desde "Subir copias".
+- Explorador de una colección de archive.org por consola (GB/GBC/GBA/PS1), con portadas. Se escribe el
+  **identificador** del elemento (ej. `gba-pal`, la colección PAL de Game Boy Advance) y se listan sus juegos.
+- Usa la API pública de archive.org (`metadata/<id>` para localizar el `.zip`/`.7z` y el listado HTML de
+  `view_archive.php` para leer los archivos que contiene), todo con CORS habilitado.
+- Los nombres de los archivos ya vienen en formato No-Intro/Redump, así que las portadas de
+  `libretro-thumbnails` funcionan directamente; hay un filtro por nombre en la propia pantalla.
+- **Descarga:** los archivos dentro de un `.zip`/`.7z` se sirven a través de `view_archive.php`, que **sí
+  envía cabeceras CORS**, así que el navegador los descarga directamente. Para elementos con archivos sueltos
+  (no empaquetados, que archive.org **no** CORS habilita) se usa el proxy `api/download.ts` (Edge Function de
+  Vercel, *streaming* sin el límite de 4,5 MB). Cada juego tiene además un enlace "Abrir" que descarga con el
+  navegador.
 - La identificación, el renombrado No-Intro y la subida reanudable son los mismos que en "Subir copias".
 
 **Subir copias**

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { downloadUrl, proxyPath } from './archive'
+import { archiveFileUrl, downloadUrl, parseArchiveListing, proxyPath } from './archive'
 import { consoleForFile } from './consoles'
 import { groupFiles } from './group'
 import { crc32 } from './hash'
@@ -115,9 +115,31 @@ describe('archive.org URLs', () => {
     )
   })
 
+  it('keeps the "/" separator for a file inside an archive', () => {
+    expect(archiveFileUrl('gba-pal', 'GBA PAL.zip', 'Dragon Ball - Advanced Adventure (Europe).gba')).toBe(
+      'https://archive.org/download/gba-pal/GBA%20PAL.zip/Dragon%20Ball%20-%20Advanced%20Adventure%20(Europe).gba',
+    )
+  })
+
   it('builds the same-origin proxy path', () => {
     expect(proxyPath('pokemon-emerald', 'Game (U).gba')).toBe(
       '/api/download?id=pokemon-emerald&file=Game%20(U).gba',
     )
+  })
+})
+
+describe('parseArchiveListing', () => {
+  it('extracts names and sizes and decodes entities', () => {
+    const html = [
+      '<table class="archext">',
+      '<tr><th>file<th>as jpg<th>timestamp<th>size</tr>',
+      '<tr><td><a href="//archive.org/download/gba-pal/GBA%20PAL.zip/Dragon%20Ball%20-%20Advanced%20Adventure%20%28Europe%29.gba">Dragon Ball - Advanced Adventure (Europe).gba</a><td><td>1996-12-24 23:32<td id="size">16777216</tr>',
+      '<tr><td><a href="//archive.org/download/gba-pal/GBA%20PAL.zip/Dungeons%20%26%20Dragons%20-%20Eye%20of%20the%20Beholder%20%28Europe%29.gba">Dungeons &amp; Dragons - Eye of the Beholder (Europe).gba</a><td><td>1996-12-24 23:32<td id="size">4194304</tr>',
+      '</table>',
+    ].join('\n')
+    expect(parseArchiveListing(html)).toEqual([
+      { name: 'Dragon Ball - Advanced Adventure (Europe).gba', size: 16777216 },
+      { name: 'Dungeons & Dragons - Eye of the Beholder (Europe).gba', size: 4194304 },
+    ])
   })
 })

@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { AppState } from '../App'
 import { Banner, Cover, Switch } from '../components/ui'
+import { archiveFileUrl, downloadUrl, listItemFiles, proxyPath, type ArchiveEntry } from '../lib/archive'
 import { consoleForFile, CONSOLES, extension, isCartridge, type ConsoleId } from '../lib/consoles'
-import { downloadUrl, fetchMetadata, proxyPath, searchArchive, type ArchiveFile, type ArchiveItem, type ArchiveMetadata } from '../lib/archive'
 import { uploadResumable } from '../lib/drive'
 import { formatBytes } from '../lib/format'
 import { baseName, displayTitle } from '../lib/names'
@@ -15,98 +15,108 @@ const KEEP_NAME = new Set(['cue', 'bin', 'm3u'])
 
 interface Job {
   key: string
-  file: ArchiveFile
+  entry: ArchiveEntry
   phase: 'downloading' | 'uploading' | 'done'
   progress: number
   error?: string
 }
 
+const norm = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+
 export function Buscar({ state }: { state: AppState }) {
   const [consoleId, setConsoleId] = useState<ConsoleId>('gba')
+  const [identifier, setIdentifier] = useState('gba-pal')
+  const [loadedId, setLoadedId] = useState('gba-pal')
+  const [entries, setEntries] = useState<ArchiveEntry[] | null>(null)
+  const [archiveName, setArchiveName] = useState<string | null>(null)
+  const [title, setTitle] = useState('')
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState<ArchiveItem[] | null>(null)
-  const [searching, setSearching] = useState(false)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [selected, setSelected] = useState<ArchiveMetadata | null>(null)
   const [toStick, setToStick] = useState(false)
   const [job, setJob] = useState<Job | null>(null)
+  const loaded = useRef(false)
 
   const busy = job?.phase === 'downloading' || job?.phase === 'uploading'
-  const files = selected ? selected.files.filter((f) => consoleForFile(f.name)) : []
   const existingNames = (c: ConsoleId) =>
     new Set(state.library?.games.filter((g) => g.console === c).flatMap((g) => g.files.map((f) => f.name)) ?? [])
 
-  async function doSearch() {
-    const term = query.trim()
-    if (!term) return
-    setSearching(true)
+  async function load(id: string) {
+    const clean = id.trim()
+    if (!clean) return
+    setLoading(true)
     setError(null)
-    setSelected(null)
+    setEntries(null)
     try {
-      setResults(await searchArchive(`mediatype:software AND (${term})`))
+      const { entries: list, archive, title: t } = await listItemFiles(clean)
+      setLoadedId(clean)
+      setArchiveName(archive)
+      setTitle(t)
+      setEntries(list)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
-      setResults([])
+      setEntries([])
     } finally {
-      setSearching(false)
+      setLoading(false)
     }
   }
 
-  async function open(item: ArchiveItem) {
-    setError(null)
-    setSelected(null)
-    try {
-      setSelected(await fetchMetadata(item.identifier))
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-    }
-  }
+  useEffect(() => {
+    if (loaded.current) return
+    loaded.current = true
+    load(identifier)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  async function uploadFile(file: ArchiveFile) {
-    if (!state.folders || !state.online || !selected || busy) return
-    const console = consoleForFile(file.name)!
-    const key = `${selected.identifier}/${file.name}`
-    setJob({ key, file, phase: 'downloading', progress: 0 })
+  async function upload(entry: ArchiveEntry) {
+    if (!state.folders || !state.online || busy) return
+    const console = consoleForFile(entry.name) ?? consoleId
+    const ext = extension(entry.name)
+    const key = entry.name
+    setJob({ key, entry, phase: 'downloading', progress: 0 })
     try {
-      const res = await fetch(proxyPath(selected.identifier, file.name))
+      const url = archiveName
+        ? archiveFileUrl(loadedId, archiveName, entry.name)
+        : proxyPath(loadedId, entry.name)
+      const res = await fetch(url)
       if (!res.ok) throw new Error(`Descarga ${res.status}`)
       const blob = await res.blob()
-      const f = new File([blob], file.name)
-      const ext = extension(file.name)
+      const f = new File([blob], entry.name)
 
       let ident: Identification | null = null
       try {
         const data = isCartridge(console) && f.size <= MAX_HASH_BYTES ? new Uint8Array(await f.arrayBuffer()) : null
-        ident = await identify(console, file.name, data)
+        ident = await identify(console, entry.name, data)
       } catch {
         ident = null
       }
-      const name = ident && !KEEP_NAME.has(ext) ? ident.name : baseName(file.name)
+      const name = ident && !KEEP_NAME.has(ext) ? ident.name : baseName(entry.name)
       const fileName = `${name}.${ext}`
       if (existingNames(console).has(fileName)) {
-        setJob({ key, file, phase: 'done', progress: 1, error: 'Ya está en la colección' })
+        setJob({ key, entry, phase: 'done', progress: 1, error: 'Ya está en la colección' })
         return
       }
 
       const parent = toStick ? state.folders.jugando[console] : state.folders.coleccion[console]
-      setJob({ key, file, phase: 'uploading', progress: 0 })
+      setJob({ key, entry, phase: 'uploading', progress: 0 })
       await uploadResumable(blob, fileName, parent, (sent, total) =>
-        setJob({ key, file, phase: 'uploading', progress: total ? sent / total : 1 }),
+        setJob({ key, entry, phase: 'uploading', progress: total ? sent / total : 1 }),
       )
-      setJob({ key, file, phase: 'done', progress: 1 })
+      setJob({ key, entry, phase: 'done', progress: 1 })
       state.notify(`${fileName}: subido`)
       state.refresh()
     } catch (e) {
-      setJob({ key, file, phase: 'done', progress: 0, error: e instanceof Error ? e.message : String(e) })
+      setJob({ key, entry, phase: 'done', progress: 0, error: e instanceof Error ? e.message : String(e) })
     }
   }
 
-  const count = results?.length ?? 0
+  const q = norm(query.trim())
+  const filtered = entries?.filter((e) => consoleForFile(e.name) === consoleId && (!q || norm(e.name).includes(q))) ?? []
 
   return (
     <main className="screen">
       <h1>Buscar juegos</h1>
-      <p className="sub">Busca en archive.org y sube el juego a tu colección</p>
+      <p className="sub">Explora una colección de archive.org y sube el juego que quieras</p>
 
       <div className="chips-row">
         {CONSOLES.map((c) => (
@@ -118,94 +128,86 @@ export function Buscar({ state }: { state: AppState }) {
 
       <div className="search">
         <input
-          value={query}
-          placeholder="Nombre del juego…"
-          aria-label="Buscar juego"
-          inputMode="search"
-          enterKeyHint="search"
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && doSearch()}
+          value={identifier}
+          placeholder="Identificador de archive.org (ej. gba-pal)"
+          aria-label="Identificador de archive.org"
+          autoCapitalize="none"
+          autoCorrect="off"
+          onChange={(e) => setIdentifier(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && load(identifier)}
         />
-        <button onClick={doSearch} disabled={searching || !query.trim()}>
-          {searching ? '…' : 'Buscar'}
+        <button onClick={() => load(identifier)} disabled={loading || !identifier.trim()}>
+          {loading ? '…' : 'Cargar'}
         </button>
       </div>
 
       {error && <Banner tone="error">{error}</Banner>}
 
-      {selected ? (
-        <>
-          <button className="back" onClick={() => setSelected(null)}>
-            ← Volver a los resultados
-          </button>
-          <h2>{displayTitle(selected.title)}</h2>
-          <p className="sub">{files.length ? `${files.length} archivos de juego` : 'Sin archivos de juego en este elemento'}</p>
+      {entries && !loading && (
+        <div className="search">
+          <input
+            value={query}
+            placeholder="Filtrar por nombre…"
+            aria-label="Filtrar juegos"
+            inputMode="search"
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </div>
+      )}
 
-          {files.map((f) => {
-            const isJob = job?.key === `${selected.identifier}/${f.name}`
-            return (
-              <div key={f.name} className="frow">
-                <div className="grow">
-                  <b>{f.name}</b>
-                  <small>{f.size ? formatBytes(Number(f.size)) : 'tamaño desconocido'}</small>
-                  {isJob && job.phase !== 'done' && (
-                    <div className="prog">
-                      <i style={{ width: `${job.progress * 100}%` }} />
-                    </div>
-                  )}
-                  {isJob && job.error && <small className="error">{job.error}</small>}
-                </div>
-                {isJob && job.phase === 'done' && !job.error ? (
-                  <span className="chip g">Subido</span>
-                ) : (
-                  <button className="pill" onClick={() => uploadFile(f)} disabled={!state.online || busy}>
-                    {isJob && busy ? `${Math.round(job.progress * 100)} %` : 'Subir'}
-                  </button>
-                )}
-                <a
-                  className="link"
-                  href={downloadUrl(selected.identifier, f.name)}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label={`Abrir ${f.name} en archive.org`}
-                >
-                  Abrir
-                </a>
-              </div>
-            )
-          })}
-        </>
-      ) : (
+      {loading && <p className="loading">Cargando colección…</p>}
+
+      {entries && !loading && (
         <>
-          {searching && <p className="loading">Buscando…</p>}
-          {results && !searching && (
-            <>
-              <p className="sub">
-                {count} {count === 1 ? 'resultado' : 'resultados'}
-              </p>
-              {count === 0 ? (
-                <div className="empty">No hay resultados.</div>
-              ) : (
-                <div className="grid">
-                  {results.map((r) => (
-                    <div key={r.identifier} className="game-card" onClick={() => open(r)}>
-                      <Cover console={consoleId} name={r.title} title={displayTitle(r.title)} />
-                      <div className="ft">
-                        <div className="nm">{displayTitle(r.title)}</div>
+          <p className="sub">
+            {title ? `${title} · ` : ''}
+            {filtered.length} {filtered.length === 1 ? 'juego' : 'juegos'}
+          </p>
+          {filtered.length === 0 ? (
+            <div className="empty">No hay resultados.</div>
+          ) : (
+            <div className="grid">
+              {filtered.map((e) => {
+                const isJob = job?.key === e.name
+                return (
+                  <div key={e.name} className="game-card">
+                    <Cover console={consoleId} name={e.name} title={displayTitle(e.name)} />
+                    <div className="ft">
+                      <div className="nm">{displayTitle(e.name)}</div>
+                      <div className="st">{formatBytes(e.size)}</div>
+                      {isJob && job.phase !== 'done' && (
+                        <div className="prog">
+                          <i style={{ width: `${job.progress * 100}%` }} />
+                        </div>
+                      )}
+                      {isJob && job.error && <div className="pt error">{job.error}</div>}
+                      <div className="actions">
+                        {isJob && job.phase === 'done' && !job.error ? (
+                          <span className="chip g">Subido</span>
+                        ) : (
+                          <button className="pill" onClick={() => upload(e)} disabled={!state.online || busy}>
+                            {isJob && busy ? `${Math.round(job.progress * 100)} %` : 'Subir'}
+                          </button>
+                        )}
+                        <a
+                          className="link"
+                          href={archiveName ? archiveFileUrl(loadedId, archiveName, e.name) : downloadUrl(loadedId, e.name)}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Abrir
+                        </a>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-          {!results && !searching && (
-            <div className="empty">
-              <p>Escribe el nombre de un juego y pulsa Buscar.</p>
+                  </div>
+                )
+              })}
             </div>
           )}
         </>
       )}
+
+      {!entries && !loading && !error && <div className="empty">Carga una colección para ver sus juegos.</div>}
 
       <div className="opt">
         <span>Enviar también al stick</span>
