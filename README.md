@@ -35,7 +35,10 @@ Convertir un **Xiaomi Mi TV Stick** en una consola retro para jugar a **mis prop
 - **No se descarga ni se distribuye ninguna BIOS.** La de PS1 la extrae el usuario de su propia consola. Si no existe, se usa la BIOS HLE integrada en PCSX ReARMed.
 - Las **portadas** se cargan en tiempo de ejecución desde `libretro-thumbnails` y no se guardan en el repo. Las de `docs/maquetas/img/` son solo para las maquetas.
 - **Idioma:** la interfaz de la PWA y del launcher va en **español**. El código y los comentarios pueden ir en inglés.
-- **Secretos:** el *Client ID* de OAuth no es secreto, pero se configura por variable de entorno (`VITE_GOOGLE_CLIENT_ID`), no se escribe en el código. No hay *client secret*: la PWA usa el flujo de token en el navegador.
+- **Secretos:** nada se escribe en el código ni se sube al repo.
+  - Cliente OAuth de TV (stick y PWA): `android/local.properties` en el PC y `VITE_GOOGLE_CLIENT_ID` /
+    `VITE_GOOGLE_CLIENT_SECRET` en Vercel. El secreto de este tipo de cliente no es confidencial (va dentro del APK y de la web).
+  - Acceso a la PWA: `AUTH_USER`, `AUTH_PASSWORD` y `AUTH_SECRET`, variables secretas de Vercel.
 
 ---
 
