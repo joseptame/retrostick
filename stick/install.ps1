@@ -2,7 +2,7 @@
 .SYNOPSIS
   RetroStick installer for the Xiaomi Mi TV Stick. Idempotent: safe to run again.
 .EXAMPLE
-  .\stick\install.ps1 -Stick 192.168.1.106
+  .\stick\install.ps1 -Stick 192.168.1.50
 #>
 param(
   [Parameter(Mandatory = $true)][string]$Stick,
