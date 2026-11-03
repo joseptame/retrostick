@@ -4,3 +4,5 @@
 *.cfg text eol=lf
 *.opt text eol=lf
 *.rmp text eol=lf
+gradlew text eol=lf
+*.bat text eol=crlf
