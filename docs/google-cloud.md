@@ -5,9 +5,11 @@
 > prueba. "Publicar app" está bloqueado hasta añadir página principal y política de privacidad en *Información de la
 > marca*. Mientras siga en Prueba, **Google desconecta el stick cada 7 días** (la cabecera dirá "Drive sin conectar";
 > se vuelve a conectar desde Retro Ajustes). Cliente de TV creado y probado: el stick está conectado.
-> **Plan (2026-11-03): publicar la app** (pasar a *En producción*) con la página principal y la política de
-> privacidad de GitHub Pages (`site/`, ver paso 3b). Solo cambia el estado del proyecto de Google: no se publica en
-> ninguna tienda.
+> **Hecho (2026-11-03): app publicada (*En producción*)** con la página principal y la política de privacidad de
+> GitHub Pages (`site/`, paso 3b). No se ha enviado a revisión: el aviso "Tu app requiere una verificación" solo
+> implica la pantalla de "app no verificada" al conectar y un máximo de 100 usuarios. El stick se reconectó después
+> de publicar (los permisos concedidos en modo Prueba caducan a los 7 días aunque se publique luego).
+> Solo cambia el estado del proyecto de Google: no se publica en ninguna tienda.
 
 Necesario para que el stick (y más adelante la app del móvil) usen tu Google Drive. Se hace una vez, en el navegador
 del PC, con tu cuenta de Gmail. Gratis.
