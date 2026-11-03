@@ -108,6 +108,19 @@ del Switch Pro se tomarán en la Fase 2.
 - `persist.adb.tcp.port` está vacío, pero el puerto **sigue abierto tras reiniciar** (comprobado el 2026-11-03 con `adb connect` a los 2 min de arrancar).
 - Recomendado: reservar la IP del stick en el router (DHCP estático).
 
+## RetroArch (Fase 2)
+
+- Versión **1.22.2** estable del buildbot, `RetroArch_ra32.apk`. `aapt dump badging`: paquete `com.retroarch.ra32`,
+  `targetSdkVersion 28`, ABIs `armeabi-v7a` y `x86`, con actividad leanback (aparece en el launcher de la TV).
+- Config: **`/storage/emulated/0/Android/data/com.retroarch.ra32/files/retroarch.cfg`**. ADB puede leerlo y escribirlo.
+- Al primer arranque crea `/storage/emulated/0/RetroArch/{saves,states,system,config,downloads,playlists,thumbnails,…}`.
+- Directorios internos (`/data/user/0/com.retroarch.ra32/…`, ADB no puede escribir en ellos): `libretro_directory` (núcleos),
+  `libretro_info_path`, `assets_directory`, `joypad_autoconfig_dir`, `overlay_directory`.
+  Los dos últimos se mueven a `/storage/emulated/0/RetroArch/{autoconfig,overlays}` en `retroarch.overrides.cfg`.
+  Por eso hay que ejecutar *Actualizar perfiles de mando* después de instalar.
+- Opciones de núcleo: `global_core_options = "false"`, así que van en `/storage/emulated/0/RetroArch/config/<Núcleo>/<Núcleo>.opt`.
+- `stick/install.ps1` aplicado el 2026-11-03: 27 claves (13 cambiaban algo), copias `retroarch.cfg.orig` y `.bak`.
+
 ## Estado de los ⚠️ VERIFICAR
 
 | Sección | Punto | Estado |
@@ -118,8 +131,9 @@ del Switch Pro se tomarán en la Fase 2.
 | 5.5 | Paquete del launcher de Google | ✅ `com.google.android.tvlauncher`, ya desactivado; el launcher actual es FLauncher |
 | 5.5 | Abrir Ajustes de Android desde otra app | ✅ `android.settings.SETTINGS` resuelve a `MainSettings` |
 | 8.2 | Intent "Emparejar mando" | ✅ `CONNECT_INPUT` funciona; ❌ la alternativa `BLUETOOTH_SETTINGS` no existe |
-| 5.2 | Nombre del APK y paquete de RetroArch 32 bits | ⏳ Fase 2 (al instalarlo) |
-| 5.2 / 6.2 | Ruta real del `retroarch.cfg` y claves | ⏳ Fase 2 (RetroArch no está instalado) |
+| 5.2 | Nombre del APK y paquete de RetroArch 32 bits | ✅ `RetroArch_ra32.apk` → paquete **`com.retroarch.ra32`** (no `com.retroarch`) |
+| 5.2 / 6.2 | Ruta real del `retroarch.cfg` y claves | ✅ Ver "RetroArch" abajo; las 27 claves existen en la 1.22.2 |
+| 6.2 | Valor de Start + Select en `input_menu_toggle_gamepad_combo` | ✅ `4` = `INPUT_COMBO_START_SELECT` (`input/input_defines.h`, v1.22.2) |
 | 5.2 | Paquetes de Daijishō y FolderSync | ⏳ Fase 3 (al instalarlos) |
 | 5.3 / 8.2 | Intent público de sincronización de FolderSync | ⏳ Fase 3 |
 | 6.3 | Nombres de opciones de núcleo y BIOS de PCSX ReARMed | ⏳ Fase 2 (código del núcleo / `.opt` generado) |

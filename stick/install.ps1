@@ -23,16 +23,17 @@ $Tmp = Join-Path ([IO.Path]::GetTempPath()) 'retrostick'
 
 function Step([string]$msg) { Write-Host "`n==> $msg" -ForegroundColor Cyan }
 function Fail([string]$msg) { Write-Host "ERROR: $msg" -ForegroundColor Red; exit 1 }
-function Adb { & adb -s $Serial @args; if ($LASTEXITCODE -ne 0) { Fail "adb $($args -join ' ') ha fallado" } }
-function Sh([string]$cmd) { ((& adb -s $Serial shell $cmd) | Out-String).Trim() }
+$AdbExe = (Get-Command adb -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1).Source
+if (-not $AdbExe) { Fail 'adb no esta en el PATH (Android SDK platform-tools).' }
+function Invoke-Adb { & $AdbExe -s $Serial @args; if ($LASTEXITCODE -ne 0) { Fail "adb $($args -join ' ') ha fallado" } }
+function Sh([string]$cmd) { ((& $AdbExe -s $Serial shell $cmd) | Out-String).Trim() }
 
 New-Item -ItemType Directory -Force $Tmp, (Split-Path $RaApk) | Out-Null
 
 # 1. Connection and architecture
 Step "Conectando con $Serial"
-if (-not (Get-Command adb -ErrorAction SilentlyContinue)) { Fail 'adb no esta en el PATH (Android SDK platform-tools).' }
-& adb connect $Serial | Out-Null
-$state = ((& adb -s $Serial get-state 2>$null) | Out-String).Trim()
+& $AdbExe connect $Serial | Out-Null
+$state = ((& $AdbExe -s $Serial get-state 2>$null) | Out-String).Trim()
 if ($state -ne 'device') { Fail "El stick no esta listo (estado: '$state'). Activa la depuracion USB y acepta el aviso en la TV." }
 $abi = Sh 'getprop ro.product.cpu.abilist'
 $release = Sh 'getprop ro.build.version.release'
@@ -50,12 +51,12 @@ if ($installed -match "versionName=$([regex]::Escape($RetroArchVersion))") {
     Write-Host "Descargando $RaApkUrl"
     Invoke-WebRequest -UseBasicParsing -Uri $RaApkUrl -OutFile $RaApk
   }
-  Adb install -r $RaApk
+  Invoke-Adb install -r $RaApk
 }
 
 # Retro Ajustes (phase 4): installed only once the APK has been built
 $ajustes = Get-ChildItem (Join-Path $Here '..\android\app\build\outputs\apk\release\*.apk') -ErrorAction SilentlyContinue | Select-Object -First 1
-if ($ajustes) { Step 'Retro Ajustes'; Adb install -r $ajustes.FullName }
+if ($ajustes) { Step 'Retro Ajustes'; Invoke-Adb install -r $ajustes.FullName }
 
 # 3. Folders
 Step 'Creando carpetas'
@@ -77,7 +78,7 @@ Sh "[ -f $RaCfg.orig ] || cp $RaCfg $RaCfg.orig; cp $RaCfg $RaCfg.bak" | Out-Nul
 Write-Host "Copias de seguridad: retroarch.cfg.orig (la primera) y retroarch.cfg.bak (la anterior)."
 
 $local = Join-Path $Tmp 'retroarch.cfg'
-Adb pull $RaCfg $local | Out-Null
+Invoke-Adb pull $RaCfg $local | Out-Null
 $lines = [Collections.Generic.List[string]](Get-Content -LiteralPath $local -Encoding UTF8)
 $wanted = [ordered]@{}
 foreach ($l in Get-Content -LiteralPath $Overrides -Encoding UTF8) {
@@ -89,7 +90,7 @@ foreach ($key in $wanted.Keys) {
   if ($idx -ge 0) { $lines[$idx] = $line } else { $lines.Add($line) }
 }
 [IO.File]::WriteAllText($local, (($lines -join "`n") + "`n"), (New-Object Text.UTF8Encoding $false))
-Adb push $local $RaCfg | Out-Null
+Invoke-Adb push $local $RaCfg | Out-Null
 Write-Host "$($wanted.Count) claves aplicadas en $RaCfg"
 
 # 5. Core options, autoconfig and overlays from the repo
@@ -97,15 +98,15 @@ Step 'Opciones de nucleo, mandos y marcos'
 foreach ($opt in Get-ChildItem (Join-Path $Here 'retroarch\core-options') -Recurse -Filter *.opt -ErrorAction SilentlyContinue) {
   $core = $opt.Directory.Name
   Sh "mkdir -p '$Sd/RetroArch/config/$core'" | Out-Null
-  Adb push $opt.FullName "$Sd/RetroArch/config/$core/$($opt.Name)" | Out-Null
+  Invoke-Adb push $opt.FullName "$Sd/RetroArch/config/$core/$($opt.Name)" | Out-Null
   Write-Host "  $core/$($opt.Name)"
 }
 foreach ($cfg in Get-ChildItem (Join-Path $Here 'retroarch\autoconfig') -Filter *.cfg -ErrorAction SilentlyContinue) {
-  Adb push $cfg.FullName "$Sd/RetroArch/autoconfig/$($cfg.Name)" | Out-Null
+  Invoke-Adb push $cfg.FullName "$Sd/RetroArch/autoconfig/$($cfg.Name)" | Out-Null
   Write-Host "  autoconfig/$($cfg.Name)"
 }
 foreach ($item in Get-ChildItem (Join-Path $Here 'retroarch\overlays') -Exclude .gitkeep -ErrorAction SilentlyContinue) {
-  Adb push $item.FullName "$Sd/RetroArch/overlays/" | Out-Null
+  Invoke-Adb push $item.FullName "$Sd/RetroArch/overlays/" | Out-Null
   Write-Host "  overlays/$($item.Name)"
 }
 
