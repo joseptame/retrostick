@@ -27,6 +27,8 @@ export default defineConfig({
       workbox: {
         // The game databases (public/db) are fetched on demand and cached at runtime, not precached.
         globPatterns: ['**/*.{js,css,html,png,svg}'],
+        // /__login and /__logout are handled by the server-side access gate (middleware.ts)
+        navigateFallbackDenylist: [/^\/__/],
         runtimeCaching: [
           {
             // Box art (README 7.5): CacheFirst, 30 days

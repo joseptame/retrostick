@@ -459,7 +459,10 @@ La sincronización lo sube a `Retro/Partidas/.stick/` y la PWA lo lee. Permiso: 
 - [x] Despliegue en **Vercel**: <https://retrostick.vercel.app>. **Automático** con cada push a `main` que cambie
   `pwa/` (proyecto conectado al repo, Root Directory `pwa`, `pwa/vercel.json` ignora los demás cambios). Variables
   `VITE_GOOGLE_CLIENT_ID` y `VITE_GOOGLE_CLIENT_SECRET` en el proyecto de Vercel.
-- [ ] Probar en el móvil (login, interruptor, subir, partidas, restaurar).
+- [x] **Acceso con usuario y contraseña** comprobado en el servidor (`pwa/middleware.ts`, Routing Middleware de
+  Vercel). Credenciales en variables secretas de Vercel (`AUTH_USER`, `AUTH_PASSWORD`, `AUTH_SECRET`), nunca en el
+  repo. Cookie firmada `HttpOnly` de un año; `/__logout` (botón "Cerrar acceso" en la pestaña Stick) la borra.
+- [ ] Probar en el móvil (acceso, login de Google, interruptor, subir, partidas, restaurar).
 - **Aceptación:** desde el móvil, instalada en la pantalla de inicio: subir un `.gba` con nombre raro lo renombra al nombre No-Intro y muestra portada; el interruptor "En el stick" hace que aparezca o desaparezca en la TV tras sincronizar; las partidas se ven, se descargan y se restaura una revisión anterior.
 
 ### Fase 6 – Pulido

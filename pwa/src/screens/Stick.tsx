@@ -30,8 +30,14 @@ export function Stick({ state, onSignOut }: { state: AppState; onSignOut: () => 
       <div className="card info-list">
         <Row k="Google Drive" v={accountEmail() ?? '—'} />
       </div>
-      <button className="btn secondary" onClick={() => confirm('¿Cerrar sesión en este móvil?') && onSignOut()}>
-        Cerrar sesión
+      <button className="btn secondary" onClick={() => confirm('¿Desconectar Google Drive en este móvil?') && onSignOut()}>
+        Desconectar Google Drive
+      </button>
+      <button
+        className="btn secondary"
+        onClick={() => confirm('¿Cerrar el acceso a RetroStick en este móvil? Te pedirá usuario y contraseña.') && (location.href = '/__logout')}
+      >
+        Cerrar acceso
       </button>
       <p className="hint">
         <a href="https://joseptame.github.io/retrostick/privacidad.html">Política de privacidad</a> ·{' '}
