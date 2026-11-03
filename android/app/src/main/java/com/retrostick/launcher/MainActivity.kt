@@ -636,12 +636,13 @@ class MainActivity : Activity() {
     // ---- Input ----
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (event.keyCode !in HANDLED_KEYS) return super.dispatchKeyEvent(event)
+        val code = StickStatus.standardKey(event.device, event.keyCode)
+        if (code !in HANDLED_KEYS) return super.dispatchKeyEvent(event)
         if (event.action == KeyEvent.ACTION_DOWN && splash.visibility != View.VISIBLE) {
             val style = StickStatus.padStyle(event.device)
             forcedPadStyle = null
             setPadStyle(style)
-            onKey(semanticKey(event.keyCode, style))
+            onKey(semanticKey(code, style))
         }
         return true
     }

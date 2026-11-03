@@ -101,9 +101,37 @@ foreach ($opt in Get-ChildItem (Join-Path $Here 'retroarch\core-options') -Recur
   Invoke-Adb push $opt.FullName "$Sd/RetroArch/config/$core/$($opt.Name)" | Out-Null
   Write-Host "  $core/$($opt.Name)"
 }
-foreach ($cfg in Get-ChildItem (Join-Path $Here 'retroarch\autoconfig') -Filter *.cfg -ErrorAction SilentlyContinue) {
-  Invoke-Adb push $cfg.FullName "$Sd/RetroArch/autoconfig/$($cfg.Name)" | Out-Null
-  Write-Host "  autoconfig/$($cfg.Name)"
+# Per-core remaps (config/remaps/<Core>/<Core>.rmp) and overrides (config/<Core>/<Core>.cfg)
+foreach ($rmp in Get-ChildItem (Join-Path $Here 'retroarch\remaps') -Recurse -Filter *.rmp -ErrorAction SilentlyContinue) {
+  $core = $rmp.Directory.Name
+  Sh "mkdir -p '$Sd/RetroArch/config/remaps/$core'" | Out-Null
+  Invoke-Adb push $rmp.FullName "$Sd/RetroArch/config/remaps/$core/$($rmp.Name)" | Out-Null
+  Write-Host "  remaps/$core/$($rmp.Name)"
+}
+foreach ($ovr in Get-ChildItem (Join-Path $Here 'retroarch\overrides') -Recurse -Filter *.cfg -ErrorAction SilentlyContinue) {
+  $core = $ovr.Directory.Name
+  Sh "mkdir -p '$Sd/RetroArch/config/$core'" | Out-Null
+  Invoke-Adb push $ovr.FullName "$Sd/RetroArch/config/$core/$($ovr.Name)" | Out-Null
+  Write-Host "  $core/$($ovr.Name)"
+}
+# Controller profiles keep their driver subfolder (RetroArch reads autoconfig/android/ first).
+# Official profiles for the same controller are moved to autoconfig/disabled/, otherwise RetroArch
+# would pick one of them at random.
+$autoRoot = Join-Path $Here 'retroarch\autoconfig'
+$helper = '/data/local/tmp/disable-duplicate-autoconfig.sh'
+Invoke-Adb push (Join-Path $Here 'retroarch\disable-duplicate-autoconfig.sh') $helper | Out-Null
+foreach ($cfg in Get-ChildItem $autoRoot -Recurse -Filter *.cfg -ErrorAction SilentlyContinue) {
+  $sub = $cfg.Directory.FullName.Substring($autoRoot.Length).TrimStart('\').Replace('\', '/')
+  $dir = if ($sub) { "$Sd/RetroArch/autoconfig/$sub" } else { "$Sd/RetroArch/autoconfig" }
+  Sh "mkdir -p '$dir'" | Out-Null
+  Invoke-Adb push $cfg.FullName "$dir/$($cfg.Name)" | Out-Null
+  Write-Host "  autoconfig/$(if ($sub) { "$sub/" })$($cfg.Name)"
+  $text = Get-Content -LiteralPath $cfg.FullName -Raw
+  if ($text -match '(?m)^input_vendor_id = "(\d+)"' -and ($vid = $Matches[1]) -and
+      $text -match '(?m)^input_product_id = "(\d+)"' -and ($prodId = $Matches[1])) {
+    $out = Sh "sh $helper $dir $vid $prodId"
+    if ($out) { Write-Host $out }
+  }
 }
 foreach ($item in Get-ChildItem (Join-Path $Here 'retroarch\overlays') -Exclude .gitkeep -ErrorAction SilentlyContinue) {
   Invoke-Adb push $item.FullName "$Sd/RetroArch/overlays/" | Out-Null
@@ -117,7 +145,8 @@ Write-Host @"
      Gambatte, mGBA y PCSX ReARMed.
   2. Actualizador en linea > Actualizar archivos de informacion de nucleos.
   3. Actualizador en linea > Actualizar perfiles de mando (OBLIGATORIO: la carpeta
-     de autoconfig se ha movido a $Sd/RetroArch/autoconfig).
+     de autoconfig se ha movido a $Sd/RetroArch/autoconfig). Despues, vuelve a
+     ejecutar este script: retira los perfiles oficiales que chocan con los del repo.
   4. (Opcional) Copia tu BIOS de PS1 a $Sd/RetroArch/system.
 Revertir la configuracion: adb -s $Serial shell cp $RaCfg.orig $RaCfg
 "@

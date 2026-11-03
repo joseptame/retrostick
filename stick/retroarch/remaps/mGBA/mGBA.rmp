@@ -1,0 +1,13 @@
+# Game Boy Advance (mGBA), user's layout (2026-11-03):
+#   Cross and Circle = A, Square and Triangle = B, L1 = L, R1 = R, left stick moves like the D-pad.
+#   L2 / R2 are hotkeys in config/mGBA/mGBA.cfg, so they do nothing in the game.
+# Keys: input_player1_btn_<RetroPad button pressed> = <RetroPad button sent to the core>
+#   (configuration.c input_remapping_load_file; B=0 Y=1 A=8 X=9, -1 = unmapped)
+input_player1_btn_b = "8"
+input_player1_btn_a = "8"
+input_player1_btn_y = "0"
+input_player1_btn_x = "0"
+input_player1_btn_l2 = "-1"
+input_player1_btn_r2 = "-1"
+# 1 = ANALOG_DPAD_LSTICK
+input_player1_analog_dpad_mode = "1"

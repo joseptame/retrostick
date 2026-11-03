@@ -86,9 +86,32 @@ for opt in "$HERE"/retroarch/core-options/*/*.opt; do
   sh_ "mkdir -p '$SD/RetroArch/config/$core'" >/dev/null
   adbs push "$opt" "$SD/RetroArch/config/$core/$(basename "$opt")" >/dev/null && echo "  $core/$(basename "$opt")"
 done
-for cfg in "$HERE"/retroarch/autoconfig/*.cfg; do
-  [ -f "$cfg" ] || continue
-  adbs push "$cfg" "$SD/RetroArch/autoconfig/" >/dev/null && echo "  autoconfig/$(basename "$cfg")"
+# Per-core remaps (config/remaps/<Core>/<Core>.rmp) and overrides (config/<Core>/<Core>.cfg)
+for rmp in "$HERE"/retroarch/remaps/*/*.rmp; do
+  [ -f "$rmp" ] || continue
+  core="$(basename "$(dirname "$rmp")")"
+  sh_ "mkdir -p '$SD/RetroArch/config/remaps/$core'" >/dev/null
+  adbs push "$rmp" "$SD/RetroArch/config/remaps/$core/$(basename "$rmp")" >/dev/null && echo "  remaps/$core/$(basename "$rmp")"
+done
+for ovr in "$HERE"/retroarch/overrides/*/*.cfg; do
+  [ -f "$ovr" ] || continue
+  core="$(basename "$(dirname "$ovr")")"
+  sh_ "mkdir -p '$SD/RetroArch/config/$core'" >/dev/null
+  adbs push "$ovr" "$SD/RetroArch/config/$core/$(basename "$ovr")" >/dev/null && echo "  $core/$(basename "$ovr")"
+done
+# Controller profiles keep their driver subfolder (RetroArch reads autoconfig/android/ first).
+# Official profiles for the same controller are moved to autoconfig/disabled/, otherwise RetroArch
+# would pick one of them at random.
+helper=/data/local/tmp/disable-duplicate-autoconfig.sh
+adbs push "$HERE/retroarch/disable-duplicate-autoconfig.sh" "$helper" >/dev/null
+find "$HERE/retroarch/autoconfig" -name '*.cfg' | while IFS= read -r cfg; do
+  sub="$(dirname "${cfg#"$HERE/retroarch/autoconfig"}")"; sub="${sub#/}"; [ "$sub" = "." ] && sub=""
+  dir="$SD/RetroArch/autoconfig${sub:+/$sub}"
+  sh_ "mkdir -p '$dir'" >/dev/null
+  adbs push "$cfg" "$dir/$(basename "$cfg")" >/dev/null && echo "  autoconfig/${sub:+$sub/}$(basename "$cfg")"
+  vid="$(tr -d '\r' < "$cfg" | sed -n 's/^input_vendor_id = "\([0-9]*\)"/\1/p')"
+  pid="$(tr -d '\r' < "$cfg" | sed -n 's/^input_product_id = "\([0-9]*\)"/\1/p')"
+  [ -n "$vid" ] && [ -n "$pid" ] && sh_ "sh $helper $dir $vid $pid"
 done
 for item in "$HERE"/retroarch/overlays/*; do
   [ -e "$item" ] || continue
@@ -102,7 +125,8 @@ cat <<EOF
      Gambatte, mGBA y PCSX ReARMed.
   2. Actualizador en línea > Actualizar archivos de información de núcleos.
   3. Actualizador en línea > Actualizar perfiles de mando (OBLIGATORIO: la carpeta
-     de autoconfig se ha movido a $SD/RetroArch/autoconfig).
+     de autoconfig se ha movido a $SD/RetroArch/autoconfig). Después, vuelve a
+     ejecutar este script: retira los perfiles oficiales que chocan con los del repo.
   4. (Opcional) Copia tu BIOS de PS1 a $SD/RetroArch/system.
 Revertir la configuración: adb -s $SERIAL shell cp $RA_CFG.orig $RA_CFG
 EOF
