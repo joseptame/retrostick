@@ -191,6 +191,14 @@ FPS medidos con `dumpsys SurfaceFlinger --latency 'com.retroarch.ra32/com.retroa
 - Portadas en caché en `files/covers/<consola>/` (con `index.txt`, índice de `Named_Boxarts` de la API de GitHub).
   Borrar caché: `adb shell run-as com.retrostick.launcher rm -rf files/covers` (solo con APK de depuración).
 
+## Reposo y HDMI-CEC
+
+- Reposo: pantalla apagada a los 15 min (`screen_off_timeout = 900000`) y stick dormido a los 30 min
+  (`sleep_timeout = 1800000`). Se mantiene así por decisión del usuario; dormido no sincroniza ni responde por ADB.
+- `hdmi_control_auto_device_off_enabled` pasa de `1` a **`0`** (2026-11-03, a petición del usuario): el stick ya no apaga
+  la TV al dormirse. HDMI-CEC sigue activo (`hdmi_control_enabled = 1`). Lo aplican también `install.ps1`/`install.sh`.
+  Revertir: `adb shell settings put global hdmi_control_auto_device_off_enabled 1`.
+
 ## Estado de los ⚠️ VERIFICAR
 
 | Sección | Punto | Estado |

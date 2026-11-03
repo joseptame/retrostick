@@ -47,6 +47,9 @@ fi
 ajustes="$(ls "$HERE"/../android/app/build/outputs/apk/release/*.apk 2>/dev/null | head -1 || true)"
 [ -z "$ajustes" ] || { step "Retro Ajustes"; adbs install -r "$ajustes"; }
 
+# The stick may sleep (30 min) but must not switch the TV off through HDMI-CEC
+sh_ "settings put global hdmi_control_auto_device_off_enabled 0" >/dev/null
+
 # 3. Folders
 step "Creando carpetas"
 sh_ "mkdir -p $SD/ROMs/gb $SD/ROMs/gbc $SD/ROMs/gba $SD/ROMs/psx \

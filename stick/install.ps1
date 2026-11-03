@@ -58,6 +58,9 @@ if ($installed -match "versionName=$([regex]::Escape($RetroArchVersion))") {
 $ajustes = Get-ChildItem (Join-Path $Here '..\android\app\build\outputs\apk\release\*.apk') -ErrorAction SilentlyContinue | Select-Object -First 1
 if ($ajustes) { Step 'Retro Ajustes'; Invoke-Adb install -r $ajustes.FullName }
 
+# The stick may sleep (30 min) but must not switch the TV off through HDMI-CEC
+Sh 'settings put global hdmi_control_auto_device_off_enabled 0' | Out-Null
+
 # 3. Folders
 Step 'Creando carpetas'
 $dirs = @('ROMs/gb', 'ROMs/gbc', 'ROMs/gba', 'ROMs/psx', 'Partidas/saves', 'Partidas/states', 'Partidas/.stick',
