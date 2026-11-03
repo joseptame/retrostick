@@ -2,10 +2,12 @@
 
 Convertir un **Xiaomi Mi TV Stick** en una consola retro para jugar a **mis propios juegos originales dumpeados** (Game Boy, Game Boy Color, Game Boy Advance y PlayStation 1), con:
 
-- Un **menú de inicio en la TV** con secciones por consola, logos y portadas.
+- Un **menú de inicio en la TV propio** (*RetroStick Launcher*), que es la pantalla de inicio del stick: arranca al encenderlo, con secciones por consola, logos y portadas (diseño: `docs/maquetas/inicio-stick.png`).
 - La colección guardada en **Google Drive**, sincronizada automáticamente con el stick.
 - Una **PWA en el móvil** para subir copias, elegir qué juegos están en el stick y gestionar las partidas guardadas.
-- Una **mini app "Retro Ajustes"** en el stick para emparejar mandos, forzar la sincronización y abrir los ajustes.
+- **Retro Ajustes**, integrado en el launcher como una pestaña más, para emparejar mandos, forzar la sincronización y abrir los ajustes.
+
+> **Cambio de especificación (2026-11-03):** el menú de la TV ya no es Daijishō sino un launcher propio que replica la maqueta. Retro Ajustes deja de ser una app aparte y pasa a ser parte del launcher.
 
 > **Para Claude Code:** este documento es la especificación completa del proyecto. Léelo entero antes de empezar. Trabaja por fases (sección 9) y no pases a la siguiente sin cumplir los criterios de aceptación de la actual. Cuando algo esté marcado como **⚠️ VERIFICAR**, compruébalo en el dispositivo real (por ADB), en la documentación o en el código fuente oficial antes de darlo por bueno. No inventes nombres de paquete, claves de configuración ni intents.
 
@@ -33,7 +35,7 @@ Convertir un **Xiaomi Mi TV Stick** en una consola retro para jugar a **mis prop
 - **No se descarga ni se distribuye ninguna BIOS.** La de PS1 la extrae el usuario de su propia consola. Si no existe, se usa la BIOS HLE integrada en PCSX ReARMed.
 - **Todo el contenido son copias de juegos que posee el usuario.** La app no debe incluir buscadores ni enlaces de descarga de ROMs.
 - Las **portadas** se cargan en tiempo de ejecución desde `libretro-thumbnails` y no se guardan en el repo. Las de `docs/maquetas/img/` son solo para las maquetas.
-- **Idioma:** la interfaz de la PWA y de la mini app va en **español**. El código y los comentarios pueden ir en inglés.
+- **Idioma:** la interfaz de la PWA y del launcher va en **español**. El código y los comentarios pueden ir en inglés.
 - **Secretos:** el *Client ID* de OAuth no es secreto, pero se configura por variable de entorno (`VITE_GOOGLE_CLIENT_ID`), no se escribe en el código. No hay *client secret*: la PWA usa el flujo de token en el navegador.
 
 ---
@@ -72,15 +74,16 @@ Convertir un **Xiaomi Mi TV Stick** en una consola retro para jugar a **mis prop
 📺 Mi TV Stick
    ├── /storage/emulated/0/ROMs/      ← JugandoAhora (Drive → stick, en espejo)
    ├── /storage/emulated/0/Partidas/  ← Partidas (bidireccional, sin borrar)
-   ├── Daijishō  (menú de inicio: secciones por consola, portadas)
-   │     └── Retro Ajustes (mini app propia)
-   └── RetroArch (32 bits) + núcleos: Gambatte, mGBA, PCSX ReARMed
+   ├── RetroStick Launcher (app propia = pantalla de inicio de Android)
+   │     ├── secciones por consola, portadas, partidas, tiempo jugado
+   │     └── pestaña Retro Ajustes (mando, sincronización, Wi-Fi, ajustes)
+   └── RetroArch 32 bits (com.retroarch.ra32) + núcleos: Gambatte, mGBA, PCSX ReARMed
 ```
 
 - **La PWA no habla con el stick.** Solo ordena archivos en Drive. El stick se pone al día en su próxima sincronización.
 - **"Poner un juego en el stick"** = mover el archivo de `Coleccion/<consola>/` a `JugandoAhora/<consola>/` (cambiar el *parent* en Drive). **"Quitarlo"** = devolverlo a `Coleccion/`.
 - **Las partidas nunca se borran** del Drive al quitar un juego. Por eso viven en una carpeta aparte.
-- **Estado del stick:** la mini app Retro Ajustes escribe `Partidas/.stick/status.json` (espacio libre, hora de la última sincronización, mando conectado). FolderSync lo sube y la PWA lo lee para la pestaña "Stick".
+- **Estado del stick:** el launcher escribe `Partidas/.stick/status.json` (espacio libre, hora de la última sincronización, mando conectado). FolderSync lo sube y la PWA lo lee para la pestaña "Stick".
 
 ---
 
@@ -100,7 +103,7 @@ Retro/
     └── bios/           ← scph*.bin del usuario (opcional)
 ```
 
-- Los nombres de carpeta de consola (`gb`, `gbc`, `gba`, `psx`) son fijos. Los usan la PWA, FolderSync y Daijishō.
+- Los nombres de carpeta de consola (`gb`, `gbc`, `gba`, `psx`) son fijos. Los usan la PWA, FolderSync y el launcher.
 - Los archivos de juego se nombran según **No-Intro** (cartuchos) o **Redump** (PS1). Así funcionan las portadas automáticas.
   Ejemplo: `Pokemon - Edicion Esmeralda (Spain).gba`.
 - **PS1:** formato preferido `.chd`. Para juegos de varios discos, `.m3u` + discos en la misma carpeta.
@@ -128,11 +131,10 @@ Debe ser **idempotente** (se puede ejecutar varias veces) y hacer:
 1. Comprobar la conexión ADB y la arquitectura. Abortar con un mensaje claro si no es lo esperado.
 2. Descargar e instalar los APK (en `stick/apks/`, ignorado por git):
    - **RetroArch 32 bits.** Build estable del buildbot de libretro (`buildbot.libretro.com/stable/<versión>/android/`). El APK de 32 bits suele llamarse `RetroArch_ra32.apk`. ⚠️ VERIFICAR el nombre y el paquete instalado (`adb shell pm list packages | grep -i retroarch`).
-   - **Daijishō.** Desde Google Play en el stick, o APK oficial de su GitHub. ⚠️ VERIFICAR paquete (probablemente `com.magneticchen.daijishou`).
    - **FolderSync.** Desde Google Play en el stick. ⚠️ VERIFICAR paquete (`dk.tacit.android.foldersync.lite` o la versión de pago).
-   - **Retro Ajustes.** APK compilado en la fase 4 (`android/app/build/outputs/apk/...`).
+   - **RetroStick Launcher.** APK compilado en la fase 4 (`android/app/build/outputs/apk/...`).
 3. Crear las carpetas: `/storage/emulated/0/ROMs/{gb,gbc,gba,psx}`, `/storage/emulated/0/Partidas/{saves,states,.stick}`, `/storage/emulated/0/RetroArch/system`.
-4. Copiar la configuración de RetroArch (sección 6) a su ruta. ⚠️ VERIFICAR la ruta real del `retroarch.cfg` en esta versión (normalmente `/storage/emulated/0/Android/data/com.retroarch/files/retroarch.cfg`; en Android 9 esa ruta es accesible por ADB). Hacer **copia de seguridad** del cfg existente antes de sobrescribirlo.
+4. Copiar la configuración de RetroArch (sección 6) a su ruta. Ruta verificada: `/storage/emulated/0/Android/data/com.retroarch.ra32/files/retroarch.cfg` (accesible por ADB). Hacer **copia de seguridad** del cfg existente antes de sobrescribirlo.
 5. Copiar los archivos de opciones de núcleo y los *remaps* o *autoconfig* de los mandos.
 6. **Opcional, con confirmación explícita:** sustituir el launcher (sección 5.5).
 7. Mostrar al final una lista de **pasos manuales pendientes** (descarga de núcleos, login en FolderSync, etc.).
@@ -155,23 +157,19 @@ Debe ser **idempotente** (se puede ejecutar varias veces) y hacer:
 
 > **Seguridad:** antes de activar el modo espejo del par 1, confirmar que **ninguna partida se guarda dentro de `/ROMs`** (sección 6). Si no, se borrarían.
 
-### 5.4 Daijishō
-- Plataformas: Game Boy (`/ROMs/gb`), Game Boy Color (`/ROMs/gbc`), Game Boy Advance (`/ROMs/gba`), PlayStation (`/ROMs/psx`).
-- Reproductor de cada plataforma: RetroArch (32 bits) con su núcleo (GB/GBC → Gambatte, GBA → mGBA, PS1 → PCSX ReARMed).
-- Portadas: *scraper* de Daijishō con libretro-thumbnails.
-- Añadir **Retro Ajustes** como entrada visible (sección de apps de Android o plataforma propia).
-- Documentar en `docs/daijisho.md`. Si Daijishō permite exportar o importar la configuración de plataformas, guardar la exportación en `stick/daijisho/`.
+### 5.4 Menú de la TV
+Lo da el launcher propio (sección 8). Sustituye a Daijishō, que ya no se usa.
 
 ### 5.5 Arranque directo en el menú de juegos
-- **Opción A (sin riesgo):** app *AutoStart – No root* que abre Daijishō al encender.
-- **Opción B (completa):** desactivar el launcher de Android TV para que Home lleve a Daijishō:
+El launcher declara `android.intent.category.HOME`, así que el stick arranca en él y el botón Home vuelve a él.
+- El launcher de Google ya está desactivado (`docs/dispositivo.md`). El actual es **FLauncher** (`me.efesser.flauncher`), que **se conserva** como salida de emergencia.
+- Fijar el launcher propio como Home por defecto:
   ```bash
-  adb shell cmd package resolve-activity -a android.intent.action.MAIN -c android.intent.category.HOME   # ver launcher actual
-  adb shell pm disable-user --user 0 com.google.android.tvlauncher   # ⚠️ VERIFICAR paquete
-  # Revertir:
-  adb shell pm enable com.google.android.tvlauncher
+  adb shell cmd package set-home-activity com.retrostick.launcher/.MainActivity   # ⚠️ VERIFICAR en Android 9
+  # Revertir a FLauncher:
+  adb shell cmd package set-home-activity me.efesser.flauncher/.MainActivity
   ```
-  **Requisito previo:** comprobar que desde Daijishō o Retro Ajustes se puede abrir *Ajustes de Android*. Si no, el usuario se queda sin acceso a la configuración. Incluir el comando de reversión en `docs/` y en la salida del script.
+- **Requisito previo:** desde la pestaña Retro Ajustes se puede abrir *Ajustes de Android* (`android.settings.SETTINGS`, verificado). Incluir el comando de reversión en `docs/` y en la salida del script.
 
 ---
 
@@ -347,20 +345,33 @@ https://raw.githubusercontent.com/libretro-thumbnails/<Sistema>/master/Named_Box
 
 ---
 
-## 8. Mini app "Retro Ajustes" (Android TV)
+## 8. RetroStick Launcher (Android TV)
 
 ### 8.1 Stack
-- **Kotlin**, una sola Activity, UI con **Jetpack Compose for TV** o Views con Leanback (lo más ligero).
-- `minSdk 21`, `targetSdk 28`. Se instala por sideload, no por Play Store, así que se puede apuntar a 28 y usar almacenamiento heredado sin complicaciones en Android 9.
-- `AndroidManifest`: `LEANBACK_LAUNCHER` + `LAUNCHER`, banner de TV (320×180), `uses-feature android.software.leanback required=false`, `touchscreen required=false`.
+- **Kotlin**, una sola Activity, **Views nativas sin Leanback ni Compose** (lo más ligero para 1 GB de RAM y Mali-450; el diseño es propio).
+- Paquete `com.retrostick.launcher`. `minSdk 21`, `targetSdk 28`. Se instala por sideload, así que se puede apuntar a 28 y usar almacenamiento heredado en Android 9.
+- `AndroidManifest`: categorías `HOME` + `DEFAULT` (pantalla de inicio), `LEANBACK_LAUNCHER` + `LAUNCHER`, banner de TV (320×180), `uses-feature android.software.leanback required=false`, `touchscreen required=false`.
 - Compilación del APK en **GitHub Actions** (artefacto descargable) y en local con `./gradlew assembleRelease` (firma con keystore de debug o una propia guardada fuera del repo).
 
-### 8.2 Pantalla
+### 8.2 Pantalla de inicio (maqueta `docs/maquetas/inicio.html`)
+- **Cabecera:** marca, mando conectado (`InputDevice` con `SOURCE_GAMEPAD`), estado de sincronización (hora del último cambio en `/Partidas`, o "sin sincronizar"), Wi-Fi y hora.
+- **Pestañas de consola** (GB, GBC, GBA, PS1) con su logo y el número de juegos en `/ROMs/<c>`. La última es **Retro Ajustes**. Se cambia con L1/R1 o con izquierda/derecha.
+- **Juego seleccionado:** portada grande, nombre (No-Intro sin la parte entre paréntesis), consola y región.
+  - *Última partida:* fecha del `.srm`/`.state.auto` en `/Partidas`.
+  - *Tiempo jugado:* registro de tiempo de RetroArch (`content_runtime_log`). ⚠️ VERIFICAR la ruta y el formato en la 1.22.2.
+  - *Partida guardada:* "Copia en Drive" si FolderSync la ha subido (⚠️ VERIFICAR cómo saberlo en la fase 3); si no, "Solo en el stick".
+  - Botón **Continuar partida** o **Jugar** (si no hay partida).
+- **Estante** con las portadas de la consola, marca "Jugando" en el último jugado y tarjeta final "+ Añade juegos desde la app del móvil".
+- **Ayudas de botones** abajo: ✕ Jugar · ○ Atrás · △ Favorito · □ Detalles · L1/R1 Cambiar consola.
+- **Lanzar un juego:** intent a `com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture` con `ROM`, `LIBRETRO` y `CONFIGFILE` (verificado, ver `docs/dispositivo.md`).
+- **Portadas:** libretro-thumbnails (misma regla que la PWA, 7.5), con caché en disco y tarjeta de degradado si no hay portada o no hay red.
+
+### 8.2b Pestaña Retro Ajustes
 Botones grandes navegables con el mando, con el estilo de la maqueta de TV:
 
 | Botón | Acción |
 |---|---|
-| 🎮 **Emparejar mando** | Abrir la pantalla de emparejamiento de accesorios de Android TV. ⚠️ VERIFICAR el intent (candidato: acción `com.google.android.intent.action.CONNECT_INPUT`); si falla, `Settings.ACTION_BLUETOOTH_SETTINGS`. |
+| 🎮 **Emparejar mando** | `com.google.android.intent.action.CONNECT_INPUT` (verificado: `AddAccessoryActivity`). `ACTION_BLUETOOTH_SETTINGS` **no existe** en este stick. |
 | 🔄 **Sincronizar ahora** | Lanzar la sincronización de FolderSync si tiene intent público (⚠️ VERIFICAR); si no, abrir FolderSync. |
 | 📶 **Wi-Fi** | `Settings.ACTION_WIFI_SETTINGS` |
 | ⚙️ **Ajustes de Android** | `Settings.ACTION_SETTINGS` (salida de emergencia si se sustituyó el launcher) |
@@ -394,22 +405,23 @@ FolderSync lo sube con el par 2 y la PWA lo lee. Permiso: `WRITE_EXTERNAL_STORAG
 - [ ] Resolver todos los ⚠️ VERIFICAR que dependan del dispositivo.
 - **Aceptación:** `docs/dispositivo.md` con los datos reales.
 
-### Fase 2 – Stick: emuladores
-- [ ] `stick/install.sh` (y `install.ps1` si el PC es Windows).
-- [ ] Configuración de RetroArch, opciones de núcleo, overlays y autoconfig de mandos.
-- [ ] Guía de pasos manuales (descarga de núcleos).
-- **Aceptación:** un juego de prueba de cada consola, copiado a mano a `/ROMs/<c>`, arranca a velocidad completa; al salir se crea su `.srm`/`.state.auto` en `/Partidas/...`; el DualSense y el Pro Controller funcionan con los botones correctos y Select+Start abre el menú.
+### Fase 2 – Stick: emuladores ✅ (cerrada el 2026-11-03, con pendientes)
+- [x] `stick/install.sh` y `install.ps1`.
+- [x] Configuración de RetroArch y opciones de núcleo (Gambatte, mGBA).
+- [x] Núcleos, información de núcleos y perfiles de mando descargados.
+- [x] GBC y GBA a velocidad completa; `.srm`/`.state.auto` en `/Partidas` (ver `docs/dispositivo.md`).
+- [ ] **Pendiente:** emparejar DualSense y Pro Controller, validar autoconfig y atajos (Select+Start, guardar/cargar estado, avance rápido).
+- [ ] **Pendiente:** PS1 (opciones de PCSX ReARMed y prueba) cuando haya un juego. Overlays/marcos.
 
-### Fase 3 – Stick: Drive, FolderSync y Daijishō
+### Fase 3 – Stick: Drive y FolderSync
 - [ ] Crear `Retro/` en Drive (a mano o con la PWA de la fase 5).
 - [ ] Configurar FolderSync (pares 1, 2 y 3) y documentarlo.
-- [ ] Configurar Daijishō y documentarlo.
-- [ ] Arranque automático (opción A; la B solo con confirmación del usuario).
-- **Aceptación:** mover un juego en Drive a `JugandoAhora` hace que aparezca en Daijishō con portada tras sincronizar; quitarlo lo borra del stick y su partida sigue en Drive; al encender el stick se abre Daijishō.
+- **Aceptación:** mover un juego en Drive a `JugandoAhora` hace que aparezca en `/ROMs` tras sincronizar; quitarlo lo borra del stick y su partida sigue en Drive.
 
-### Fase 4 – Retro Ajustes (APK)
+### Fase 4 – RetroStick Launcher (APK)
 - [ ] App Kotlin (sección 8) + workflow de GitHub Actions que publique el APK.
-- **Aceptación:** se instala por ADB, aparece en Daijishō, todos los botones funcionan con el mando y `status.json` llega a Drive.
+- [ ] Fijarla como pantalla de inicio (5.5), con FLauncher como respaldo.
+- **Aceptación:** al encender el stick se abre el launcher con el aspecto de la maqueta; los juegos de `/ROMs` aparecen con portada y se lanzan en RetroArch; la pestaña Retro Ajustes funciona con el mando; `status.json` llega a Drive.
 
 ### Fase 5 – PWA
 - [ ] Proyecto Vite + React + TS + PWA, login con Google y capa Drive.
@@ -435,7 +447,6 @@ retrostick/
 │   ├── dispositivo.md       # fase 1
 │   ├── google-cloud.md
 │   ├── foldersync.md
-│   ├── daijisho.md
 │   ├── mandos.md
 │   ├── bios-ps1.md
 │   └── uso.md
@@ -448,9 +459,8 @@ retrostick/
 │   │   ├── core-options/
 │   │   ├── autoconfig/
 │   │   └── overlays/
-│   ├── daijisho/
 │   └── apks/                # ignorado por git
-├── android/                 # Retro Ajustes (Gradle)
+├── android/                 # RetroStick Launcher (Gradle)
 ├── pwa/
 │   ├── src/
 │   │   ├── lib/drive.ts
@@ -501,6 +511,6 @@ Tema oscuro únicamente (se usa en TV y de noche). En la TV, el foco se marca co
 | Juego de PS1 no arranca | Probar con la BIOS del usuario en `system/`; revisar `.cue`/`.m3u`. |
 | Partida "perdida" | Revisar que `savefile_directory` apunta a `/Partidas/saves`; restaurar una revisión desde la PWA. |
 | Conflicto de partidas | No jugar la misma partida en dos dispositivos a la vez; FolderSync se queda con la más reciente. |
-| Sin acceso a Ajustes tras cambiar el launcher | `adb shell pm enable com.google.android.tvlauncher` o abrir Retro Ajustes → Ajustes de Android. |
+| Sin acceso a Ajustes tras cambiar el launcher | `adb shell cmd package set-home-activity me.efesser.flauncher/.MainActivity` (vuelve a FLauncher) o pestaña Retro Ajustes → Ajustes de Android. |
 | Stick lento | Cerrar o desinstalar apps preinstaladas no usadas; desactivar animaciones en Opciones de desarrollador. |
 | Calentamiento en sesiones largas de PS1 | Alargador HDMI para separar el stick de la TV. |
