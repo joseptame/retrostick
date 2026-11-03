@@ -1,0 +1,114 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><title>PWA móvil</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:1440px;height:960px;font-family:Inter,sans-serif;background:radial-gradient(900px 600px at 50% 0%,#2a2170,#0d0b1f 70%);display:flex;gap:56px;justify-content:center;align-items:flex-start;padding-top:40px;color:#f2f0ff}
+.col{display:flex;flex-direction:column;align-items:center;gap:16px}
+.cap{font-size:17px;font-weight:600;color:#bdb6ec}
+.phone{width:390px;height:844px;border-radius:52px;background:#110e26;border:10px solid #2b2840;position:relative;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+.sb{display:flex;justify-content:space-between;padding:14px 26px 0;font-size:14px;font-weight:600}
+.notch{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:110px;height:30px;background:#000;border-radius:20px}
+.scr{padding:22px 18px 0}
+h1{font-size:28px;font-weight:800;letter-spacing:-.5px}
+.sub{font-size:13px;color:#a49ccf;margin-top:4px}
+.space{margin-top:16px;background:rgba(255,255,255,.06);border-radius:16px;padding:14px}
+.space .row{display:flex;justify-content:space-between;font-size:13px;color:#cfc9f5}
+.bar{height:8px;border-radius:5px;background:rgba(255,255,255,.1);margin-top:9px;overflow:hidden}.bar i{display:block;height:100%;background:linear-gradient(90deg,#7c6cff,#4ade80);border-radius:5px}
+.tabs{display:flex;gap:8px;margin-top:16px;overflow:hidden}
+.tab{padding:8px 14px;border-radius:20px;background:rgba(255,255,255,.07);font-size:13px;font-weight:600;color:#cfc9f5;white-space:nowrap}
+.tab.on{background:#fff;color:#1b1446}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}
+.card{background:rgba(255,255,255,.05);border-radius:16px;overflow:hidden}
+.card img{width:100%;aspect-ratio:1;object-fit:cover;display:block}
+.card .ft{padding:9px 10px 10px}
+.card .nm{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.st{display:flex;align-items:center;justify-content:space-between;margin-top:7px;font-size:11.5px;color:#a49ccf}
+.sw{width:34px;height:20px;border-radius:12px;background:rgba(255,255,255,.18);position:relative}.sw:after{content:"";position:absolute;width:16px;height:16px;border-radius:50%;background:#fff;top:2px;left:2px}
+.sw.on{background:#4ade80}.sw.on:after{left:16px}
+.on-t{color:#4ade80}
+.nav{position:absolute;bottom:0;left:0;right:0;height:84px;background:rgba(17,14,38,.95);border-top:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-around;padding-top:12px;font-size:11px;color:#8f88bd}
+.nav div{display:flex;flex-direction:column;align-items:center;gap:5px}.nav .on{color:#fff}
+.nav svg{width:24px;height:24px}
+.fab{position:absolute;right:20px;bottom:100px;width:58px;height:58px;border-radius:50%;background:linear-gradient(135deg,#7c6cff,#5b4bd6);display:grid;place-items:center;font-size:32px;font-weight:300;box-shadow:0 10px 30px rgba(91,75,214,.6)}
+/* detalle */
+.back{font-size:15px;color:#bdb6ec;margin-bottom:14px}
+.dcover{width:100%;height:230px;border-radius:20px;overflow:hidden;position:relative}
+.dcover img{width:100%;height:100%;object-fit:cover;filter:blur(0)}
+.dt{font-size:24px;font-weight:800;margin-top:16px}
+.toggle{margin-top:14px;display:flex;justify-content:space-between;align-items:center;background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.35);border-radius:16px;padding:14px 16px}
+.toggle b{font-size:15px}.toggle small{display:block;font-size:12px;color:#a49ccf;margin-top:3px;font-weight:400}
+.sec{font-size:12px;letter-spacing:1.4px;text-transform:uppercase;color:#8f88bd;margin:16px 0 8px}
+.save{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:rgba(255,255,255,.05);border-radius:14px;margin-bottom:8px}
+.save b{font-size:14px}.save small{display:block;font-size:12px;color:#a49ccf;margin-top:2px}
+.dl{font-size:12px;font-weight:700;color:#9d8cff;border:1px solid #5b4bd6;padding:6px 10px;border-radius:10px}
+/* subir */
+.drop{margin-top:14px;border:2px dashed rgba(157,140,255,.5);border-radius:20px;padding:12px;text-align:center;color:#bdb6ec;font-size:14px}
+.drop b{display:block;font-size:16px;color:#fff;margin:8px 0 4px}
+.up{margin-top:10px;background:rgba(255,255,255,.05);border-radius:16px;padding:14px;display:flex;gap:12px}
+.up img{width:64px;height:64px;border-radius:10px;object-fit:cover;flex:none}
+.up .i{flex:1;min-width:0}
+.up .f{font-size:11.5px;color:#8f88bd;text-decoration:line-through;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.up .n{font-size:13.5px;font-weight:700;margin-top:3px;line-height:1.25}
+.chips{display:flex;gap:6px;margin-top:7px}.chip{font-size:11px;font-weight:700;padding:3px 8px;border-radius:7px;background:rgba(124,108,255,.2);color:#c9c0ff}
+.chip.g{background:rgba(74,222,128,.15);color:#4ade80}
+.prog{height:6px;border-radius:4px;background:rgba(255,255,255,.1);margin-top:9px;overflow:hidden}.prog i{display:block;height:100%;background:#7c6cff}
+.pt{font-size:11.5px;color:#a49ccf;margin-top:5px}
+.opt{display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding:13px 14px;background:rgba(255,255,255,.05);border-radius:14px;font-size:14px}
+.btn{margin-top:16px;background:#fff;color:#1b1446;font-weight:800;text-align:center;padding:15px;border-radius:16px;font-size:16px}
+</style></head><body>
+
+<div class="col"><div class="phone"><div class="notch"></div>
+<div class="sb"><span>18:46</span><span>5G ▮▮▮</span></div>
+<div class="scr">
+  <h1>Mi colección</h1><div class="sub">20 juegos · sincronizado hace 3 min</div>
+  <div class="space"><div class="row"><span>En el stick</span><span><b style="color:#fff">1,3 GB</b> de 4,5 GB libres</span></div><div class="bar"><i style="width:29%"></i></div></div>
+  <div class="tabs"><span class="tab">Todos</span><span class="tab">GB</span><span class="tab">GBC</span><span class="tab on">GBA</span><span class="tab">PS1</span></div>
+  <div class="grid">
+    <div class="card"><img src="img/poke.png"><div class="ft"><div class="nm">Pokémon Esmeralda</div><div class="st"><span class="on-t">En el stick</span><span class="sw on"></span></div></div></div>
+    <div class="card"><img src="img/zelda.png"><div class="ft"><div class="nm">Zelda: The Minish Cap</div><div class="st"><span class="on-t">En el stick</span><span class="sw on"></span></div></div></div>
+    <div class="card"><img src="img/metroid.png"><div class="ft"><div class="nm">Metroid Fusion</div><div class="st"><span>Solo en Drive</span><span class="sw"></span></div></div></div>
+    <div class="card"><img src="img/golden.png"><div class="ft"><div class="nm">Golden Sun</div><div class="st"><span>Solo en Drive</span><span class="sw"></span></div></div></div>
+  </div>
+</div>
+<div class="nav">
+  <div class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Colección</div>
+  <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg>Subir</div>
+  <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3h11l3 3v15H5z"/><path d="M8 3v5h7V3M8 21v-6h8v6"/></svg>Partidas</div>
+  <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="13" rx="2"/><path d="M8 21h8"/></svg>Stick</div>
+</div></div><div class="cap">Colección</div></div>
+
+<div class="col"><div class="phone"><div class="notch"></div>
+<div class="sb"><span>18:47</span><span>5G ▮▮▮</span></div>
+<div class="scr">
+  <div class="back">‹ Game Boy Advance</div>
+  <div class="dcover"><img src="img/poke.png"></div>
+  <div class="dt">Pokémon Esmeralda</div><div class="sub">Game Boy Advance · España · 16 MB</div>
+  <div class="toggle"><div><b>En el stick</b><small>Disponible en la TV · llegó hace 2 días</small></div><span class="sw on"></span></div>
+  <div class="sec">Partidas guardadas · Drive</div>
+  <div class="save"><div><b>Partida del juego</b><small>Hoy 18:12 · 41 h 20 min jugadas</small></div><span class="dl">Descargar</span></div>
+  <div class="save"><div><b>Estado guardado (auto)</b><small>Hoy 18:12</small></div><span class="dl">Descargar</span></div>
+  <div class="save"><div><b>Copia anterior</b><small>Ayer 22:40</small></div><span class="dl">Restaurar</span></div>
+</div>
+<div class="nav">
+  <div class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Colección</div>
+  <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg>Subir</div>
+  <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3h11l3 3v15H5z"/><path d="M8 3v5h7V3M8 21v-6h8v6"/></svg>Partidas</div>
+  <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="13" rx="2"/><path d="M8 21h8"/></svg>Stick</div>
+</div></div><div class="cap">Ficha del juego</div></div>
+
+<div class="col"><div class="phone"><div class="notch"></div>
+<div class="sb"><span>18:50</span><span>5G ▮▮▮</span></div>
+<div class="scr">
+  <h1>Subir copias</h1><div class="sub">Detecta la consola y pone el nombre correcto</div>
+  <div class="drop"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#9d8cff" stroke-width="2"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg><b>Elegir archivos</b>.gb · .gbc · .gba · .chd · .cue</div>
+  <div class="up"><img src="img/mk.png"><div class="i"><div class="f">mkarioo_dump01.gba</div><div class="n">Mario Kart - Super Circuit (Europe)</div><div class="chips"><span class="chip">GBA</span><span class="chip g">✓ Reconocido</span></div><div class="prog"><i style="width:100%;background:#4ade80"></i></div><div class="pt">Subido · 8 MB</div></div></div>
+  <div class="up"><img src="img/aw.png"><div class="i"><div class="f">advance_wars.gba</div><div class="n">Advance Wars (Europe) (En,Fr,De,Es)</div><div class="chips"><span class="chip">GBA</span><span class="chip g">✓ Reconocido</span></div><div class="prog"><i style="width:62%"></i></div><div class="pt">Subiendo · 62 % de 8 MB</div></div></div>
+  <div class="up"><img src="img/cv.png"><div class="i"><div class="f">CASTLEVANIA_AOS.GBA</div><div class="n">Castlevania - Aria of Sorrow (Europe)</div><div class="chips"><span class="chip">GBA</span><span class="chip g">✓ Reconocido</span></div><div class="prog"><i style="width:0"></i></div><div class="pt">En cola</div></div></div>
+  <div class="opt"><span>Enviar también al stick</span><span class="sw on"></span></div>
+</div>
+<div class="nav">
+  <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Colección</div>
+  <div class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg>Subir</div>
+  <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3h11l3 3v15H5z"/><path d="M8 3v5h7V3M8 21v-6h8v6"/></svg>Partidas</div>
+  <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="13" rx="2"/><path d="M8 21h8"/></svg>Stick</div>
+</div></div><div class="cap">Subir copias</div></div>
+</body></html>

@@ -1,0 +1,35 @@
+# Juegos, BIOS y partidas: NUNCA al repositorio
+*.gb
+*.gbc
+*.gba
+*.bin
+*.cue
+*.chd
+*.iso
+*.img
+*.pbp
+*.m3u
+*.srm
+*.sav
+*.state*
+*.zip
+*.7z
+stick/apks/
+
+# Entorno y builds
+.env
+.env.local
+node_modules/
+dist/
+pwa/public/db/
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+*.keystore
+*.jks
+.DS_Store
+*.apk
+*.aab
+Thumbs.db
+.idea/

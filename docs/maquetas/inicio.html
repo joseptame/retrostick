@@ -1,0 +1,107 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Inicio stick</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:1920px;height:1080px;overflow:hidden;font-family:Inter,sans-serif;color:#f2f0ff;
+background:radial-gradient(1200px 700px at 75% 20%,#3b2f8f 0%,transparent 60%),radial-gradient(900px 600px at 10% 90%,#1d1650 0%,transparent 60%),#0d0b1f;}
+.top{display:flex;justify-content:space-between;align-items:center;padding:44px 80px 0}
+.brand{font-weight:800;font-size:30px;letter-spacing:.5px}.brand span{color:#9d8cff}
+.status{display:flex;gap:36px;align-items:center;font-size:22px;color:#cfc9f5}
+.chip{display:flex;gap:10px;align-items:center}
+.dot{width:10px;height:10px;border-radius:50%;background:#4ade80;box-shadow:0 0 10px #4ade80}
+.time{font-size:30px;font-weight:600;color:#fff}
+.plats{display:flex;gap:28px;padding:44px 80px 0;align-items:flex-end}
+.plat{width:250px;height:132px;border-radius:22px;background:rgba(255,255,255,.06);border:2px solid rgba(255,255,255,.08);
+display:flex;flex-direction:column;justify-content:space-between;padding:18px 22px;opacity:.7}
+.plat .tag{font-weight:800;font-size:40px;letter-spacing:1px}
+.plat .nm{font-size:18px;color:#d8d3ff}.plat .ct{font-size:16px;color:#a49ccf}
+.plat.sel{width:300px;height:160px;opacity:1;background:linear-gradient(135deg,#5b4bd6,#3a2d9c);border:3px solid #fff;box-shadow:0 12px 40px rgba(91,75,214,.6)}
+.plat.sel .tag{font-size:50px}
+.gb .tag{color:#9bbc0f}.gbc .tag{background:linear-gradient(90deg,#ff4d6d,#ffb703,#2ec4b6,#4361ee);-webkit-background-clip:text;color:transparent}
+.ps .tag{color:#c9ccd3}
+.cfg .tag svg{display:block}
+.main{display:flex;gap:64px;padding:44px 80px 0}
+.hero{width:380px;height:380px;border-radius:24px;flex:none;position:relative;overflow:hidden;
+background:linear-gradient(160deg,#0f9b6e,#065f46 55%,#022c22);box-shadow:0 20px 60px rgba(0,0,0,.5);border:3px solid rgba(255,255,255,.9)}
+.hero .big{position:absolute;right:-30px;top:-40px;font-size:340px;font-weight:900;color:rgba(255,255,255,.12)}
+.hero .lbl{position:absolute;left:28px;bottom:26px;right:28px;font-size:38px;font-weight:800;line-height:1.1}
+.hero .sys{position:absolute;left:28px;top:24px;font-size:16px;font-weight:700;background:rgba(0,0,0,.35);padding:6px 12px;border-radius:8px}
+.info{flex:1;padding-top:6px}
+.info h1{font-size:64px;font-weight:800;letter-spacing:-1px}
+.meta{font-size:24px;color:#bdb6ec;margin-top:12px}
+.rows{margin-top:38px;display:grid;grid-template-columns:repeat(3,auto);gap:22px 56px;justify-content:start}
+.k{font-size:17px;color:#9a93c9;text-transform:uppercase;letter-spacing:1.5px}.v{font-size:27px;font-weight:600;margin-top:6px}
+.ok{color:#4ade80}
+.play{margin-top:44px;display:inline-flex;align-items:center;gap:16px;background:#fff;color:#1b1446;font-weight:800;font-size:28px;padding:18px 40px;border-radius:16px}
+.play i{font-style:normal;width:40px;height:40px;border-radius:50%;background:#1b1446;color:#fff;display:grid;place-items:center;font-size:22px}
+.shelf{position:absolute;left:80px;right:0;top:730px}
+.shelf h2{font-size:22px;font-weight:600;color:#bdb6ec;margin-bottom:18px}
+.covers{display:flex;gap:26px}
+.cv{width:196px;height:196px;border-radius:16px;position:relative;overflow:hidden;flex:none;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+.cv .b{position:absolute;right:-14px;top:-30px;font-size:180px;font-weight:900;color:rgba(255,255,255,.13)}
+.cv .t{position:absolute;left:16px;right:14px;bottom:14px;font-size:19px;font-weight:700;line-height:1.15}
+.cv.on{outline:4px solid #fff;outline-offset:4px}
+.cv .badge{position:absolute;top:12px;left:12px;font-size:13px;font-weight:700;background:rgba(0,0,0,.4);padding:4px 9px;border-radius:6px}
+.hints{position:absolute;bottom:30px;right:80px;display:flex;gap:34px;font-size:21px;color:#cfc9f5;align-items:center}
+.btn{display:inline-grid;place-items:center;width:34px;height:34px;border-radius:50%;border:2px solid #cfc9f5;margin-right:9px;font-size:17px;vertical-align:middle}
+.pill{display:inline-block;padding:3px 10px;border-radius:8px;border:2px solid #cfc9f5;font-size:16px;margin-right:9px;font-weight:600}
+.logo{display:block;width:100%;max-width:206px;height:34px;object-fit:contain;object-position:left center;filter:brightness(0) invert(1)}
+.plat.sel .logo{max-width:256px;height:44px}
+.plat{justify-content:space-between}
+.hero img,.cv img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.cv .t,.cv .b,.hero .big,.hero .lbl{display:none}
+.hero{background:#000}
+</style></head><body>
+<div class="top">
+  <div class="brand">Retro<span>Stick</span></div>
+  <div class="status">
+    <div class="chip"><svg width="34" height="24" viewBox="0 0 34 24" fill="none" stroke="#cfc9f5" stroke-width="2.2"><path d="M8 3h18c4 0 6 4 7 10s-1 9-4 9c-2 0-3-2-5-4H10c-2 2-3 4-5 4-3 0-5-3-4-9S4 3 8 3z"/><circle cx="24" cy="10" r="1.6" fill="#cfc9f5"/><path d="M9 8v6M6 11h6"/></svg>DualSense · J1</div>
+    <div class="chip"><span class="dot"></span>Sincronizado con Drive · hace 3 min</div>
+    <div class="chip"><svg width="28" height="22" viewBox="0 0 28 22" fill="none" stroke="#cfc9f5" stroke-width="2.4" stroke-linecap="round"><path d="M2 7c7-6 17-6 24 0M6 11.5c4.5-4 11.5-4 16 0M10 16c2.3-2 5.7-2 8 0"/><circle cx="14" cy="19.5" r="1.3" fill="#cfc9f5"/></svg>Wi-Fi</div>
+    <div class="time">18:45</div>
+  </div>
+</div>
+
+<div class="plats">
+  <div class="plat gb"><div class="tag"><img class="logo" src="img/logo_gb.svg"></div><div><div class="nm">Game Boy</div><div class="ct">6 juegos</div></div></div>
+  <div class="plat gbc"><div class="tag"><img class="logo" src="img/logo_gbc.svg"></div><div><div class="nm">Game Boy Color</div><div class="ct">4 juegos</div></div></div>
+  <div class="plat sel"><div class="tag"><img class="logo" src="img/logo_gba.svg" style="filter:none;border-radius:6px"></div><div><div class="nm" style="color:#fff;font-size:21px;font-weight:600">Game Boy Advance</div><div class="ct" style="color:#ddd8ff">7 juegos</div></div></div>
+  <div class="plat ps"><div class="tag"><img class="logo" src="img/logo_psx.svg" style="height:40px"></div><div><div class="nm">PlayStation</div><div class="ct">3 juegos</div></div></div>
+  <div class="plat cfg"><div class="tag"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#d8d3ff" stroke-width="1.8"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></div><div><div class="nm">Retro Ajustes</div><div class="ct">Mando · Sync · Wi-Fi</div></div></div>
+</div>
+
+<div class="main">
+  <div class="hero"><img src="img/poke.png"><div class="big">P</div><div class="lbl">Pokémon<br>Esmeralda</div></div>
+  <div class="info">
+    <h1>Pokémon Esmeralda</h1>
+    <div class="meta">Game Boy Advance · 2005 · RPG · 1 jugador</div>
+    <div class="rows">
+      <div><div class="k">Última partida</div><div class="v">Hoy, 18:12</div></div>
+      <div><div class="k">Tiempo jugado</div><div class="v">41 h 20 min</div></div>
+      <div><div class="k">Partida guardada</div><div class="v ok">✓ Copia en Drive</div></div>
+    </div>
+    <div class="play"><i>✕</i>Continuar partida</div>
+  </div>
+</div>
+
+<div class="shelf">
+  <h2>Game Boy Advance · en el stick</h2>
+  <div class="covers">
+    <div class="cv on" style="background:linear-gradient(160deg,#0f9b6e,#022c22)"><img src="img/poke.png"><div class="badge" style="z-index:2;left:auto;right:10px;top:10px;background:#fff;color:#1b1446;font-size:14px">▶ Jugando</div><div class="t">Pokémon Esmeralda</div></div>
+    <div class="cv" style="background:linear-gradient(160deg,#16a34a,#14532d)"><img src="img/zelda.png"><div class="t">Zelda: The Minish Cap</div></div>
+    <div class="cv" style="background:linear-gradient(160deg,#f97316,#7c2d12)"><img src="img/metroid.png"><div class="t">Metroid Fusion</div></div>
+    <div class="cv" style="background:linear-gradient(160deg,#eab308,#713f12)"><img src="img/golden.png"><div class="t">Golden Sun</div></div>
+    <div class="cv" style="background:linear-gradient(160deg,#ef4444,#7f1d1d)"><img src="img/mk.png"><div class="t">Mario Kart: Super Circuit</div></div>
+    <div class="cv" style="background:linear-gradient(160deg,#3b82f6,#1e3a8a)"><img src="img/aw.png"><div class="t">Advance Wars</div></div>
+    <div class="cv" style="background:linear-gradient(160deg,#8b5cf6,#2e1065)"><img src="img/cv.png"><div class="t">Castlevania: Aria of Sorrow</div></div>
+    <div class="cv" style="background:rgba(255,255,255,.06);border:2px dashed rgba(255,255,255,.25)"><div class="t" style="display:block;color:#bdb6ec;font-weight:600">+ Añade juegos desde la app del móvil</div></div>
+  </div>
+</div>
+
+<div class="hints">
+  <span><span class="btn">✕</span>Jugar</span>
+  <span><span class="btn">○</span>Atrás</span>
+  <span><span class="btn">△</span>Favorito</span>
+  <span><span class="btn">□</span>Detalles</span>
+  <span><span class="pill">L1 / R1</span>Cambiar consola</span>
+</div>
+</body></html>

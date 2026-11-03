@@ -1,0 +1,6 @@
+* text=auto
+# Files pushed to the stick (Android/Linux) must keep LF line endings
+*.sh  text eol=lf
+*.cfg text eol=lf
+*.opt text eol=lf
+*.rmp text eol=lf
