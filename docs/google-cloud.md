@@ -5,6 +5,8 @@
 > prueba. "Publicar app" está bloqueado hasta añadir página principal y política de privacidad en *Información de la
 > marca*. Mientras siga en Prueba, **Google desconecta el stick cada 7 días** (la cabecera dirá "Drive sin conectar";
 > se vuelve a conectar desde Retro Ajustes). Cliente de TV creado y probado: el stick está conectado.
+> **Decisión del usuario (2026-11-03): se queda en Prueba.** No se crean página principal ni política de privacidad;
+> se acepta reconectar el stick cada 7 días (*Retro Ajustes → Sincronizar ahora*, código nuevo).
 
 Necesario para que el stick (y más adelante la app del móvil) usen tu Google Drive. Se hace una vez, en el navegador
 del PC, con tu cuenta de Gmail. Gratis.
