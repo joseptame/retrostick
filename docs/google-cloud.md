@@ -1,5 +1,11 @@
 # Google Cloud: proyecto RetroStick
 
+> **Estado (2026-11-03):** no se pudo crear un proyecto nuevo, así que se usa el proyecto existente del usuario. Ya
+> tenía la Google Drive API habilitada y la pantalla de consentimiento en **Prueba**, con el usuario como usuario de
+> prueba. "Publicar app" está bloqueado hasta añadir página principal y política de privacidad en *Información de la
+> marca*. Mientras siga en Prueba, **Google desconecta el stick cada 7 días** (la cabecera dirá "Drive sin conectar";
+> se vuelve a conectar desde Retro Ajustes). Cliente de TV creado y probado: el stick está conectado.
+
 Necesario para que el stick (y más adelante la app del móvil) usen tu Google Drive. Se hace una vez, en el navegador
 del PC, con tu cuenta de Gmail. Gratis.
 

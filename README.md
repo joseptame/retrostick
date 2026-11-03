@@ -421,9 +421,12 @@ La sincronización lo sube a `Retro/Partidas/.stick/` y la PWA lo lee. Permiso: 
 - [ ] **Pendiente:** PS1 (opciones de PCSX ReARMed y prueba) cuando haya un juego. Overlays/marcos.
 
 ### Fase 3 – Stick: Google Drive
-- [ ] Proyecto de Google Cloud y cliente OAuth de TV (`docs/google-cloud.md`).
+- [x] Proyecto de Google Cloud y cliente OAuth de TV (`docs/google-cloud.md`). Se usa un proyecto existente, en modo
+  *Prueba*: la conexión caduca cada 7 días hasta publicar la app (requiere página principal y política de privacidad).
 - [x] Sincronización en el launcher (`Drive.kt`, `DriveSync.kt`, sección 5.3).
-- [ ] Conectar el stick y probar.
+- [x] Stick conectado (2026-11-03): primera sincronización con 3 juegos, 4 partidas y `status.json`; la ficha muestra
+  "✓ Copia en Drive".
+- [ ] Probar quitar/devolver un juego de `JugandoAhora` y el reposo del stick (se duerme a los 30 min).
 - **Aceptación:** al conectar se crea `Retro/` en Drive y suben las partidas y los juegos del stick; un archivo nuevo en
   `Retro/JugandoAhora/<c>` aparece en el menú tras sincronizar; quitarlo de ahí lo borra del stick y su partida sigue en
   Drive; la ficha del juego muestra "✓ Copia en Drive".
