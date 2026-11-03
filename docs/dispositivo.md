@@ -120,6 +120,25 @@ del Switch Pro se tomarán en la Fase 2.
   Por eso hay que ejecutar *Actualizar perfiles de mando* después de instalar.
 - Opciones de núcleo: `global_core_options = "false"`, así que van en `/storage/emulated/0/RetroArch/config/<Núcleo>/<Núcleo>.opt`.
 - `stick/install.ps1` aplicado el 2026-11-03: 27 claves (13 cambiaban algo), copias `retroarch.cfg.orig` y `.bak`.
+- Pasos del Actualizador en línea hechos el 2026-11-03 (manejando el menú por ADB):
+  núcleos **Gambatte**, **mGBA** y **PCSX ReARMed** instalados (aparecen en *Cargar núcleo*); información de núcleos actualizada;
+  perfiles de mando descargados en `/storage/emulated/0/RetroArch/autoconfig` (1.107 `.cfg`; en `android/` hay
+  `DualSense Wireless Controller (Android 11/13, Google TV 12)`, `Pro Controller.cfg` y `Wireless Controller.cfg`).
+  Libre después: 3,3 GB.
+- *Cargar núcleo → Instalar o restaurar un núcleo* instala un `.so` desde `/storage/emulated/0/RetroArch/downloads`
+  (`core_assets_directory`). Es una forma de instalar núcleos sin root a partir de un `adb push`.
+
+### Manejar el menú de RetroArch por ADB
+
+`adb shell input keyevent <código>` y `adb exec-out screencap -p > captura.png` para ver dónde se está:
+
+| Acción en el menú | Tecla (keyevent) |
+|---|---|
+| Arriba / abajo / izquierda / derecha | 19 / 20 / 21 / 22 |
+| Aceptar | 23 (DPAD_CENTER) |
+| Buscar (botón X del RetroPad) | 47 (`S`); después `input text <texto>` y 66 (Intro) |
+| Bajar ~10 elementos (botón R) | 51 (`W`) |
+| Volver | ⚠️ no funcionan ni 4 (BACK) ni 54 (`Z`) dentro de una búsqueda; es más fiable `am force-stop com.retroarch.ra32` y volver a abrir |
 
 ## Estado de los ⚠️ VERIFICAR
 
