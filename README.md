@@ -420,7 +420,7 @@ La sincronización lo sube a `Retro/Partidas/.stick/` y la PWA lo lee. Permiso: 
 - [ ] **Pendiente:** emparejar DualSense y Pro Controller, validar autoconfig y atajos (Select+Start, guardar/cargar estado, avance rápido).
 - [ ] **Pendiente:** PS1 (opciones de PCSX ReARMed y prueba) cuando haya un juego. Overlays/marcos.
 
-### Fase 3 – Stick: Google Drive
+### Fase 3 – Stick: Google Drive ✅ (cerrada el 2026-11-03)
 - [x] Proyecto de Google Cloud y cliente OAuth de TV (`docs/google-cloud.md`). Se usa un proyecto existente, en modo
   *Prueba*: la conexión caduca cada 7 días hasta publicar la app (requiere página principal y política de privacidad).
 - [x] Sincronización en el launcher (`Drive.kt`, `DriveSync.kt`, sección 5.3).
@@ -428,7 +428,8 @@ La sincronización lo sube a `Retro/Partidas/.stick/` y la PWA lo lee. Permiso: 
   "✓ Copia en Drive".
 - [x] Quitar/devolver un juego (2026-11-03): mover Oracle of Seasons a `Coleccion/gbc` lo borró del stick; devolverlo
   a `JugandoAhora/gbc` lo volvió a descargar (MD5 idéntico al original). Su partida no se tocó.
-- [ ] Reposo del stick: se duerme a los 30 min (`sleep_timeout = 1800000`) y entonces no sincroniza.
+- [x] Reposo del stick: se mantiene a los 30 min (`sleep_timeout = 1800000`, decisión del usuario). Dormido no
+  sincroniza; al despertar, el launcher vuelve a primer plano y sincroniza enseguida.
 - **Aceptación:** al conectar se crea `Retro/` en Drive y suben las partidas y los juegos del stick; un archivo nuevo en
   `Retro/JugandoAhora/<c>` aparece en el menú tras sincronizar; quitarlo de ahí lo borra del stick y su partida sigue en
   Drive; la ficha del juego muestra "✓ Copia en Drive".
