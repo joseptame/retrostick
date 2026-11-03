@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Design tokens (README section 11, docs/maquetas/inicio.html) -->
+<resources>
+    <color name="bg">#0D0B1F</color>
+    <color name="bg_glow_1">#3B2F8F</color>
+    <color name="bg_glow_2">#1D1650</color>
+    <color name="surface">#0FFFFFFF</color>
+    <color name="surface_border">#14FFFFFF</color>
+    <color name="text">#F2F0FF</color>
+    <color name="text_2">#BDB6EC</color>
+    <color name="text_3">#9A93C9</color>
+    <color name="chip_text">#CFC9F5</color>
+    <color name="tab_name">#D8D3FF</color>
+    <color name="tab_count">#A49CCF</color>
+    <color name="tab_count_sel">#DDD8FF</color>
+    <color name="brand_accent">#9D8CFF</color>
+    <color name="accent_start">#5B4BD6</color>
+    <color name="accent_end">#3A2D9C</color>
+    <color name="ok">#4ADE80</color>
+    <color name="off">#8F88BD</color>
+    <color name="button_text">#1B1446</color>
+</resources>

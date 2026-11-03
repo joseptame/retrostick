@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">RetroStick</string>
+    <string name="brand_retro">Retro</string>
+    <string name="brand_stick">Stick</string>
+
+    <string name="no_controller">Sin mando</string>
+    <string name="drive_not_configured">Drive sin configurar</string>
+    <string name="drive_foldersync">Sincronización con Drive activa</string>
+    <string name="offline">Sin conexión</string>
+
+    <string name="settings_tab">Retro Ajustes</string>
+    <string name="settings_tab_sub">Mando · Sync · Wi-Fi</string>
+
+    <string name="last_played">Última partida</string>
+    <string name="time_played">Tiempo jugado</string>
+    <string name="saved_game">Partida guardada</string>
+    <string name="continue_game">Continuar partida</string>
+    <string name="play">Jugar</string>
+    <string name="never">Nunca</string>
+    <string name="no_save">Sin partida</string>
+    <string name="save_on_stick">En el stick</string>
+    <string name="playing_badge">▶ Jugando</string>
+    <string name="add_games">+ Añade juegos desde la app del móvil</string>
+    <string name="shelf_title">%1$s · en el stick</string>
+    <string name="empty_console">Aún no hay juegos de %1$s en el stick.</string>
+
+    <string name="hint_play">Jugar</string>
+    <string name="hint_open">Abrir</string>
+    <string name="hint_back">Atrás</string>
+    <string name="hint_favorite">Favorito</string>
+    <string name="hint_details">Detalles</string>
+    <string name="hint_switch">Cambiar consola</string>
+
+    <string name="need_storage">RetroStick necesita permiso de almacenamiento para ver tus juegos.</string>
+    <string name="retroarch_missing">RetroArch (32 bits) no está instalado.</string>
+    <string name="foldersync_missing">FolderSync aún no está instalado (fase 3).</string>
+    <string name="app_missing">No se encuentra la app.</string>
+    <string name="favorite_added">Añadido a favoritos</string>
+    <string name="favorite_removed">Quitado de favoritos</string>
+
+    <string name="set_pair">Emparejar mando</string>
+    <string name="set_pair_sub">Añadir DualSense o Pro Controller</string>
+    <string name="set_sync">Sincronizar ahora</string>
+    <string name="set_wifi">Wi-Fi</string>
+    <string name="set_android">Ajustes de Android</string>
+    <string name="set_android_sub">Configuración del stick</string>
+    <string name="set_space">Espacio</string>
+    <string name="set_controllers">Mandos conectados</string>
+    <string name="set_retroarch">RetroArch</string>
+    <string name="set_retroarch_sub">Menú y ajustes del emulador</string>
+    <string name="set_other_apps">Otras apps</string>
+    <string name="set_other_apps_sub">Abre FLauncher</string>
+</resources>

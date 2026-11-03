@@ -1,0 +1,354 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- docs/maquetas/inicio.html at 1920x1080 / density 320: 1dp = 2px -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/bg_screen"
+    android:clipChildren="false">
+
+    <!-- Top bar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="40dp"
+        android:paddingEnd="40dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/inter_extrabold"
+            android:letterSpacing="0.02"
+            android:text="@string/brand_retro"
+            android:textColor="@color/text"
+            android:textSize="15sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/inter_extrabold"
+            android:letterSpacing="0.02"
+            android:text="@string/brand_stick"
+            android:textColor="@color/brand_accent"
+            android:textSize="15sp" />
+
+        <View
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <ImageView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@drawable/ic_gamepad" />
+
+        <TextView
+            android:id="@+id/controllerText"
+            style="@style/Chip" />
+
+        <View
+            android:id="@+id/syncDot"
+            android:layout_width="5dp"
+            android:layout_height="5dp"
+            android:layout_marginStart="18dp"
+            android:background="@drawable/dot_off" />
+
+        <TextView
+            android:id="@+id/syncText"
+            style="@style/Chip" />
+
+        <ImageView
+            android:id="@+id/netIcon"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="18dp"
+            android:src="@drawable/ic_wifi" />
+
+        <TextView
+            android:id="@+id/netText"
+            style="@style/Chip" />
+
+        <TextClock
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="18dp"
+            android:fontFamily="@font/inter_semibold"
+            android:format12Hour="HH:mm"
+            android:format24Hour="HH:mm"
+            android:textColor="#FFFFFF"
+            android:textSize="15sp" />
+    </LinearLayout>
+
+    <!-- Console tabs -->
+    <LinearLayout
+        android:id="@+id/tabs"
+        android:layout_width="match_parent"
+        android:layout_height="86dp"
+        android:layout_marginTop="53dp"
+        android:clipChildren="false"
+        android:gravity="bottom"
+        android:orientation="horizontal"
+        android:paddingStart="40dp" />
+
+    <!-- Selected game -->
+    <LinearLayout
+        android:id="@+id/gamePanel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="161dp"
+        android:orientation="horizontal"
+        android:paddingStart="40dp"
+        android:paddingEnd="40dp">
+
+        <FrameLayout
+            android:id="@+id/hero"
+            android:layout_width="190dp"
+            android:layout_height="190dp"
+            android:background="@drawable/bg_hero"
+            android:elevation="10dp"
+            android:foreground="@drawable/fg_hero_border">
+
+            <TextView
+                android:id="@+id/heroFallback"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:fontFamily="@font/inter_extrabold"
+                android:gravity="bottom|start"
+                android:padding="14dp"
+                android:textSize="19sp" />
+
+            <ImageView
+                android:id="@+id/heroImage"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop" />
+        </FrameLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="32dp"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:paddingTop="3dp">
+
+            <TextView
+                android:id="@+id/gameTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:fontFamily="@font/inter_extrabold"
+                android:letterSpacing="-0.02"
+                android:maxLines="1"
+                android:textColor="@color/text"
+                android:textSize="32sp" />
+
+            <TextView
+                android:id="@+id/gameMeta"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textColor="@color/text_2"
+                android:textSize="12sp" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="19dp"
+                android:orientation="horizontal">
+
+                <LinearLayout style="@style/InfoColumn">
+                    <TextView style="@style/InfoKey" android:text="@string/last_played" />
+                    <TextView android:id="@+id/lastPlayed" style="@style/InfoValue" />
+                </LinearLayout>
+
+                <LinearLayout style="@style/InfoColumn">
+                    <TextView style="@style/InfoKey" android:text="@string/time_played" />
+                    <TextView android:id="@+id/timePlayed" style="@style/InfoValue" />
+                </LinearLayout>
+
+                <LinearLayout style="@style/InfoColumn">
+                    <TextView style="@style/InfoKey" android:text="@string/saved_game" />
+                    <TextView android:id="@+id/saveState" style="@style/InfoValue" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="22dp"
+                android:background="@drawable/bg_play"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="17dp"
+                android:paddingTop="9dp"
+                android:paddingEnd="20dp"
+                android:paddingBottom="9dp">
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_btn_play_cross" />
+
+                <TextView
+                    android:id="@+id/playText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:fontFamily="@font/inter_extrabold"
+                    android:textColor="@color/button_text"
+                    android:textSize="14sp" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/emptyText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="40dp"
+        android:layout_marginTop="190dp"
+        android:fontFamily="@font/inter_semibold"
+        android:textColor="@color/text_2"
+        android:textSize="16sp"
+        android:visibility="gone" />
+
+    <!-- Retro Ajustes tab -->
+    <GridLayout
+        android:id="@+id/settingsGrid"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="40dp"
+        android:layout_marginTop="165dp"
+        android:columnCount="4"
+        android:visibility="gone" />
+
+    <!-- Shelf -->
+    <LinearLayout
+        android:id="@+id/shelf"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="363dp"
+        android:clipChildren="false"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/shelfTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="40dp"
+            android:layout_marginBottom="5dp"
+            android:fontFamily="@font/inter_semibold"
+            android:textColor="@color/text_2"
+            android:textSize="11sp" />
+
+        <HorizontalScrollView
+            android:id="@+id/shelfScroll"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:clipToPadding="false"
+            android:descendantFocusability="blocksDescendants"
+            android:focusable="false"
+            android:overScrollMode="never"
+            android:paddingStart="36dp"
+            android:paddingEnd="36dp"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:id="@+id/covers"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal" />
+        </HorizontalScrollView>
+    </LinearLayout>
+
+    <!-- Startup animation, on top of everything; hidden once the library is loaded -->
+    <FrameLayout
+        android:id="@+id/splash"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/bg_screen"
+        android:elevation="20dp"
+        android:visibility="gone">
+
+        <!-- Glow and icon match bg_launch exactly: a layer-list item with android:bottom="60dp" moves up 30dp,
+             a centred FrameLayout child moves up by its full marginBottom (30dp). -->
+        <View
+            android:id="@+id/splashGlow"
+            android:layout_width="280dp"
+            android:layout_height="280dp"
+            android:layout_gravity="center"
+            android:layout_marginBottom="30dp"
+            android:background="@drawable/bg_splash_glow" />
+
+        <ImageView
+            android:id="@+id/splashIcon"
+            android:layout_width="120dp"
+            android:layout_height="85dp"
+            android:layout_gravity="center"
+            android:layout_marginBottom="30dp"
+            android:src="@drawable/ic_splash" />
+
+        <!-- Below the icon: text top 18dp under the icon -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_marginTop="64dp"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/splashRetro"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/inter_extrabold"
+                    android:letterSpacing="0.02"
+                    android:text="@string/brand_retro"
+                    android:textColor="@color/text"
+                    android:textSize="34sp" />
+
+                <TextView
+                    android:id="@+id/splashStick"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/inter_extrabold"
+                    android:letterSpacing="0.02"
+                    android:text="@string/brand_stick"
+                    android:textColor="@color/brand_accent"
+                    android:textSize="34sp" />
+            </LinearLayout>
+
+            <FrameLayout
+                android:layout_width="160dp"
+                android:layout_height="3dp"
+                android:layout_marginTop="22dp"
+                android:background="@drawable/bg_splash_track">
+
+                <View
+                    android:id="@+id/splashFill"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@drawable/bg_splash_fill" />
+            </FrameLayout>
+        </LinearLayout>
+    </FrameLayout>
+
+    <!-- Button hints -->
+    <LinearLayout
+        android:id="@+id/hints"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="40dp"
+        android:layout_marginBottom="15dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal" />
+</FrameLayout>

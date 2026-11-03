@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- .cv in inicio.html. The 4dp padding leaves room for the selection outline (outline-offset). -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="106dp"
+    android:layout_height="106dp"
+    android:layout_marginEnd="5dp"
+    android:padding="4dp">
+
+    <FrameLayout
+        android:id="@+id/coverInner"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/bg_cover">
+
+        <TextView
+            android:id="@+id/coverTitle"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fontFamily="@font/inter_bold"
+            android:gravity="bottom|start"
+            android:maxLines="4"
+            android:padding="8dp"
+            android:textColor="@color/text"
+            android:textSize="9.5sp" />
+
+        <ImageView
+            android:id="@+id/coverImage"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop" />
+
+        <TextView
+            android:id="@+id/coverFavorite"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|start"
+            android:layout_margin="5dp"
+            android:background="@drawable/bg_badge_dark"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
+            android:text="★"
+            android:textColor="#FFD54A"
+            android:textSize="9sp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/coverBadge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|end"
+            android:layout_margin="5dp"
+            android:background="@drawable/bg_badge"
+            android:fontFamily="@font/inter_bold"
+            android:paddingStart="4.5dp"
+            android:paddingTop="2dp"
+            android:paddingEnd="4.5dp"
+            android:paddingBottom="2dp"
+            android:text="@string/playing_badge"
+            android:textColor="@color/button_text"
+            android:textSize="7sp"
+            android:visibility="gone" />
+    </FrameLayout>
+</FrameLayout>

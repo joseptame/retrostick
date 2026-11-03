@@ -171,6 +171,26 @@ FPS medidos con `dumpsys SurfaceFlinger --latency 'com.retroarch.ra32/com.retroa
 | Bajar ~10 elementos (botón R) | 51 (`W`) |
 | Volver | ⚠️ no funcionan ni 4 (BACK) ni 54 (`Z`) dentro de una búsqueda; es más fiable `am force-stop com.retroarch.ra32` y volver a abrir |
 
+## RetroStick Launcher (Fase 4, en curso)
+
+- Instalado `com.retrostick.launcher` (APK de `android/`, firmado con la clave de depuración local) y fijado como
+  pantalla de inicio el 2026-11-03:
+  ```bash
+  adb shell cmd package set-home-activity com.retrostick.launcher/.MainActivity   # verificado: "Success"
+  # Volver a FLauncher (sigue instalado):
+  adb shell cmd package set-home-activity me.efesser.flauncher/.MainActivity
+  ```
+- Comprobado tras `adb reboot`: el stick arranca en el launcher (~24 s hasta `sys.boot_completed`).
+- Un `am force-stop` del launcher hace que Android lo reabra al momento (es la app de inicio).
+- Arranque en frío: ~1,7 s hasta el primer fotograma. Mientras tanto se ve `bg_launch` (fondo + brillo + mando) y después
+  la animación RetroStick (~1,6 s).
+- **La animación "Android TV" del arranque no se puede cambiar sin root**: es `/system/media/bootanimation.zip`, `/` está
+  montado en solo lectura, `ro.build.type=user`, `ro.debuggable=0`, sin `su`. Tampoco existen
+  `/oem/media`, `/product/media` ni `/data/local/bootanimation.zip`.
+- `pm grant com.retrostick.launcher android.permission.{READ,WRITE}_EXTERNAL_STORAGE` evita el diálogo de permisos.
+- Portadas en caché en `files/covers/<consola>/` (con `index.txt`, índice de `Named_Boxarts` de la API de GitHub).
+  Borrar caché: `adb shell run-as com.retrostick.launcher rm -rf files/covers` (solo con APK de depuración).
+
 ## Estado de los ⚠️ VERIFICAR
 
 | Sección | Punto | Estado |
@@ -179,6 +199,7 @@ FPS medidos con `dumpsys SurfaceFlinger --latency 'com.retroarch.ra32/com.retroa
 | 2 | GLES 2.0, sin Vulkan | ✅ Confirmado GLES 2.0 |
 | 5.1 | ADB por red en el puerto 5555 | ✅ Funciona y sigue activo tras reiniciar |
 | 5.5 | Paquete del launcher de Google | ✅ `com.google.android.tvlauncher`, ya desactivado; el launcher actual es FLauncher |
+| 5.5 | `cmd package set-home-activity` en Android 9 | ✅ Funciona (launcher propio fijado y comprobado tras reiniciar) |
 | 5.5 | Abrir Ajustes de Android desde otra app | ✅ `android.settings.SETTINGS` resuelve a `MainSettings` |
 | 8.2 | Intent "Emparejar mando" | ✅ `CONNECT_INPUT` funciona; ❌ la alternativa `BLUETOOTH_SETTINGS` no existe |
 | 5.2 | Nombre del APK y paquete de RetroArch 32 bits | ✅ `RetroArch_ra32.apk` → paquete **`com.retroarch.ra32`** (no `com.retroarch`) |

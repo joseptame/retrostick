@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Window background while the app starts: same glow and gamepad, at the same place, as the splash layout
+     (centre shifted up by android:bottom = the views' layout_marginBottom). -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@drawable/bg_screen" />
+    <item android:width="280dp" android:height="280dp" android:gravity="center" android:bottom="60dp"
+        android:drawable="@drawable/bg_splash_glow" />
+    <item android:width="120dp" android:height="85dp" android:gravity="center" android:bottom="60dp"
+        android:drawable="@drawable/ic_splash" />
+</layer-list>

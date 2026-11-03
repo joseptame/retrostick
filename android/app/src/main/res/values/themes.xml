@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.RetroStick" parent="android:Theme.Material.NoActionBar.Fullscreen">
+        <!-- Shown before the first frame; the layout paints bg_screen over it afterwards -->
+        <item name="android:windowBackground">@drawable/bg_launch</item>
+        <item name="android:fontFamily">@font/inter_regular</item>
+        <item name="android:textColor">@color/text</item>
+        <item name="android:colorAccent">@color/accent_start</item>
+        <item name="android:windowShowWallpaper">false</item>
+    </style>
+
+    <style name="Dialog.RetroStick" parent="android:Theme.Material.Dialog.Alert">
+        <item name="android:fontFamily">@font/inter_regular</item>
+        <item name="android:colorAccent">@color/brand_accent</item>
+        <item name="android:windowBackground">@drawable/bg_dialog</item>
+    </style>
+</resources>

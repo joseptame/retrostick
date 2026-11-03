@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="20dp" android:height="20dp" android:viewportWidth="20" android:viewportHeight="20">
+    <path android:fillColor="@color/button_text" android:pathData="M20,10a10,10 0,1 0,-20 0a10,10 0,1 0,20 0z" />
+    <path android:strokeColor="#FFFFFF" android:strokeWidth="2" android:strokeLineCap="round" android:pathData="M6.8,6.8L13.2,13.2M13.2,6.8L6.8,13.2" />
+</vector>

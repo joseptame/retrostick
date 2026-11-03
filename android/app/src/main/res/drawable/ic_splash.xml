@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Big RetroStick gamepad for the startup animation -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="120dp" android:height="85dp" android:viewportWidth="34" android:viewportHeight="24">
+    <path android:strokeColor="#FFFFFF" android:strokeWidth="1.6" android:strokeLineJoin="round" android:strokeLineCap="round"
+        android:pathData="M8,3h18c4,0 6,4 7,10s-1,9 -4,9c-2,0 -3,-2 -5,-4H10c-2,2 -3,4 -5,4 -3,0 -5,-3 -4,-9S4,3 8,3z M9,8v6M6,11h6" />
+    <path android:fillColor="@color/brand_accent" android:pathData="M25.8,10a1.8,1.8 0,1 0,-3.6 0a1.8,1.8 0,1 0,3.6 0z" />
+</vector>

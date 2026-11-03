@@ -1,0 +1,706 @@
+package com.retrostick.launcher
+
+import android.Manifest
+import android.app.Activity
+import android.app.AlertDialog
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
+import android.hardware.input.InputManager
+import android.net.ConnectivityManager
+import android.net.Network
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.provider.Settings
+import android.text.format.Formatter
+import android.util.TypedValue
+import android.view.KeyEvent
+import android.view.View
+import android.view.ViewGroup
+import android.view.ViewTreeObserver
+import android.view.animation.AccelerateDecelerateInterpolator
+import android.view.animation.DecelerateInterpolator
+import android.view.animation.OvershootInterpolator
+import android.widget.GridLayout
+import android.widget.HorizontalScrollView
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.TextView
+import android.widget.Toast
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
+import java.util.concurrent.Executors
+
+private const val SETTINGS_COLUMNS = 4
+private const val PERMISSION_REQUEST = 1
+private const val CONNECT_INPUT = "com.google.android.intent.action.CONNECT_INPUT"
+private const val FLAUNCHER_PACKAGE = "me.efesser.flauncher"
+
+/** Fallback card colours when there is no box art (inicio.html .cv gradients). */
+private val COVER_GRADIENTS = listOf(
+    0xFF0F9B6E to 0xFF022C22, 0xFF16A34A to 0xFF14532D, 0xFFF97316 to 0xFF7C2D12, 0xFFEAB308 to 0xFF713F12,
+    0xFFEF4444 to 0xFF7F1D1D, 0xFF3B82F6 to 0xFF1E3A8A, 0xFF8B5CF6 to 0xFF2E1065,
+)
+
+private val HANDLED_KEYS = setOf(
+    KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
+    KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_BACK,
+    KeyEvent.KEYCODE_BUTTON_A, KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_BUTTON_X, KeyEvent.KEYCODE_BUTTON_Y,
+    KeyEvent.KEYCODE_BUTTON_L1, KeyEvent.KEYCODE_BUTTON_R1,
+)
+
+class MainActivity : Activity() {
+
+    private enum class Zone { TABS, CONTENT }
+
+    private class Setting(val icon: String, val title: String, var subtitle: String, val action: () -> Unit)
+
+    private lateinit var library: Library
+    private lateinit var covers: CoverLoader
+    private val io = Executors.newSingleThreadExecutor()
+    private val main = Handler(Looper.getMainLooper())
+
+    private var games: Map<String, List<Game>> = emptyMap()
+    /** 0..3 = consoles, 4 = Retro Ajustes. */
+    private var tab = 0
+    private val selected = IntArray(CONSOLES.size)
+    private var settingIndex = 0
+    private var zone = Zone.CONTENT
+    private var initialTabChosen = false
+    private var hasStorage = false
+    private var heroKey: String? = null
+    private lateinit var splash: View
+    private var splashBarDone = false
+    private var libraryLoaded = false
+
+    private val tabCount = CONSOLES.size + 1
+    private val settingsTab get() = tab == CONSOLES.size
+    private val consoleGames get() = if (settingsTab) emptyList() else games[CONSOLES[tab].id].orEmpty()
+    private val currentGame get() = consoleGames.getOrNull(selected.getOrElse(tab) { 0 })
+
+    private lateinit var tabs: LinearLayout
+    private lateinit var gamePanel: View
+    private lateinit var hero: ViewGroup
+    private lateinit var heroImage: ImageView
+    private lateinit var heroFallback: TextView
+    private lateinit var emptyText: TextView
+    private lateinit var shelf: View
+    private lateinit var shelfTitle: TextView
+    private lateinit var shelfScroll: HorizontalScrollView
+    private lateinit var coverRow: LinearLayout
+    private lateinit var settingsGrid: GridLayout
+    private lateinit var hints: LinearLayout
+    private val tabViews = mutableListOf<View>()
+    private val coverViews = mutableListOf<View>()
+    private val settingViews = mutableListOf<View>()
+    private lateinit var settings: List<Setting>
+
+    private val inputListener = object : InputManager.InputDeviceListener {
+        override fun onInputDeviceAdded(deviceId: Int) = refreshStatus()
+        override fun onInputDeviceRemoved(deviceId: Int) = refreshStatus()
+        override fun onInputDeviceChanged(deviceId: Int) = refreshStatus()
+    }
+    // Wi-Fi comes up a few seconds after boot: refresh the top bar as soon as the network changes.
+    private val networkCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) { main.post { refreshStatus() } }
+        override fun onLost(network: Network) { main.post { refreshStatus() } }
+    }
+    private val statusTicker = object : Runnable {
+        override fun run() {
+            refreshStatus()
+            main.postDelayed(this, 30_000)
+        }
+    }
+    private val statusJsonTicker = object : Runnable {
+        override fun run() {
+            writeStatusJson()
+            main.postDelayed(this, 60 * 60_000L)
+        }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+        library = Library(this)
+        covers = CoverLoader(this)
+
+        tabs = findViewById(R.id.tabs)
+        gamePanel = findViewById(R.id.gamePanel)
+        hero = findViewById(R.id.hero)
+        heroImage = findViewById(R.id.heroImage)
+        heroFallback = findViewById(R.id.heroFallback)
+        emptyText = findViewById(R.id.emptyText)
+        shelf = findViewById(R.id.shelf)
+        shelfTitle = findViewById(R.id.shelfTitle)
+        shelfScroll = findViewById(R.id.shelfScroll)
+        coverRow = findViewById(R.id.covers)
+        settingsGrid = findViewById(R.id.settingsGrid)
+        hints = findViewById(R.id.hints)
+        hero.clipToOutline = true
+        splash = findViewById(R.id.splash)
+
+        buildTabs()
+        buildSettings()
+        // Only on a cold start (boot, reinstall), not when coming back from a game.
+        if (savedInstanceState == null) startSplash()
+    }
+
+    // ---- Startup animation ----
+
+    private fun startSplash() {
+        splash.visibility = View.VISIBLE
+        // Initial state equals the window background (glow + icon), so the hand-over is invisible.
+        listOf(R.id.splashRetro, R.id.splashStick).forEach { findViewById<View>(it).alpha = 0f }
+        findViewById<View>(R.id.splashFill).apply {
+            pivotX = 0f
+            scaleX = 0f
+        }
+        // A cold start takes ~2 s to draw its first frame on this stick: animate only once it is on screen.
+        splash.viewTreeObserver.addOnPreDrawListener(object : ViewTreeObserver.OnPreDrawListener {
+            override fun onPreDraw(): Boolean {
+                splash.viewTreeObserver.removeOnPreDrawListener(this)
+                splash.postOnAnimation { animateSplash() }
+                return true
+            }
+        })
+    }
+
+    private fun animateSplash() {
+        findViewById<View>(R.id.splashGlow)
+            .animate().alpha(0.6f).scaleX(1.12f).scaleY(1.12f).setDuration(900).start()
+        findViewById<View>(R.id.splashIcon).apply {
+            animate().scaleX(1.12f).scaleY(1.12f).setDuration(220).setInterpolator(DecelerateInterpolator())
+                .withEndAction {
+                    animate().scaleX(1f).scaleY(1f).setDuration(380).setInterpolator(OvershootInterpolator(3f)).start()
+                }.start()
+        }
+        listOf(R.id.splashRetro to -1, R.id.splashStick to 1).forEachIndexed { i, (id, side) ->
+            findViewById<View>(id).apply {
+                translationX = side * dp(28).toFloat()
+                animate().alpha(1f).translationX(0f).setStartDelay(150L + i * 120).setDuration(420)
+                    .setInterpolator(DecelerateInterpolator()).start()
+            }
+        }
+        findViewById<View>(R.id.splashFill).apply {
+            animate().scaleX(1f).setStartDelay(350).setDuration(1100)
+                .setInterpolator(AccelerateDecelerateInterpolator())
+                .withEndAction {
+                    splashBarDone = true
+                    maybeHideSplash()
+                }.start()
+        }
+        // Never block the home screen if storage is slow or missing.
+        main.postDelayed({
+            libraryLoaded = true
+            splashBarDone = true
+            maybeHideSplash()
+        }, 5000)
+    }
+
+    private fun maybeHideSplash() {
+        if (splash.visibility != View.VISIBLE || !splashBarDone || !libraryLoaded) return
+        splash.animate().alpha(0f).setDuration(350).withEndAction { splash.visibility = View.GONE }.start()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        hasStorage = checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+        if (!hasStorage) {
+            requestPermissions(
+                arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE),
+                PERMISSION_REQUEST,
+            )
+        }
+        reload()
+        getSystemService(InputManager::class.java).registerInputDeviceListener(inputListener, main)
+        getSystemService(ConnectivityManager::class.java).registerDefaultNetworkCallback(networkCallback)
+        main.post(statusTicker)
+        main.post(statusJsonTicker)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        getSystemService(InputManager::class.java).unregisterInputDeviceListener(inputListener)
+        getSystemService(ConnectivityManager::class.java).unregisterNetworkCallback(networkCallback)
+        main.removeCallbacks(statusTicker)
+        main.removeCallbacks(statusJsonTicker)
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        // Home pressed while already here
+        zone = Zone.CONTENT
+        render()
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        hasStorage = grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }
+        reload()
+    }
+
+    // ---- Data ----
+
+    private fun reload() {
+        if (!hasStorage) {
+            games = emptyMap()
+            buildShelf()
+            render()
+            libraryLoaded = true
+            maybeHideSplash()
+            return
+        }
+        io.execute {
+            val scanned = library.scan()
+            main.post {
+                val keepKeys = CONSOLES.indices.map { i -> games[CONSOLES[i].id]?.getOrNull(selected[i])?.key }
+                games = scanned
+                CONSOLES.forEachIndexed { i, c ->
+                    val list = games[c.id].orEmpty()
+                    selected[i] = list.indexOfFirst { it.key == keepKeys[i] }.takeIf { it >= 0 }
+                        ?: selected[i].coerceIn(0, maxOf(0, list.size - 1))
+                }
+                if (!initialTabChosen) chooseInitialTab()
+                updateTabCounts()
+                buildShelf()
+                render()
+                libraryLoaded = true
+                maybeHideSplash()
+            }
+        }
+    }
+
+    /** Start on the console of the most recently played game, else the first one with games. */
+    private fun chooseInitialTab() {
+        initialTabChosen = true
+        val recent = games.values.flatten().filter { it.lastPlayed > 0 }.maxByOrNull { it.lastPlayed }
+        tab = when {
+            recent != null -> CONSOLES.indexOf(recent.console)
+            else -> CONSOLES.indexOfFirst { games[it.id].orEmpty().isNotEmpty() }.coerceAtLeast(0)
+        }
+        selected[tab] = 0
+    }
+
+    private fun writeStatusJson() {
+        if (!hasStorage) return
+        io.execute { runCatching { StickStatus.writeStatusJson(this) } }
+    }
+
+    // ---- Tabs ----
+
+    private fun buildTabs() {
+        CONSOLES.forEach { console ->
+            val v = layoutInflater.inflate(R.layout.item_tab, tabs, false)
+            v.findViewById<ImageView>(R.id.tabLogo).setImageResource(console.logo)
+            v.findViewById<TextView>(R.id.tabName).text = console.name
+            tabs.addView(v)
+            tabViews += v
+        }
+        val v = layoutInflater.inflate(R.layout.item_tab, tabs, false)
+        v.findViewById<ImageView>(R.id.tabLogo).setImageResource(R.drawable.ic_settings)
+        v.findViewById<TextView>(R.id.tabName).setText(R.string.settings_tab)
+        v.findViewById<TextView>(R.id.tabCount).setText(R.string.settings_tab_sub)
+        tabs.addView(v)
+        tabViews += v
+    }
+
+    private fun updateTabCounts() {
+        CONSOLES.forEachIndexed { i, c ->
+            val n = games[c.id].orEmpty().size
+            tabViews[i].findViewById<TextView>(R.id.tabCount).text = if (n == 1) "1 juego" else "$n juegos"
+        }
+    }
+
+    private fun renderTabs() {
+        tabViews.forEachIndexed { i, v ->
+            val sel = i == tab
+            v.layoutParams = (v.layoutParams as LinearLayout.LayoutParams).apply {
+                width = dp(if (sel) 150 else 125)
+                height = dp(if (sel) 80 else 66)
+            }
+            v.setBackgroundResource(when {
+                sel && zone == Zone.TABS -> R.drawable.bg_tab_sel_focus
+                sel -> R.drawable.bg_tab_sel
+                else -> R.drawable.bg_tab
+            })
+            v.alpha = if (sel) 1f else 0.7f
+            v.elevation = if (sel) dp(8).toFloat() else 0f
+
+            val logo = v.findViewById<ImageView>(R.id.tabLogo)
+            logo.layoutParams = logo.layoutParams.apply { height = dp(if (sel) 22 else 17) }
+            logo.maxWidth = dp(if (sel) 128 else 103)
+            // Unselected logos are white (filter: brightness(0) invert(1)); the selected one keeps its colours.
+            val console = CONSOLES.getOrNull(i)
+            when {
+                console == null || sel -> {
+                    console?.let { logo.setImageResource(it.logo) }
+                    logo.clearColorFilter()
+                }
+                console.logoWhite != null -> {
+                    logo.setImageResource(console.logoWhite)
+                    logo.clearColorFilter()
+                }
+                else -> {
+                    logo.setImageResource(console.logo)
+                    logo.setColorFilter(Color.WHITE)
+                }
+            }
+
+            v.findViewById<TextView>(R.id.tabName).apply {
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, if (sel) 10.5f else 9f)
+                setTextColor(if (sel) Color.WHITE else getColor(R.color.tab_name))
+                typeface = resources.getFont(if (sel) R.font.inter_semibold else R.font.inter_regular)
+            }
+            v.findViewById<TextView>(R.id.tabCount)
+                .setTextColor(getColor(if (sel) R.color.tab_count_sel else R.color.tab_count))
+        }
+    }
+
+    // ---- Shelf ----
+
+    private fun buildShelf() {
+        coverRow.removeAllViews()
+        coverViews.clear()
+        if (settingsTab) return
+        val list = consoleGames
+        val playing = list.filter { it.lastPlayed > 0 }.maxByOrNull { it.lastPlayed }
+        list.forEach { game ->
+            val v = layoutInflater.inflate(R.layout.item_cover, coverRow, false)
+            val inner = v.findViewById<View>(R.id.coverInner)
+            inner.background = fallbackGradient(game, 8)
+            inner.clipToOutline = true
+            v.findViewById<TextView>(R.id.coverTitle).text = game.title
+            v.findViewById<View>(R.id.coverFavorite).visibility = if (game.favorite) View.VISIBLE else View.GONE
+            v.findViewById<View>(R.id.coverBadge).visibility = if (game == playing) View.VISIBLE else View.GONE
+            val image = v.findViewById<ImageView>(R.id.coverImage)
+            image.tag = game.key
+            covers.load(game, dp(98)) { bitmap -> if (image.tag == game.key) image.setImageBitmap(bitmap) }
+            coverRow.addView(v)
+            coverViews += v
+        }
+        val add = layoutInflater.inflate(R.layout.item_cover, coverRow, false)
+        add.findViewById<View>(R.id.coverInner).setBackgroundResource(R.drawable.bg_add_card)
+        add.findViewById<TextView>(R.id.coverTitle).apply {
+            setText(R.string.add_games)
+            setTextColor(getColor(R.color.text_2))
+            typeface = resources.getFont(R.font.inter_semibold)
+        }
+        coverRow.addView(add)
+    }
+
+    private fun renderShelf() {
+        if (settingsTab) return
+        val sel = selected[tab]
+        coverViews.forEachIndexed { i, v ->
+            v.background = if (i == sel && zone == Zone.CONTENT) getDrawable(R.drawable.bg_cover_sel) else null
+        }
+        val v = coverViews.getOrNull(sel) ?: return
+        shelfScroll.post {
+            val visible = shelfScroll.width - shelfScroll.paddingStart - shelfScroll.paddingEnd
+            when {
+                v.left < shelfScroll.scrollX -> shelfScroll.smoothScrollTo(v.left, 0)
+                v.right > shelfScroll.scrollX + visible -> shelfScroll.smoothScrollTo(v.right - visible, 0)
+            }
+        }
+    }
+
+    // ---- Selected game ----
+
+    private fun renderContent() {
+        val game = currentGame
+        gamePanel.visibility = if (!settingsTab && game != null) View.VISIBLE else View.GONE
+        emptyText.visibility = if (!settingsTab && game == null) View.VISIBLE else View.GONE
+        shelf.visibility = if (settingsTab) View.GONE else View.VISIBLE
+        settingsGrid.visibility = if (settingsTab) View.VISIBLE else View.GONE
+        if (settingsTab) return
+
+        val console = CONSOLES[tab]
+        shelfTitle.text = getString(R.string.shelf_title, console.name)
+        if (game == null) {
+            emptyText.text = if (hasStorage) getString(R.string.empty_console, console.name) else getString(R.string.need_storage)
+            return
+        }
+        findViewById<TextView>(R.id.gameTitle).text = game.title
+        findViewById<TextView>(R.id.gameMeta).text = listOfNotNull(console.name, game.region).joinToString(" · ")
+        findViewById<TextView>(R.id.lastPlayed).text = formatWhen(game.lastPlayed)
+        findViewById<TextView>(R.id.timePlayed).text = formatDuration(game.runtimeSeconds)
+        // "✓ Copia en Drive" needs FolderSync's state (phase 3); until then only local facts are shown.
+        findViewById<TextView>(R.id.saveState).setText(if (game.hasProgress) R.string.save_on_stick else R.string.no_save)
+        findViewById<TextView>(R.id.playText).setText(if (game.hasProgress) R.string.continue_game else R.string.play)
+
+        if (heroKey != game.key) {
+            heroKey = game.key
+            hero.background = fallbackGradient(game, 12)
+            heroFallback.text = game.title
+            heroImage.setImageDrawable(null)
+            heroImage.tag = game.key
+            covers.load(game, dp(190)) { bitmap -> if (heroImage.tag == game.key) heroImage.setImageBitmap(bitmap) }
+        }
+    }
+
+    // ---- Retro Ajustes ----
+
+    private fun buildSettings() {
+        settings = listOf(
+            Setting("🎮", getString(R.string.set_pair), getString(R.string.set_pair_sub)) { open(Intent(CONNECT_INPUT)) },
+            Setting("🔄", getString(R.string.set_sync), "") {
+                StickStatus.folderSyncLaunchIntent(this)?.let(::open) ?: toast(R.string.foldersync_missing)
+            },
+            Setting("📶", getString(R.string.set_wifi), "") { open(Intent(Settings.ACTION_WIFI_SETTINGS)) },
+            Setting("⚙️", getString(R.string.set_android), getString(R.string.set_android_sub)) {
+                open(Intent(Settings.ACTION_SETTINGS))
+            },
+            Setting("💾", getString(R.string.set_space), "") { open(Intent(Settings.ACTION_INTERNAL_STORAGE_SETTINGS)) },
+            Setting("🕹️", getString(R.string.set_controllers), "") { open(Intent(CONNECT_INPUT)) },
+            Setting("👾", getString(R.string.set_retroarch), getString(R.string.set_retroarch_sub)) {
+                launchIntent(RETROARCH_PACKAGE)?.let(::open) ?: toast(R.string.retroarch_missing)
+            },
+            Setting("📱", getString(R.string.set_other_apps), getString(R.string.set_other_apps_sub)) {
+                launchIntent(FLAUNCHER_PACKAGE)?.let(::open) ?: toast(R.string.app_missing)
+            },
+        )
+        settings.forEach { s ->
+            val v = layoutInflater.inflate(R.layout.item_setting, settingsGrid, false)
+            v.findViewById<TextView>(R.id.settingIcon).text = s.icon
+            v.findViewById<TextView>(R.id.settingTitle).text = s.title
+            settingsGrid.addView(v)
+            settingViews += v
+        }
+    }
+
+    private fun renderSettings() {
+        settingViews.forEachIndexed { i, v ->
+            val sel = i == settingIndex && zone == Zone.CONTENT && settingsTab
+            v.setBackgroundResource(if (sel) R.drawable.bg_tab_sel else R.drawable.bg_tab)
+            v.findViewById<TextView>(R.id.settingSub).text = settings[i].subtitle
+        }
+    }
+
+    // ---- Status (top bar and settings subtitles) ----
+
+    private fun refreshStatus() {
+        val pads = StickStatus.controllers()
+        findViewById<TextView>(R.id.controllerText).text = when {
+            pads.isEmpty() -> getString(R.string.no_controller)
+            pads.size == 1 -> "${StickStatus.shortControllerName(pads[0])} · J1"
+            else -> "${StickStatus.shortControllerName(pads[0])} · J1 +${pads.size - 1}"
+        }
+        val folderSync = StickStatus.folderSyncLaunchIntent(this) != null
+        findViewById<View>(R.id.syncDot).setBackgroundResource(if (folderSync) R.drawable.dot_ok else R.drawable.dot_off)
+        findViewById<TextView>(R.id.syncText)
+            .setText(if (folderSync) R.string.drive_foldersync else R.string.drive_not_configured)
+        val net = StickStatus.network(this)
+        findViewById<TextView>(R.id.netText).text = net ?: getString(R.string.offline)
+        findViewById<View>(R.id.netIcon).alpha = if (net != null) 1f else 0.4f
+
+        settings[1].subtitle = if (folderSync) "Abre FolderSync" else "Pendiente de instalar"
+        settings[2].subtitle = net?.let { "Conectado por $it" } ?: getString(R.string.offline)
+        settings[5].subtitle = if (pads.isEmpty()) "Ninguno" else pads.joinToString(", ")
+        if (hasStorage) {
+            io.execute {
+                val free = StickStatus.freeBytes()
+                val roms = StickStatus.romsBytes()
+                main.post {
+                    settings[4].subtitle = "${Formatter.formatShortFileSize(this, free)} libres · " +
+                        "juegos ${Formatter.formatShortFileSize(this, roms)}"
+                    renderSettings()
+                }
+            }
+        }
+        renderSettings()
+    }
+
+    // ---- Hints ----
+
+    private fun renderHints() {
+        hints.removeAllViews()
+        when {
+            settingsTab -> addHint(R.drawable.ic_hint_cross, R.string.hint_open)
+            currentGame != null -> {
+                addHint(R.drawable.ic_hint_cross, R.string.hint_play)
+                addHint(R.drawable.ic_hint_circle, R.string.hint_back)
+                addHint(R.drawable.ic_hint_triangle, R.string.hint_favorite)
+                addHint(R.drawable.ic_hint_square, R.string.hint_details)
+            }
+        }
+        addHint(null, R.string.hint_switch)
+    }
+
+    /** [icon] is a PlayStation button glyph; null draws the "L1 / R1" pill. */
+    private fun addHint(icon: Int?, label: Int) {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+        }
+        if (icon != null) {
+            row.addView(ImageView(this).apply { setImageResource(icon) }, LinearLayout.LayoutParams(dp(17), dp(17)))
+        } else {
+            row.addView(TextView(this).apply {
+                text = "L1 / R1"
+                setTextColor(getColor(R.color.chip_text))
+                setBackgroundResource(R.drawable.bg_hint_pill)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 8f)
+                typeface = resources.getFont(R.font.inter_semibold)
+                setPadding(dp(5), dp(1), dp(5), dp(1))
+            }, LinearLayout.LayoutParams(-2, -2))
+        }
+        row.addView(TextView(this).apply {
+            setText(label)
+            setTextColor(getColor(R.color.chip_text))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 10.5f)
+        }, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(4.5f) })
+        hints.addView(row, LinearLayout.LayoutParams(-2, -2).apply { if (hints.childCount > 0) marginStart = dp(17) })
+    }
+
+    // ---- Input ----
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.keyCode !in HANDLED_KEYS) return super.dispatchKeyEvent(event)
+        if (event.action == KeyEvent.ACTION_DOWN && splash.visibility != View.VISIBLE) onKey(event.keyCode)
+        return true
+    }
+
+    private fun onKey(code: Int) {
+        val tabsZone = zone == Zone.TABS
+        when (code) {
+            KeyEvent.KEYCODE_BUTTON_L1 -> switchTab(-1)
+            KeyEvent.KEYCODE_BUTTON_R1 -> switchTab(1)
+            KeyEvent.KEYCODE_DPAD_LEFT -> when {
+                tabsZone -> switchTab(-1)
+                settingsTab -> if (settingIndex % SETTINGS_COLUMNS > 0) settingIndex--
+                else -> moveGame(-1)
+            }
+            KeyEvent.KEYCODE_DPAD_RIGHT -> when {
+                tabsZone -> switchTab(1)
+                settingsTab -> if (settingIndex % SETTINGS_COLUMNS < SETTINGS_COLUMNS - 1 && settingIndex + 1 < settings.size) settingIndex++
+                else -> moveGame(1)
+            }
+            KeyEvent.KEYCODE_DPAD_UP -> when {
+                tabsZone -> Unit
+                settingsTab && settingIndex >= SETTINGS_COLUMNS -> settingIndex -= SETTINGS_COLUMNS
+                else -> zone = Zone.TABS
+            }
+            KeyEvent.KEYCODE_DPAD_DOWN -> when {
+                tabsZone -> zone = Zone.CONTENT
+                settingsTab && settingIndex + SETTINGS_COLUMNS < settings.size -> settingIndex += SETTINGS_COLUMNS
+            }
+            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER,
+            KeyEvent.KEYCODE_BUTTON_A -> when {
+                tabsZone -> zone = Zone.CONTENT
+                settingsTab -> settings[settingIndex].action()
+                else -> play()
+            }
+            // The home screen never closes: Back only leaves the tab row.
+            KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_BUTTON_B -> zone = Zone.CONTENT
+            KeyEvent.KEYCODE_BUTTON_Y -> toggleFavorite()
+            KeyEvent.KEYCODE_BUTTON_X -> showDetails()
+        }
+        render()
+    }
+
+    private fun switchTab(delta: Int) {
+        tab = (tab + delta + tabCount) % tabCount
+        buildShelf()
+    }
+
+    private fun moveGame(delta: Int) {
+        val size = consoleGames.size
+        if (size > 0) selected[tab] = (selected[tab] + delta).coerceIn(0, size - 1)
+    }
+
+    private fun play() {
+        val game = currentGame ?: return
+        if (!launchInRetroArch(this, game)) toast(R.string.retroarch_missing)
+    }
+
+    private fun toggleFavorite() {
+        val game = currentGame ?: return
+        library.setFavorite(game, !game.favorite)
+        toast(if (game.favorite) R.string.favorite_added else R.string.favorite_removed)
+        reload()
+    }
+
+    private fun showDetails() {
+        val game = currentGame ?: return
+        val date = SimpleDateFormat("d MMM yyyy, HH:mm", Locale("es", "ES"))
+        val text = buildString {
+            appendLine("Archivo: ${game.file.name}")
+            appendLine("Tamaño: ${Formatter.formatShortFileSize(this@MainActivity, game.file.length())}")
+            appendLine("Consola: ${game.console.name}")
+            appendLine("Veces jugado: ${game.playCount}")
+            appendLine("Tiempo jugado: ${formatDuration(game.runtimeSeconds)}")
+            appendLine()
+            if (game.saveFiles.isEmpty()) appendLine("Sin partidas guardadas en el stick.")
+            else {
+                appendLine("Partidas en el stick:")
+                game.saveFiles.sortedByDescending { it.lastModified() }.forEach {
+                    appendLine("• ${it.name.removePrefix(game.baseName)} — ${date.format(it.lastModified())}")
+                }
+            }
+        }
+        AlertDialog.Builder(this, R.style.Dialog_RetroStick)
+            .setTitle(game.title)
+            .setMessage(text.trim())
+            .setPositiveButton("Cerrar", null)
+            .show()
+    }
+
+    private fun render() {
+        renderTabs()
+        renderContent()
+        renderShelf()
+        renderSettings()
+        renderHints()
+    }
+
+    // ---- Helpers ----
+
+    private fun launchIntent(pkg: String) =
+        packageManager.getLaunchIntentForPackage(pkg) ?: packageManager.getLeanbackLaunchIntentForPackage(pkg)
+
+    private fun open(intent: Intent) {
+        try {
+            startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        } catch (e: Exception) {
+            toast(R.string.app_missing)
+        }
+    }
+
+    private fun toast(text: Int) = Toast.makeText(this, text, Toast.LENGTH_SHORT).show()
+
+    private fun fallbackGradient(game: Game, radiusDp: Int): GradientDrawable {
+        val (start, end) = COVER_GRADIENTS[Math.floorMod(game.title.hashCode(), COVER_GRADIENTS.size)]
+        return GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(start.toInt(), end.toInt())).apply {
+            cornerRadius = dp(radiusDp).toFloat()
+        }
+    }
+
+    private fun formatWhen(millis: Long): String {
+        if (millis <= 0) return getString(R.string.never)
+        val then = Calendar.getInstance().apply { timeInMillis = millis }
+        val today = Calendar.getInstance()
+        val time = SimpleDateFormat("HH:mm", Locale.US).format(millis)
+        val sameDay = { a: Calendar, b: Calendar ->
+            a.get(Calendar.YEAR) == b.get(Calendar.YEAR) && a.get(Calendar.DAY_OF_YEAR) == b.get(Calendar.DAY_OF_YEAR)
+        }
+        if (sameDay(then, today)) return "Hoy, $time"
+        if (sameDay(then, (today.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -1) })) return "Ayer, $time"
+        return SimpleDateFormat("d MMM", Locale("es", "ES")).format(millis).replace(".", "") + ", $time"
+    }
+
+    private fun formatDuration(seconds: Long): String {
+        if (seconds <= 0) return "—"
+        val h = seconds / 3600
+        val m = (seconds % 3600) / 60
+        return when {
+            h > 0 -> "$h h $m min"
+            m > 0 -> "$m min"
+            else -> "< 1 min"
+        }
+    }
+
+    private fun dp(value: Number) =
+        TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, value.toFloat(), resources.displayMetrics).toInt()
+}

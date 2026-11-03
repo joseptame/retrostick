@@ -333,7 +333,8 @@ https://raw.githubusercontent.com/libretro-thumbnails/<Sistema>/master/Named_Box
 ```
 - `<Sistema>`: `Nintendo_-_Game_Boy`, `Nintendo_-_Game_Boy_Color`, `Nintendo_-_Game_Boy_Advance`, `Sony_-_PlayStation`.
 - `<Nombre>` = nombre No-Intro/Redump sin extensión, sustituyendo `&*/:\`<>?\|"` por `_` y codificado con `encodeURIComponent`.
-- Si no existe, probar la variante sin la parte de idiomas `(En,Fr,De,…)`, y si tampoco, mostrar una tarjeta generada con degradado e inicial (como en la primera maqueta).
+- **Preferencia del usuario: portada europea siempre que exista.** Con el índice de `Named_Boxarts` (API de GitHub, `git/trees`, en caché una semana), entre las portadas con el mismo título se elige: europea con el nombre exacto > edición española `(Spain)` > otra europea > nombre exacto > otra región. Se descartan Beta/Proto/Demo/Sample/Kiosk.
+- Sin índice (sin red o límite de la API): nombre exacto, sin la parte de idiomas `(En,Fr,De,…)`, `(Europe)`, `(USA, Europe)` y `(USA)`. Si no hay ninguna, tarjeta generada con degradado y título (como en la primera maqueta).
 - Caché en el service worker (`CacheFirst`, 30 días).
 
 ### 7.6 Requisitos técnicos
@@ -349,7 +350,7 @@ https://raw.githubusercontent.com/libretro-thumbnails/<Sistema>/master/Named_Box
 
 ### 8.1 Stack
 - **Kotlin**, una sola Activity, **Views nativas sin Leanback ni Compose** (lo más ligero para 1 GB de RAM y Mali-450; el diseño es propio).
-- Paquete `com.retrostick.launcher`. `minSdk 21`, `targetSdk 28`. Se instala por sideload, así que se puede apuntar a 28 y usar almacenamiento heredado en Android 9.
+- Paquete `com.retrostick.launcher`. `minSdk 26` (fuentes como recurso), `targetSdk 28`. Se instala por sideload, así que se puede apuntar a 28 y usar almacenamiento heredado en Android 9.
 - `AndroidManifest`: categorías `HOME` + `DEFAULT` (pantalla de inicio), `LEANBACK_LAUNCHER` + `LAUNCHER`, banner de TV (320×180), `uses-feature android.software.leanback required=false`, `touchscreen required=false`.
 - Compilación del APK en **GitHub Actions** (artefacto descargable) y en local con `./gradlew assembleRelease` (firma con keystore de debug o una propia guardada fuera del repo).
 
