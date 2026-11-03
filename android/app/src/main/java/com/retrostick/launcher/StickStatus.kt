@@ -1,7 +1,6 @@
 package com.retrostick.launcher
 
 import android.content.Context
-import android.content.Intent
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Build
@@ -15,9 +14,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
-
-// ⚠️ Package names to confirm when FolderSync is installed (phase 3).
-private val FOLDERSYNC_PACKAGES = listOf("dk.tacit.android.foldersync.full", "dk.tacit.android.foldersync.lite")
 
 /** Which button glyphs to show: follows the controller family (USB/BT vendor id). */
 enum class PadStyle { PLAYSTATION, NINTENDO, XBOX, REMOTE }
@@ -98,10 +94,7 @@ object StickStatus {
 
     fun romsBytes() = File("$SDCARD/ROMs").walkTopDown().filter { it.isFile }.sumOf { it.length() }
 
-    fun folderSyncLaunchIntent(context: Context): Intent? =
-        FOLDERSYNC_PACKAGES.firstNotNullOfOrNull { context.packageManager.getLaunchIntentForPackage(it) }
-
-    /** README 8.3: Partidas/.stick/status.json, uploaded by FolderSync and read by the PWA. */
+    /** README 8.3: Partidas/.stick/status.json, uploaded by DriveSync and read by the PWA. */
     fun writeStatusJson(context: Context) {
         val iso = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }
         val json = JSONObject()

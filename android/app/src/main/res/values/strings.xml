@@ -5,9 +5,29 @@
     <string name="brand_stick">Stick</string>
 
     <string name="no_controller">Sin mando</string>
-    <string name="drive_not_configured">Drive sin configurar</string>
-    <string name="drive_foldersync">Sincronización con Drive activa</string>
     <string name="offline">Sin conexión</string>
+
+    <string name="drive_not_connected">Drive sin conectar</string>
+    <string name="drive_connected">Conectado</string>
+    <string name="drive_syncing">Sincronizando con Drive…</string>
+    <string name="drive_synced">Sincronizado con Drive · %1$s</string>
+    <string name="drive_error">Error al sincronizar</string>
+    <string name="drive_error_retry">Error: pulsa para reintentar</string>
+    <string name="drive_last_sync">Última: %1$s</string>
+    <string name="drive_connect">Conectar Google Drive</string>
+    <string name="drive_missing_config">Falta configurar Google Cloud (docs/google-cloud.md)</string>
+    <string name="drive_login_title">Conectar Google Drive</string>
+    <string name="drive_login_info">En el móvil o el PC abre</string>
+    <string name="drive_login_waiting">e introduce este código. Esperando…</string>
+    <string name="drive_login_ok">Google Drive conectado</string>
+    <string name="drive_login_denied">Has rechazado el acceso a Drive</string>
+    <string name="drive_login_expired">El código ha caducado. Vuelve a intentarlo.</string>
+    <string name="drive_login_error">No se pudo conectar: %1$s</string>
+    <string name="drive_disconnect_title">¿Desconectar Google Drive?</string>
+    <string name="drive_disconnect_message">%1$s\n\nLos juegos y partidas del stick no se borran.</string>
+    <string name="drive_disconnect">Desconectar</string>
+    <string name="syncing">Sincronizando…</string>
+    <string name="cancel">Cancelar</string>
 
     <string name="settings_tab">Retro Ajustes</string>
     <string name="settings_tab_sub">Mando · Sync · Wi-Fi</string>
@@ -20,6 +40,8 @@
     <string name="never">Nunca</string>
     <string name="no_save">Sin partida</string>
     <string name="save_on_stick">En el stick</string>
+    <string name="save_in_drive">✓ Copia en Drive</string>
+    <string name="save_pending">Pendiente de subir</string>
     <string name="playing_badge">▶ Jugando</string>
     <string name="add_games">+ Añade juegos desde la app del móvil</string>
     <string name="shelf_title">%1$s · en el stick</string>
@@ -35,7 +57,6 @@
 
     <string name="need_storage">RetroStick necesita permiso de almacenamiento para ver tus juegos.</string>
     <string name="retroarch_missing">RetroArch (32 bits) no está instalado.</string>
-    <string name="foldersync_missing">FolderSync aún no está instalado (fase 3).</string>
     <string name="app_missing">No se encuentra la app.</string>
     <string name="favorite_added">Añadido a favoritos</string>
     <string name="favorite_removed">Quitado de favoritos</string>
@@ -52,4 +73,5 @@
     <string name="set_retroarch_sub">Menú y ajustes del emulador</string>
     <string name="set_other_apps">Otras apps</string>
     <string name="set_other_apps_sub">Abre FLauncher</string>
+    <string name="set_account">Cuenta de Drive</string>
 </resources>

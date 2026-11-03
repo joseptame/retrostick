@@ -40,6 +40,7 @@ private const val SETTINGS_COLUMNS = 4
 private const val PERMISSION_REQUEST = 1
 private const val CONNECT_INPUT = "com.google.android.intent.action.CONNECT_INPUT"
 private const val FLAUNCHER_PACKAGE = "me.efesser.flauncher"
+private const val SYNC_PERIOD_MS = 15 * 60_000L
 
 /** Fallback card colours when there is no box art (inicio.html .cv gradients). */
 private val COVER_GRADIENTS = listOf(
@@ -127,6 +128,20 @@ class MainActivity : Activity() {
             main.postDelayed(this, 30_000)
         }
     }
+    private val driveAuth by lazy { DriveAuth(this) }
+    private val syncListener: () -> Unit = {
+        refreshStatus()
+        // Games or saves may have changed on the stick
+        if (DriveSync.phase != DriveSync.Phase.SYNCING) reload()
+    }
+    private val syncTicker = object : Runnable {
+        override fun run() {
+            if (hasStorage) DriveSync.sync(this@MainActivity)
+            main.postDelayed(this, SYNC_PERIOD_MS)
+        }
+    }
+    @Volatile private var loginCancelled = false
+
     private val statusJsonTicker = object : Runnable {
         override fun run() {
             writeStatusJson()
@@ -231,16 +246,24 @@ class MainActivity : Activity() {
         reload()
         getSystemService(InputManager::class.java).registerInputDeviceListener(inputListener, main)
         getSystemService(ConnectivityManager::class.java).registerDefaultNetworkCallback(networkCallback)
+        DriveSync.addListener(syncListener)
         main.post(statusTicker)
         main.post(statusJsonTicker)
+        // Back from a game or from boot: sync if the last one is older than a minute, then every 15 min.
+        if (hasStorage && System.currentTimeMillis() - DriveSync.lastSuccess(this) > 60_000) DriveSync.sync(this)
+        main.postDelayed(syncTicker, SYNC_PERIOD_MS)
     }
 
     override fun onPause() {
         super.onPause()
         getSystemService(InputManager::class.java).unregisterInputDeviceListener(inputListener)
         getSystemService(ConnectivityManager::class.java).unregisterNetworkCallback(networkCallback)
+        DriveSync.removeListener(syncListener)
         main.removeCallbacks(statusTicker)
         main.removeCallbacks(statusJsonTicker)
+        main.removeCallbacks(syncTicker)
+        // Never sync while a game may have its save open.
+        DriveSync.cancel()
     }
 
     override fun onNewIntent(intent: Intent?) {
@@ -446,8 +469,16 @@ class MainActivity : Activity() {
         findViewById<TextView>(R.id.gameMeta).text = listOfNotNull(console.name, game.region).joinToString(" · ")
         findViewById<TextView>(R.id.lastPlayed).text = formatWhen(game.lastPlayed)
         findViewById<TextView>(R.id.timePlayed).text = formatDuration(game.runtimeSeconds)
-        // "✓ Copia en Drive" needs FolderSync's state (phase 3); until then only local facts are shown.
-        findViewById<TextView>(R.id.saveState).setText(if (game.hasProgress) R.string.save_on_stick else R.string.no_save)
+        findViewById<TextView>(R.id.saveState).apply {
+            val backedUp = game.hasProgress && driveAuth.isConnected && DriveSync.isBackedUp(this@MainActivity, game)
+            setText(when {
+                !game.hasProgress -> R.string.no_save
+                backedUp -> R.string.save_in_drive
+                driveAuth.isConnected -> R.string.save_pending
+                else -> R.string.save_on_stick
+            })
+            setTextColor(getColor(if (backedUp) R.color.ok else R.color.text))
+        }
         findViewById<TextView>(R.id.playText).setText(if (game.hasProgress) R.string.continue_game else R.string.play)
 
         if (heroKey != game.key) {
@@ -466,7 +497,12 @@ class MainActivity : Activity() {
         settings = listOf(
             Setting("🎮", getString(R.string.set_pair), getString(R.string.set_pair_sub)) { open(Intent(CONNECT_INPUT)) },
             Setting("🔄", getString(R.string.set_sync), "") {
-                StickStatus.folderSyncLaunchIntent(this)?.let(::open) ?: toast(R.string.foldersync_missing)
+                if (driveAuth.isConnected) {
+                    DriveSync.sync(this)
+                    toast(R.string.syncing)
+                } else {
+                    startDriveLogin()
+                }
             },
             Setting("📶", getString(R.string.set_wifi), "") { open(Intent(Settings.ACTION_WIFI_SETTINGS)) },
             Setting("⚙️", getString(R.string.set_android), getString(R.string.set_android_sub)) {
@@ -479,6 +515,9 @@ class MainActivity : Activity() {
             },
             Setting("📱", getString(R.string.set_other_apps), getString(R.string.set_other_apps_sub)) {
                 launchIntent(FLAUNCHER_PACKAGE)?.let(::open) ?: toast(R.string.app_missing)
+            },
+            Setting("☁️", getString(R.string.set_account), "") {
+                if (driveAuth.isConnected) confirmDisconnect() else startDriveLogin()
             },
         )
         settings.forEach { s ->
@@ -507,15 +546,28 @@ class MainActivity : Activity() {
             pads.size == 1 -> "${StickStatus.shortControllerName(pads[0])} · J1"
             else -> "${StickStatus.shortControllerName(pads[0])} · J1 +${pads.size - 1}"
         }
-        val folderSync = StickStatus.folderSyncLaunchIntent(this) != null
-        findViewById<View>(R.id.syncDot).setBackgroundResource(if (folderSync) R.drawable.dot_ok else R.drawable.dot_off)
-        findViewById<TextView>(R.id.syncText)
-            .setText(if (folderSync) R.string.drive_foldersync else R.string.drive_not_configured)
+        val connected = driveAuth.isConfigured && driveAuth.isConnected
+        val ago = formatAgo(DriveSync.lastSuccess(this))
+        val (dot, syncText) = when {
+            !connected -> R.drawable.dot_off to getString(R.string.drive_not_connected)
+            DriveSync.phase == DriveSync.Phase.SYNCING -> R.drawable.dot_ok to getString(R.string.drive_syncing)
+            DriveSync.phase == DriveSync.Phase.ERROR -> R.drawable.dot_error to getString(R.string.drive_error)
+            else -> R.drawable.dot_ok to getString(R.string.drive_synced, ago)
+        }
+        findViewById<View>(R.id.syncDot).setBackgroundResource(dot)
+        findViewById<TextView>(R.id.syncText).text = syncText
         val net = StickStatus.network(this)
         findViewById<TextView>(R.id.netText).text = net ?: getString(R.string.offline)
         findViewById<View>(R.id.netIcon).alpha = if (net != null) 1f else 0.4f
 
-        settings[1].subtitle = if (folderSync) "Abre FolderSync" else "Pendiente de instalar"
+        settings[1].subtitle = when {
+            !driveAuth.isConfigured -> getString(R.string.drive_missing_config)
+            !connected -> getString(R.string.drive_connect)
+            DriveSync.phase == DriveSync.Phase.SYNCING -> getString(R.string.drive_syncing)
+            DriveSync.phase == DriveSync.Phase.ERROR -> getString(R.string.drive_error_retry)
+            else -> getString(R.string.drive_last_sync, ago)
+        }
+        settings[8].subtitle = if (connected) driveAuth.email ?: getString(R.string.drive_connected) else getString(R.string.drive_not_connected)
         settings[2].subtitle = net?.let { "Conectado por $it" } ?: getString(R.string.offline)
         settings[5].subtitle = if (pads.isEmpty()) "Ninguno" else pads.joinToString(", ")
         if (hasStorage) {
@@ -714,7 +766,106 @@ class MainActivity : Activity() {
         if (size > 0) selected[tab] = (selected[tab] + delta).coerceIn(0, size - 1)
     }
 
+    // ---- Google Drive sign-in (code typed on the phone) ----
+
+    private fun startDriveLogin() {
+        if (!driveAuth.isConfigured) {
+            toast(R.string.drive_missing_config)
+            return
+        }
+        loginCancelled = false
+        val info = TextView(this).apply {
+            setText(R.string.drive_login_info)
+            setTextColor(getColor(R.color.text_2))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+        }
+        val url = TextView(this).apply {
+            text = "google.com/device"
+            setTextColor(getColor(R.color.brand_accent))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            typeface = resources.getFont(R.font.inter_bold)
+        }
+        val code = TextView(this).apply {
+            text = "…"
+            setTextColor(Color.WHITE)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 30f)
+            letterSpacing = 0.12f
+            typeface = resources.getFont(R.font.inter_extrabold)
+        }
+        val waiting = TextView(this).apply {
+            setText(R.string.drive_login_waiting)
+            setTextColor(getColor(R.color.text_3))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f)
+        }
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(24), dp(8), dp(24), dp(4))
+            listOf(info, url, code, waiting).forEach { addView(it, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(6) }) }
+        }
+        val dialog = AlertDialog.Builder(this, R.style.Dialog_RetroStick)
+            .setTitle(R.string.drive_login_title)
+            .setView(box)
+            .setNegativeButton(R.string.cancel) { _, _ -> loginCancelled = true }
+            .setOnCancelListener { loginCancelled = true }
+            .show()
+
+        Thread {
+            try {
+                val device = driveAuth.requestDeviceCode()
+                main.post {
+                    code.text = device.userCode
+                    url.text = device.verificationUrl.removePrefix("https://").removePrefix("www.")
+                }
+                val outcome = driveAuth.waitForAuthorization(device) { loginCancelled }
+                main.post {
+                    dialog.dismiss()
+                    when (outcome) {
+                        DriveAuth.Outcome.CONNECTED -> {
+                            toast(R.string.drive_login_ok)
+                            DriveSync.sync(this)
+                        }
+                        DriveAuth.Outcome.DENIED -> toast(R.string.drive_login_denied)
+                        DriveAuth.Outcome.EXPIRED -> toast(R.string.drive_login_expired)
+                        DriveAuth.Outcome.CANCELLED -> Unit
+                    }
+                    refreshStatus()
+                }
+            } catch (e: Exception) {
+                main.post {
+                    dialog.dismiss()
+                    Toast.makeText(this, getString(R.string.drive_login_error, e.message), Toast.LENGTH_LONG).show()
+                }
+            }
+        }.start()
+    }
+
+    private fun confirmDisconnect() {
+        AlertDialog.Builder(this, R.style.Dialog_RetroStick)
+            .setTitle(R.string.drive_disconnect_title)
+            .setMessage(getString(R.string.drive_disconnect_message, driveAuth.email ?: ""))
+            .setPositiveButton(R.string.drive_disconnect) { _, _ ->
+                driveAuth.disconnect()
+                DriveSync.forget(this)
+                refreshStatus()
+                render()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun formatAgo(millis: Long): String {
+        if (millis <= 0) return getString(R.string.never).lowercase()
+        val minutes = (System.currentTimeMillis() - millis) / 60_000
+        return when {
+            minutes < 1 -> "ahora mismo"
+            minutes < 60 -> "hace $minutes min"
+            minutes < 24 * 60 -> "hace ${minutes / 60} h"
+            else -> formatWhen(millis)
+        }
+    }
+
     private fun play() {
+        DriveSync.cancel()
         val game = currentGame ?: return
         if (!launchInRetroArch(this, game)) toast(R.string.retroarch_missing)
     }

@@ -1,7 +1,16 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
 }
+
+// Google OAuth client ("TVs and Limited Input devices", docs/google-cloud.md). Kept out of git:
+// android/local.properties locally, environment variables in CI.
+val localProps = Properties().apply {
+    rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
+}
+fun oauthValue(key: String, env: String) = localProps.getProperty(key) ?: System.getenv(env) ?: ""
 
 android {
     namespace = "com.retrostick.launcher"
@@ -15,6 +24,12 @@ android {
         targetSdk = 28
         versionCode = 1
         versionName = "1.0.0"
+        buildConfigField("String", "OAUTH_CLIENT_ID", "\"${oauthValue("retrostick.clientId", "RETROSTICK_CLIENT_ID")}\"")
+        buildConfigField("String", "OAUTH_CLIENT_SECRET", "\"${oauthValue("retrostick.clientSecret", "RETROSTICK_CLIENT_SECRET")}\"")
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     buildTypes {

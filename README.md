@@ -69,7 +69,7 @@ Convertir un **Xiaomi Mi TV Stick** en una consola retro para jugar a **mis prop
                                     ├── Partidas/       (saves + states + estado del stick)
                                     └── Config/         (BIOS del usuario, configuración)
                                               │
-                                     FolderSync (en el stick)
+                              sincronización propia del launcher (en el stick)
                                               ▼
 📺 Mi TV Stick
    ├── /storage/emulated/0/ROMs/      ← JugandoAhora (Drive → stick, en espejo)
@@ -83,7 +83,7 @@ Convertir un **Xiaomi Mi TV Stick** en una consola retro para jugar a **mis prop
 - **La PWA no habla con el stick.** Solo ordena archivos en Drive. El stick se pone al día en su próxima sincronización.
 - **"Poner un juego en el stick"** = mover el archivo de `Coleccion/<consola>/` a `JugandoAhora/<consola>/` (cambiar el *parent* en Drive). **"Quitarlo"** = devolverlo a `Coleccion/`.
 - **Las partidas nunca se borran** del Drive al quitar un juego. Por eso viven en una carpeta aparte.
-- **Estado del stick:** el launcher escribe `Partidas/.stick/status.json` (espacio libre, hora de la última sincronización, mando conectado). FolderSync lo sube y la PWA lo lee para la pestaña "Stick".
+- **Estado del stick:** el launcher escribe `Partidas/.stick/status.json` (espacio libre, hora de la última sincronización, mando conectado). La sincronización del launcher lo sube y la PWA lo lee para la pestaña "Stick".
 
 ---
 
@@ -103,7 +103,7 @@ Retro/
     └── bios/           ← scph*.bin del usuario (opcional)
 ```
 
-- Los nombres de carpeta de consola (`gb`, `gbc`, `gba`, `psx`) son fijos. Los usan la PWA, FolderSync y el launcher.
+- Los nombres de carpeta de consola (`gb`, `gbc`, `gba`, `psx`) son fijos. Los usan la PWA y el launcher.
 - Los archivos de juego se nombran según **No-Intro** (cartuchos) o **Redump** (PS1). Así funcionan las portadas automáticas.
   Ejemplo: `Pokemon - Edicion Esmeralda (Spain).gba`.
 - **PS1:** formato preferido `.chd`. Para juegos de varios discos, `.m3u` + discos en la misma carpeta.
@@ -131,31 +131,33 @@ Debe ser **idempotente** (se puede ejecutar varias veces) y hacer:
 1. Comprobar la conexión ADB y la arquitectura. Abortar con un mensaje claro si no es lo esperado.
 2. Descargar e instalar los APK (en `stick/apks/`, ignorado por git):
    - **RetroArch 32 bits.** Build estable del buildbot de libretro (`buildbot.libretro.com/stable/<versión>/android/`). El APK de 32 bits suele llamarse `RetroArch_ra32.apk`. ⚠️ VERIFICAR el nombre y el paquete instalado (`adb shell pm list packages | grep -i retroarch`).
-   - **FolderSync.** Desde Google Play en el stick. ⚠️ VERIFICAR paquete (`dk.tacit.android.foldersync.lite` o la versión de pago).
    - **RetroStick Launcher.** APK compilado en la fase 4 (`android/app/build/outputs/apk/...`).
 3. Crear las carpetas: `/storage/emulated/0/ROMs/{gb,gbc,gba,psx}`, `/storage/emulated/0/Partidas/{saves,states,.stick}`, `/storage/emulated/0/RetroArch/system`.
 4. Copiar la configuración de RetroArch (sección 6) a su ruta. Ruta verificada: `/storage/emulated/0/Android/data/com.retroarch.ra32/files/retroarch.cfg` (accesible por ADB). Hacer **copia de seguridad** del cfg existente antes de sobrescribirlo.
 5. Copiar los archivos de opciones de núcleo y los *remaps* o *autoconfig* de los mandos.
 6. **Opcional, con confirmación explícita:** sustituir el launcher (sección 5.5).
-7. Mostrar al final una lista de **pasos manuales pendientes** (descarga de núcleos, login en FolderSync, etc.).
+7. Mostrar al final una lista de **pasos manuales pendientes** (descarga de núcleos, conectar Google Drive en Retro Ajustes, etc.).
 
 > Los núcleos (`.so`) se instalan en el directorio interno de la app, al que ADB no puede escribir sin root. **Paso manual:** en RetroArch, *Menú principal → Actualizador en línea → Descargar núcleos →* Gambatte, mGBA y PCSX ReARMed. Después, *Actualizar archivos de información de núcleos* y *Actualizar autoconfiguraciones de mandos*. Si hay alguna forma fiable de automatizarlo sin root, se puede proponer.
 
-### 5.3 FolderSync (configuración manual, documentarla con capturas o pasos en `docs/foldersync.md`)
-- Cuenta: Google Drive del usuario.
-- **Par 1 – Juegos**
-  - Remoto: `Retro/JugandoAhora` → Local: `/storage/emulated/0/ROMs`
-  - Tipo: **solo hacia local (download)**, **espejo**: borrar los archivos locales que no estén en remoto.
-  - Programación: cada 30 min + al arrancar el dispositivo, solo con Wi-Fi.
-- **Par 2 – Partidas**
-  - Remoto: `Retro/Partidas` → Local: `/storage/emulated/0/Partidas`
-  - Tipo: **bidireccional**, **sin borrar** en ningún lado. En conflictos, gana el archivo más reciente.
-  - Programación: cada 15–30 min.
-- **Par 3 – BIOS (opcional)**
-  - Remoto: `Retro/Config/bios` → Local: `/storage/emulated/0/RetroArch/system`, solo descarga.
-- ⚠️ VERIFICAR si FolderSync permite que otra app lance una sincronización (intent o API pública). Se usaría desde Retro Ajustes ("Sincronizar ahora"). Si no se puede, ese botón abre FolderSync.
+### 5.3 Sincronización con Google Drive (dentro del launcher)
+> **Cambio (2026-11-03):** FolderSync no se puede instalar desde la Play Store del stick ("Tu dispositivo no es
+> compatible") y su documentación dice que Android TV no está soportado. La sincronización la hace el propio launcher
+> (`DriveSync.kt`).
 
-> **Seguridad:** antes de activar el modo espejo del par 1, confirmar que **ninguna partida se guarda dentro de `/ROMs`** (sección 6). Si no, se borrarían.
+- **Inicio de sesión:** flujo de Google para TV: el stick muestra un código y el usuario lo introduce en
+  `google.com/device` desde el móvil. Cliente OAuth de tipo *TV y dispositivos de entrada limitada*
+  (`docs/google-cloud.md`). Ese flujo **solo admite `drive.file`/`drive.appdata`**.
+- **Partidas** (`Retro/Partidas/{saves,states,.stick}` ↔ `/Partidas/...`): en los dos sentidos, gana el más reciente,
+  **nunca borra**. Las subidas actualizan el mismo archivo de Drive (conserva las revisiones para la PWA).
+- **Juegos** (`Retro/JugandoAhora/<c>` → `/ROMs/<c>`): descarga lo que hay en Drive y **borra solo los juegos que
+  descargó él mismo** (lista en las preferencias de la app). Los juegos copiados a mano al stick se suben a
+  `JugandoAhora/<c>`.
+- **Cuándo:** solo con el launcher en pantalla (nunca durante una partida): al volver a él si la última sincronización
+  tiene más de 1 minuto, cada 15 minutos y con *Retro Ajustes → Sincronizar ahora*. Se cancela entre archivos al
+  lanzar un juego.
+- Crea la estructura de la sección 4 si no existe. Con `drive.file` **solo ve lo creado por RetroStick**: una carpeta
+  `Retro/` creada a mano en la web de Drive no se usa.
 
 ### 5.4 Menú de la TV
 Lo da el launcher propio (sección 8). Sustituye a Daijishō, que ya no se usa.
@@ -283,11 +285,13 @@ config_save_on_exit = "false"             # para que la configuración del repo 
 5. Copiar el Client ID a `.env.local` (`VITE_GOOGLE_CLIENT_ID=...`) y como secreto o variable del repo para el workflow de Pages.
 
 ### 7.3 Ámbito OAuth: decisión
-- **Usar `https://www.googleapis.com/auth/drive`** (acceso completo).
-- **Motivo:** con `drive.file` la PWA solo vería los archivos que crea ella. Pero las **partidas las sube FolderSync** desde el stick, y la PWA no podría verlas.
-- `drive` es un ámbito restringido. Para uso personal en modo **Pruebas** funciona sin verificación de Google; solo muestra un aviso de "app no verificada" que el usuario acepta.
-- Todas las operaciones se limitan a la carpeta `Retro/`. La app no lista ni toca nada fuera.
-- El token dura unos 60 minutos: renovación silenciosa con `prompt: ''` y, si falla, botón "Volver a iniciar sesión".
+- **`https://www.googleapis.com/auth/drive.file`** (actualizado 2026-11-03). El flujo de TV del stick no admite el
+  ámbito `drive` completo, y `drive.file` es no sensible: sin revisión de Google ni aviso de ámbito restringido.
+- Consecuencia: la PWA y el stick solo ven lo que crea RetroStick dentro de `Retro/`. Los juegos se suben desde la PWA
+  (o copiándolos al stick).
+- ⚠️ VERIFICAR: si un archivo creado con un cliente OAuth es visible para otro cliente del mismo proyecto con
+  `drive.file`. Si no, la PWA usará el mismo cliente de TV (flujo de código desde el navegador).
+- El token dura unos 60 minutos: renovación silenciosa y, si falla, botón "Volver a iniciar sesión".
 
 ### 7.4 Pantallas (ver `docs/maquetas/pwa-movil.png` y `movil.html`)
 Barra inferior: **Colección · Subir · Partidas · Stick**.
@@ -360,7 +364,7 @@ https://raw.githubusercontent.com/libretro-thumbnails/<Sistema>/master/Named_Box
 - **Juego seleccionado:** portada grande, nombre (No-Intro sin la parte entre paréntesis), consola y región.
   - *Última partida:* fecha del `.srm`/`.state.auto` en `/Partidas`.
   - *Tiempo jugado:* registro de tiempo de RetroArch (`content_runtime_log`). ⚠️ VERIFICAR la ruta y el formato en la 1.22.2.
-  - *Partida guardada:* "Copia en Drive" si FolderSync la ha subido (⚠️ VERIFICAR cómo saberlo en la fase 3); si no, "Solo en el stick".
+  - *Partida guardada:* "✓ Copia en Drive" si todas sus partidas están subidas tal como están en el stick; "Pendiente de subir" si no; "En el stick" sin Drive conectado.
   - Botón **Continuar partida** o **Jugar** (si no hay partida).
 - **Estante** con las portadas de la consola, marca "Jugando" en el último jugado y tarjeta final "+ Añade juegos desde la app del móvil".
 - **Ayudas de botones** abajo, con los símbolos del mando que se está usando (por *vendor id*: Sony, Nintendo, Microsoft u otros con el esquema A/B/X/Y de Android):
@@ -374,7 +378,8 @@ Botones grandes navegables con el mando, con el estilo de la maqueta de TV:
 | Botón | Acción |
 |---|---|
 | 🎮 **Emparejar mando** | `com.google.android.intent.action.CONNECT_INPUT` (verificado: `AddAccessoryActivity`). `ACTION_BLUETOOTH_SETTINGS` **no existe** en este stick. |
-| 🔄 **Sincronizar ahora** | Lanzar la sincronización de FolderSync si tiene intent público (⚠️ VERIFICAR); si no, abrir FolderSync. |
+| 🔄 **Sincronizar ahora** | Conecta Google Drive (código) o lanza la sincronización. |
+| ☁️ **Cuenta de Drive** | Muestra el correo conectado; permite desconectar. |
 | 📶 **Wi-Fi** | `Settings.ACTION_WIFI_SETTINGS` |
 | ⚙️ **Ajustes de Android** | `Settings.ACTION_SETTINGS` (salida de emergencia si se sustituyó el launcher) |
 | 💾 **Espacio** | Muestra el espacio libre (interno + USB si hay) y lo que ocupa `/ROMs` |
@@ -391,7 +396,7 @@ Al abrir la app y periódicamente (WorkManager, cada 60 min), escribir `/storage
   "appVersion": "1.0.0"
 }
 ```
-FolderSync lo sube con el par 2 y la PWA lo lee. Permiso: `WRITE_EXTERNAL_STORAGE` (Android 9).
+La sincronización lo sube a `Retro/Partidas/.stick/` y la PWA lo lee. Permiso: `WRITE_EXTERNAL_STORAGE` (Android 9).
 
 ---
 
@@ -415,10 +420,13 @@ FolderSync lo sube con el par 2 y la PWA lo lee. Permiso: `WRITE_EXTERNAL_STORAG
 - [ ] **Pendiente:** emparejar DualSense y Pro Controller, validar autoconfig y atajos (Select+Start, guardar/cargar estado, avance rápido).
 - [ ] **Pendiente:** PS1 (opciones de PCSX ReARMed y prueba) cuando haya un juego. Overlays/marcos.
 
-### Fase 3 – Stick: Drive y FolderSync
-- [ ] Crear `Retro/` en Drive (a mano o con la PWA de la fase 5).
-- [ ] Configurar FolderSync (pares 1, 2 y 3) y documentarlo.
-- **Aceptación:** mover un juego en Drive a `JugandoAhora` hace que aparezca en `/ROMs` tras sincronizar; quitarlo lo borra del stick y su partida sigue en Drive.
+### Fase 3 – Stick: Google Drive
+- [ ] Proyecto de Google Cloud y cliente OAuth de TV (`docs/google-cloud.md`).
+- [x] Sincronización en el launcher (`Drive.kt`, `DriveSync.kt`, sección 5.3).
+- [ ] Conectar el stick y probar.
+- **Aceptación:** al conectar se crea `Retro/` en Drive y suben las partidas y los juegos del stick; un archivo nuevo en
+  `Retro/JugandoAhora/<c>` aparece en el menú tras sincronizar; quitarlo de ahí lo borra del stick y su partida sigue en
+  Drive; la ficha del juego muestra "✓ Copia en Drive".
 
 ### Fase 4 – RetroStick Launcher (APK)
 - [ ] App Kotlin (sección 8) + workflow de GitHub Actions que publique el APK.
@@ -512,7 +520,7 @@ Tema oscuro únicamente (se usa en TV y de noche). En la TV, el foco se marca co
 | Parpadeos en juegos de GB/GBA | Activar mezcla de fotogramas o interframe blending. |
 | Juego de PS1 no arranca | Probar con la BIOS del usuario en `system/`; revisar `.cue`/`.m3u`. |
 | Partida "perdida" | Revisar que `savefile_directory` apunta a `/Partidas/saves`; restaurar una revisión desde la PWA. |
-| Conflicto de partidas | No jugar la misma partida en dos dispositivos a la vez; FolderSync se queda con la más reciente. |
+| Conflicto de partidas | No jugar la misma partida en dos dispositivos a la vez; la sincronización se queda con la más reciente. |
 | Sin acceso a Ajustes tras cambiar el launcher | `adb shell cmd package set-home-activity me.efesser.flauncher/.MainActivity` (vuelve a FLauncher) o pestaña Retro Ajustes → Ajustes de Android. |
 | Stick lento | Cerrar o desinstalar apps preinstaladas no usadas; desactivar animaciones en Opciones de desarrollador. |
 | Calentamiento en sesiones largas de PS1 | Alargador HDMI para separar el stick de la TV. |
