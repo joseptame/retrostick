@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { BottomNav, Banner, type Tab } from './components/ui'
+import { PullToRefreshIndicator, usePullToRefresh } from './components/PullToRefresh'
 import { accountEmail, isConfigured, isSignedIn, setAccountEmail, signOut, SignedOutError } from './lib/auth'
 import { ensureFolders, fetchAccountEmail, forgetFolders, type Folders } from './lib/drive'
 import { cachedLibrary, loadLibrary, type Library } from './lib/library'
@@ -75,6 +76,8 @@ function Main({ onSignOut }: { onSignOut: () => void }) {
     }
   }, [onSignOut])
 
+  const { pull, refreshing } = usePullToRefresh(refresh)
+
   useEffect(() => {
     refresh()
     const up = () => {
@@ -106,6 +109,7 @@ function Main({ onSignOut }: { onSignOut: () => void }) {
 
   return (
     <div className="app">
+      <PullToRefreshIndicator pull={pull} refreshing={refreshing} />
       {!online && <Banner tone="warn">Sin conexión: se muestra la última copia guardada y las acciones están desactivadas.</Banner>}
       {online && error && (
         <Banner tone="error">

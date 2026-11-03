@@ -29,6 +29,7 @@ body {
   min-height: 100vh;
   background: radial-gradient(900px 600px at 50% 0%, #2a2170, var(--bg) 70%) fixed;
   -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: contain;
 }
 button, input { font: inherit; color: inherit; }
 button { cursor: pointer; background: none; border: 0; }
@@ -204,6 +205,19 @@ h2 { font-size: 20px; font-weight: 800; }
   border-radius: 22px 22px 0 0; padding: 20px 18px calc(20px + env(safe-area-inset-bottom));
 }
 .sheet .sub { margin-bottom: 14px; }
+
+/* Pull-to-refresh */
+.ptr {
+  position: fixed; top: -64px; left: 50%; width: 44px; height: 44px; border-radius: 50%;
+  background: var(--surface-2); backdrop-filter: blur(10px); display: flex; align-items: center;
+  justify-content: center; z-index: 15; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+.ptr svg { width: 22px; height: 22px; color: var(--accent-text); transition: transform 0.15s ease; }
+.ptr-spin {
+  width: 22px; height: 22px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, 0.15);
+  border-top-color: var(--accent-text); animation: ptr-spin 0.7s linear infinite;
+}
+@keyframes ptr-spin { to { transform: rotate(360deg); } }
 
 /* Bottom navigation */
 .nav {
