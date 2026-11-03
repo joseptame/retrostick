@@ -137,7 +137,8 @@ adb shell am start -n com.retroarch.ra32/com.retroarch.browser.retroactivity.Ret
   -e LIBRETRO /data/user/0/com.retroarch.ra32/cores/<núcleo>_libretro_android.so \
   -e CONFIGFILE /storage/emulated/0/Android/data/com.retroarch.ra32/files/retroarch.cfg
 ```
-Núcleos: `gambatte_libretro_android.so`, `mgba_libretro_android.so`, `pcsx_rearmed_libretro_android.so`.
+Núcleos probados: `gambatte_libretro_android.so`, `mgba_libretro_android.so`.
+⏳ `pcsx_rearmed_libretro_android.so` sigue el mismo patrón, pero falta probarlo con un juego de PS1.
 
 FPS medidos con `dumpsys SurfaceFlinger --latency 'com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture#0'`
 (pantalla a 60 Hz):
