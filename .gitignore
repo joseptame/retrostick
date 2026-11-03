@@ -21,7 +21,6 @@ stick/apks/
 .env.local
 node_modules/
 dist/
-pwa/public/db/
 android/.gradle/
 android/build/
 android/app/build/
@@ -33,3 +32,4 @@ android/local.properties
 *.aab
 Thumbs.db
 .idea/
+.vercel/

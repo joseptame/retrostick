@@ -271,9 +271,14 @@ config_save_on_exit = "false"             # para que la configuración del repo 
 ### 7.1 Stack
 - **Vite + React + TypeScript**
 - **vite-plugin-pwa** (manifest, service worker, instalable, pantalla completa)
-- **Google Identity Services** (token client) + **Drive API v3** por REST (`fetch`, sin el SDK pesado `gapi` si no hace falta)
+- Inicio de sesión **con código** (`google.com/device`), con el **mismo cliente OAuth de TV que el stick**: con
+  `drive.file` ambos ven los mismos archivos. Google permite CORS en `oauth2.googleapis.com/device/code` y `/token`
+  (comprobado). El secreto de ese tipo de cliente no es confidencial y va en la web (variables
+  `VITE_GOOGLE_CLIENT_ID` y `VITE_GOOGLE_CLIENT_SECRET`).
+- **Drive API v3** por REST (`fetch`, sin `gapi`).
 - Estilos: CSS propio con tokens (sección 11), sin librerías de componentes pesadas
-- Despliegue: **GitHub Pages** con GitHub Actions (`base` de Vite = `/<nombre-repo>/`)
+- Despliegue: **Vercel** (cuenta del usuario), en la raíz del dominio. La página principal y la política de privacidad
+  siguen en GitHub Pages (`site/`) porque están dadas de alta en la pantalla de consentimiento de Google.
 
 ### 7.2 Google Cloud (pasos para el usuario, documentar en `docs/google-cloud.md`)
 1. console.cloud.google.com → proyecto nuevo "RetroStick".
@@ -316,11 +321,15 @@ Barra inferior: **Colección · Subir · Partidas · Stick**.
 - Selector de archivos múltiple (`.gb .gbc .gba .chd .cue .bin .m3u .pbp`; `.zip` opcional).
 - Detección de consola por extensión. Para `.bin`/`.chd`/`.cue` → psx.
 - **Identificación del juego (cartuchos):** calcular **CRC32 y SHA-1** en el navegador (Web Crypto para SHA-1, CRC32 propio o librería ligera) y buscarlo en los DAT **No-Intro** de `libretro-database` (`metadat/no-intro/Nintendo - Game Boy*.dat`).
-  - Generar en *build* (script `pwa/scripts/build-db.ts`) un JSON compacto `{sha1|crc: nombre}` por consola en `pwa/public/db/`, para no descargar los DAT en tiempo de ejecución.
+  - `pwa/scripts/build-db.ts` (`npm run build-db`) genera un JSON compacto por consola en `pwa/public/db/` con los
+    nombres, `{sha1|crc: nombre}` y el índice de portadas de libretro-thumbnails. **Se guardan en el repo** para que
+    la compilación en Vercel no dependa de la red ni de los límites de la API de GitHub; se regeneran a mano.
   - Si no hay coincidencia: búsqueda aproximada por nombre de archivo y, si tampoco, el usuario escribe el nombre a mano.
 - **PS1:** identificación por nombre de archivo frente a los DAT de **Redump** (`metadat/redump/Sony - PlayStation.dat`), o por la etiqueta del disco si es fácil. Si no hay coincidencia, nombre manual.
 - Muestra "nombre original tachado → nombre No-Intro", chip de consola, chip "✓ Reconocido" o "⚠ Revisar" y barra de progreso.
-- **Subida reanudable** (`uploadType=resumable`, trozos de 8 MiB, múltiplos de 256 KiB) con reintentos y reanudación tras un corte.
+- **Subida en sesión reanudable** (`uploadType=resumable`). Drive expone `Location` por CORS pero **no `Range`**
+  (comprobado), así que el navegador no puede saber cuánto llegó y reanudar por trozos: el archivo va en un solo PUT
+  (XHR, con progreso) y, si se corta, se reintenta con una sesión nueva (3 intentos).
 - Interruptor **"Enviar también al stick"**: sube directamente a `JugandoAhora/<c>` en vez de a `Coleccion/<c>`.
 - Evitar duplicados: si ya existe un archivo con el mismo nombre o SHA-1, preguntar.
 
