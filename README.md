@@ -333,6 +333,8 @@ Barra inferior: **Colección · Buscar · Subir · Partidas · Stick**.
   Vercel, *streaming* sin el límite de 4,5 MB). Cada juego tiene además un enlace "Abrir" que descarga con el
   navegador.
 - La identificación, el renombrado No-Intro y la subida reanudable son los mismos que en "Subir copias".
+- **Ficha del juego:** al pulsar un juego se abre su ficha con descripción, tráiler embebido y capturas (IGDB,
+  sección 7.7), y los botones de subir a Drive y abrir en archive.org.
 
 **Subir copias**
 - Selector de archivos múltiple (`.gb .gbc .gba .chd .cue .bin .m3u .pbp`; `.zip` opcional).
@@ -373,6 +375,24 @@ https://raw.githubusercontent.com/libretro-thumbnails/<Sistema>/master/Named_Box
 - Capa `drive.ts` con funciones tipadas: `ensureFolders`, `listFolder`, `moveFile`, `uploadResumable`, `download`, `listRevisions`, `restoreRevision`, `readJson`.
 - Tests unitarios (Vitest) para: normalización de nombres, URL de portadas, detección de consola, agrupación `.m3u`/`.cue`, emparejamiento juego ↔ partidas.
 - Lint + typecheck en CI.
+
+### 7.7 Ficha del juego en "Buscar" (IGDB)
+- Al pulsar un juego en la pestaña Buscar se abre su ficha: descripción, **tráiler embebido** y capturas, sacados
+  de la API de **IGDB** (Twitch).
+- La consulta y el token OAuth se hacen en `pwa/api/igdb.ts` (Edge Function de Vercel), así el `Client Secret`
+  de IGDB **nunca** va en el navegador. El cliente llama a `/api/igdb?title=…`.
+- **Descripción en inglés** (IGDB no traduce): se muestra `summary` (o `storyline` si no hay). El tráiler es un
+  vídeo de YouTube embebido (`videos[0].video_id`); las capturas vienen de `screenshots[]`.
+
+**Configuración (una vez, gratis):**
+1. En `dev.twitch.tv/console/apps` → **Registra tu aplicación**. Nombre libre (ej. "RetroStick"), categoría "Otro",
+   OAuth redirect URL: `http://localhost` (no se usa).
+2. Copia el **Client ID** y el **Client Secret**.
+3. En Vercel (proyecto retrostick) → *Settings → Environment Variables* → añadir:
+   - `IGDB_CLIENT_ID` = el Client ID
+   - `IGDB_CLIENT_SECRET` = el Client Secret
+   (sin prefijo `VITE_`: son variables del servidor). Redeploy.
+- Sin estas variables, la ficha muestra "IGDB no está configurado" y solo se ve la portada y los botones de subir.
 
 ---
 
@@ -523,6 +543,7 @@ retrostick/
 │   │   └── components/
 │   ├── scripts/build-db.ts
 │   ├── api/download.ts      # proxy Vercel para descargar de archive.org (CORS)
+│   ├── api/igdb.ts          # proxy Vercel para IGDB (ficha del juego, 7.7)
 │   ├── public/db/           # generado en build
 │   └── vite.config.ts
 └── .github/workflows/

@@ -5,6 +5,7 @@ import { archiveFileUrl, downloadUrl, listItemFiles, proxyPath, type ArchiveEntr
 import { consoleForFile, CONSOLES, extension, isCartridge, type ConsoleId } from '../lib/consoles'
 import { uploadResumable } from '../lib/drive'
 import { formatBytes } from '../lib/format'
+import { fetchIgdb, type IgdbGame } from '../lib/igdb'
 import { baseName, displayTitle } from '../lib/names'
 import { identify, type Identification } from '../lib/romdb'
 
@@ -21,6 +22,13 @@ interface Job {
   error?: string
 }
 
+interface Ficha {
+  entry: ArchiveEntry
+  data: IgdbGame | null
+  loading: boolean
+  error: string | null
+}
+
 const norm = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
 
 export function Buscar({ state }: { state: AppState }) {
@@ -35,6 +43,7 @@ export function Buscar({ state }: { state: AppState }) {
   const [error, setError] = useState<string | null>(null)
   const [toStick, setToStick] = useState(false)
   const [job, setJob] = useState<Job | null>(null)
+  const [ficha, setFicha] = useState<Ficha | null>(null)
   const loaded = useRef(false)
 
   const busy = job?.phase === 'downloading' || job?.phase === 'uploading'
@@ -110,6 +119,18 @@ export function Buscar({ state }: { state: AppState }) {
     }
   }
 
+  async function openFicha(entry: ArchiveEntry) {
+    setFicha({ entry, data: null, loading: true, error: null })
+    try {
+      const data = await fetchIgdb(displayTitle(entry.name))
+      setFicha((f) => (f && f.entry.name === entry.name ? { ...f, data, loading: false } : f))
+    } catch (e) {
+      setFicha((f) =>
+        f && f.entry.name === entry.name ? { ...f, data: null, loading: false, error: e instanceof Error ? e.message : String(e) } : f,
+      )
+    }
+  }
+
   const q = norm(query.trim())
   const filtered = entries?.filter((e) => consoleForFile(e.name) === consoleId && (!q || norm(e.name).includes(q))) ?? []
 
@@ -170,7 +191,7 @@ export function Buscar({ state }: { state: AppState }) {
               {filtered.map((e) => {
                 const isJob = job?.key === e.name
                 return (
-                  <div key={e.name} className="game-card">
+                  <div key={e.name} className="game-card" onClick={() => openFicha(e)}>
                     <Cover console={consoleId} name={e.name} title={displayTitle(e.name)} />
                     <div className="ft">
                       <div className="nm">{displayTitle(e.name)}</div>
@@ -185,7 +206,14 @@ export function Buscar({ state }: { state: AppState }) {
                         {isJob && job.phase === 'done' && !job.error ? (
                           <span className="chip g">Subido</span>
                         ) : (
-                          <button className="pill" onClick={() => upload(e)} disabled={!state.online || busy}>
+                          <button
+                            className="pill"
+                            onClick={(ev) => {
+                              ev.stopPropagation()
+                              upload(e)
+                            }}
+                            disabled={!state.online || busy}
+                          >
                             {isJob && busy ? `${Math.round(job.progress * 100)} %` : 'Subir'}
                           </button>
                         )}
@@ -194,6 +222,7 @@ export function Buscar({ state }: { state: AppState }) {
                           href={archiveName ? archiveFileUrl(loadedId, archiveName, e.name) : downloadUrl(loadedId, e.name)}
                           target="_blank"
                           rel="noreferrer"
+                          onClick={(ev) => ev.stopPropagation()}
                         >
                           Abrir
                         </a>
@@ -213,6 +242,88 @@ export function Buscar({ state }: { state: AppState }) {
         <span>Enviar también al stick</span>
         <Switch on={toStick} onChange={setToStick} label="Enviar también al stick" disabled={busy} />
       </div>
+
+      {ficha && (
+        <div className="sheet-backdrop" onClick={() => setFicha(null)}>
+          <div className="sheet" onClick={(e) => e.stopPropagation()}>
+            <button className="back" onClick={() => setFicha(null)}>
+              ← Cerrar
+            </button>
+            {ficha.loading ? (
+              <p className="loading">Cargando ficha…</p>
+            ) : (
+              <>
+                <div className="ficha-head">
+                  {ficha.data?.coverUrl ? (
+                    <img className="ficha-cover" src={ficha.data.coverUrl} alt="" />
+                  ) : (
+                    <Cover console={consoleId} name={ficha.entry.name} title={displayTitle(ficha.entry.name)} className="ficha-cover" />
+                  )}
+                  <div className="grow">
+                    <h2>{ficha.data?.name || displayTitle(ficha.entry.name)}</h2>
+                    <p className="sub">
+                      {[ficha.data?.year ? String(ficha.data.year) : null, ...(ficha.data?.genres ?? [])]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </p>
+                    {ficha.data?.rating != null && <span className="chip g">★ {ficha.data.rating}</span>}
+                  </div>
+                </div>
+
+                {ficha.error && <Banner tone="error">{ficha.error}</Banner>}
+
+                {ficha.data?.description && <p className="desc">{ficha.data.description}</p>}
+                {ficha.data && !ficha.data.description && !ficha.error && <p className="hint">Sin descripción en IGDB.</p>}
+
+                {ficha.data?.trailerId && (
+                  <>
+                    <div className="sec">Tráiler</div>
+                    <div className="trailer">
+                      <iframe
+                        src={`https://www.youtube.com/embed/${ficha.data.trailerId}`}
+                        title="Tráiler"
+                        allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                        loading="lazy"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {ficha.data?.screenshots && ficha.data.screenshots.length > 0 && (
+                  <>
+                    <div className="sec">Capturas</div>
+                    <div className="shots">
+                      {ficha.data.screenshots.map((s) => (
+                        <img key={s} src={s} alt="" loading="lazy" />
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {job?.key === ficha.entry.name && job.phase !== 'done' && (
+                  <div className="prog">
+                    <i style={{ width: `${job.progress * 100}%` }} />
+                  </div>
+                )}
+                {job?.key === ficha.entry.name && job.error && <p className="hint error">{job.error}</p>}
+
+                <button className="btn" onClick={() => upload(ficha.entry)} disabled={!state.online || busy}>
+                  {job?.key === ficha.entry.name && busy ? `Subiendo… ${Math.round(job.progress * 100)} %` : 'Subir a Drive'}
+                </button>
+                <a
+                  className="link"
+                  href={archiveName ? archiveFileUrl(loadedId, archiveName, ficha.entry.name) : downloadUrl(loadedId, ficha.entry.name)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Abrir en archive.org
+                </a>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </main>
   )
 }
