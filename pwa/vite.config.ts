@@ -1,11 +1,14 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { vercelDev } from './vercel-dev'
 
 // Deployed on Vercel at the domain root (README 7.1).
 export default defineConfig({
+  server: { port: 3000 },
   plugins: [
     react(),
+    vercelDev(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['apple-touch-icon.png'],
