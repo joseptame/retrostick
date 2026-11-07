@@ -3,7 +3,7 @@ import { archiveFileUrl, downloadUrl, parseArchiveListing, proxyPath } from './a
 import { consoleForFile } from './consoles'
 import { groupFiles } from './group'
 import { crc32 } from './hash'
-import { bestBoxart, coverUrl, displayTitle, looseKey, region, saveOf } from './names'
+import { bestBoxart, coverUrl, displayTitle, looseKey, region, regionCode, saveOf } from './names'
 
 const ZELDA = 'Legend of Zelda, The - Oracle of Ages (Europe) (En,Fr,De,Es,It)'
 
@@ -30,6 +30,10 @@ describe('names', () => {
     expect(region(ZELDA)).toBe('Europa')
     expect(region('Game (USA)')).toBe('EE. UU.')
     expect(region('Game')).toBeNull()
+    expect(regionCode('Mario Kart - Super Circuit (Europe).gba')).toBe('EU')
+    expect(regionCode('ATV - Quad Power Racing (USA, Europe).gba')).toBe('US · EU')
+    expect(regionCode('Dragon Ball (Europe) (En,Fr,De,Es,It).gba')).toBe('EU')
+    expect(regionCode('Game (Rev 1).gba')).toBeNull()
   })
 
   it('matches loosely ignoring case, accents and articles', () => {

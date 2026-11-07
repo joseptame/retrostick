@@ -26,6 +26,19 @@ export function region(name: string): string | null {
   return group ? REGIONS[group] ?? group : null
 }
 
+const REGION_CODES: Record<string, string> = {
+  Europe: 'EU', USA: 'US', Japan: 'JP', Spain: 'ES', World: 'WORLD', Germany: 'DE', France: 'FR',
+  Italy: 'IT', Australia: 'AU', Korea: 'KR', Brazil: 'BR', Asia: 'ASIA', Canada: 'CA', 'United Kingdom': 'UK',
+}
+
+/** Short region label for badges: "(USA, Europe)" → "US · EU"; null when the name has no known region. */
+export function regionCode(name: string): string | null {
+  const group = /\(([^)]*)\)/.exec(name)?.[1]
+  if (!group) return null
+  const codes = group.split(',').map((r) => REGION_CODES[r.trim()]).filter(Boolean)
+  return codes.length ? codes.join(' · ') : null
+}
+
 /** libretro-thumbnails replaces these characters with "_" (README 7.5). */
 export const safeThumbName = (name: string) => name.replace(/[&*/:`<>?\\|"]/g, '_')
 
