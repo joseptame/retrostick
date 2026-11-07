@@ -7,6 +7,7 @@ import { consoleById } from '../lib/consoles'
 import type { DriveFile } from '../lib/drive'
 import { formatAgo, formatBytes, formatWhen } from '../lib/format'
 import { fetchIgdb, type IgdbGame } from '../lib/igdb'
+import { loadLookup } from '../lib/igdbdb'
 import { deleteGame, savesFor, setInStick, type Game } from '../lib/library'
 import { regionCode, saveLabel, saveOf } from '../lib/names'
 
@@ -14,6 +15,8 @@ export function Ficha({ game, state, onBack }: { game: Game; state: AppState; on
   const [revisionsOf, setRevisionsOf] = useState<DriveFile | null>(null)
   const [busy, setBusy] = useState(false)
   const [info, setInfo] = useState<IgdbGame | null>(null)
+  /** Press score from the prebuilt data (Wikipedia / IGDB critics), same as the cards */
+  const [press, setPress] = useState<number | null>(null)
   const [expanded, setExpanded] = useState(false)
   const { url } = useCoverUrl(game.console, game.name)
   const saves = state.library ? savesFor(game, state.library.saves) : []
@@ -23,11 +26,15 @@ export function Ficha({ game, state, onBack }: { game: Game; state: AppState; on
     window.scrollTo({ top: 0 })
     let alive = true
     setInfo(null)
+    setPress(null)
     if (state.online) fetchIgdb(game.title).then((d) => alive && setInfo(d)).catch(() => {})
+    loadLookup(game.console)
+      .then((look) => alive && setPress(look(game.name)?.rating ?? null))
+      .catch(() => {})
     return () => {
       alive = false
     }
-  }, [game.key, game.title, state.online])
+  }, [game.key, game.title, game.name, game.console, state.online])
 
   async function toggle(inStick: boolean) {
     if (!state.folders) return
@@ -89,9 +96,9 @@ export function Ficha({ game, state, onBack }: { game: Game; state: AppState; on
             {regionCode(game.name) && <span className="tag">{regionCode(game.name)}</span>}
             <span className="tag">{formatBytes(game.size)}</span>
             {info?.year && <span className="tag">{info.year}</span>}
-            {info?.rating != null && (
-              <span className="tag star">
-                <Icon name="sparkle" /> {info.rating.toFixed(1)}
+            {press != null && (
+              <span className="tag star" title="Nota de prensa">
+                <Icon name="sparkle" /> {press.toFixed(1)}
               </span>
             )}
           </div>

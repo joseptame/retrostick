@@ -183,6 +183,26 @@ export async function uploadResumable(
   }
 }
 
+/**
+ * Opens a Drive resumable upload and returns its session URL. The URL itself authorizes the upload, so
+ * the server (api/transfer.ts) can fill it straight from archive.org.
+ */
+export async function createUploadSession(name: string, parentId: string, size: number, signal?: AbortSignal): Promise<string> {
+  const init = await request(`${UPLOAD}/files?uploadType=resumable&fields=${FIELDS}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json; charset=UTF-8',
+      'X-Upload-Content-Type': 'application/octet-stream',
+      'X-Upload-Content-Length': String(size),
+    },
+    body: JSON.stringify({ name, parents: [parentId] }),
+    signal,
+  })
+  const session = init.headers.get('Location')
+  if (!session) throw new Error('Drive no devolvió la sesión de subida')
+  return session
+}
+
 async function uploadOnce(
   blob: Blob,
   name: string,
@@ -190,18 +210,7 @@ async function uploadOnce(
   onProgress: (sent: number, total: number) => void,
   signal?: AbortSignal,
 ): Promise<DriveFile> {
-  const init = await request(`${UPLOAD}/files?uploadType=resumable&fields=${FIELDS}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json; charset=UTF-8',
-      'X-Upload-Content-Type': 'application/octet-stream',
-      'X-Upload-Content-Length': String(blob.size),
-    },
-    body: JSON.stringify({ name, parents: [parentId] }),
-    signal,
-  })
-  const session = init.headers.get('Location')
-  if (!session) throw new Error('Drive no devolvió la sesión de subida')
+  const session = await createUploadSession(name, parentId, blob.size, signal)
 
   onProgress(0, blob.size)
   return new Promise<DriveFile>((resolve, reject) => {

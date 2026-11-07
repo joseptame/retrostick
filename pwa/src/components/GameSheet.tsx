@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import type { ConsoleId } from '../lib/consoles'
 import type { IgdbGame } from '../lib/igdb'
-import { Banner, Cover } from './ui'
+import { Banner, Cover, useCoverUrl } from './ui'
 
 const EXIT_MS = 280
 /** Drag distance (px) past which releasing the sheet closes it. */
@@ -102,6 +102,7 @@ export function GameSheet(p: Props) {
     else setDrag(0)
   }
 
+  const boxart = useCoverUrl(p.consoleId, p.fileName)
   const d = p.data
   const title = d?.name || p.fallbackTitle
   const heroImg = d?.screenshots?.[0] ?? d?.coverUrl ?? null
@@ -136,7 +137,10 @@ export function GameSheet(p: Props) {
 
         <div className="gs-body">
           <div className="gs-head">
-            {p.loading ? (
+            {/* Same box art as the card (libretro, European when it exists); IGDB's cover only as a fallback. */}
+            {boxart.url && !boxart.failed ? (
+              <img className="gs-cover" src={boxart.url} alt="" onError={() => boxart.setFailed(true)} />
+            ) : !boxart.resolved || p.loading ? (
               <div className="gs-cover sk" />
             ) : d?.coverUrl ? (
               <img className="gs-cover" src={d.coverUrl} alt="" />

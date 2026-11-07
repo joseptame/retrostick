@@ -147,3 +147,91 @@ describe('parseArchiveListing', () => {
     ])
   })
 })
+
+describe('igdb lookup', async () => {
+  const { makeLookup } = await import('./igdbdb')
+  const db = {
+    generated: '2026-11-07',
+    genres: ['Racing', 'Shooter'],
+    games: {
+      mariokartsupercircuit: [[0], 7.6, 2001],
+      pokemonemerald: [[1], null, 2004],
+      jamesbond007everythingornothing: [[1], 7.1, 2003],
+    } as Record<string, [number[], number | null, number | null]>,
+  }
+  const look = makeLookup(db)
+  it('matches exact, "Version" suffix and partial names', () => {
+    expect(look('Mario Kart - Super Circuit (Europe)')).toEqual({ genres: ['Racing'], rating: 7.6, year: 2001 })
+    expect(look('Pokemon - Emerald Version (USA, Europe)')?.year).toBe(2004)
+    expect(look('007 - Everything or Nothing (Europe)')?.rating).toBe(7.1)
+    expect(look('Juego Inventado (Europe)')).toBeNull()
+  })
+})
+
+describe('ROM sets with folders and GoodTools names', async () => {
+  const { baseName: bn, displayTitle: dt, regionCode: rc, region: rg } = await import('./names')
+  const { archiveFileOf } = await import('./archive')
+  it('drops the folder and reads GoodTools regions', () => {
+    expect(dt('GBC/Adventures of the Smurfs, The (E) (M6) [C][!].gbc')).toBe('The Adventures of the Smurfs')
+    expect(bn('GBC/Aladdin (E) (M6) [C][!].gbc')).toBe('Aladdin (E) (M6) [C][!]')
+    expect(rc('GBC/Aladdin (E) (M6) [C][!].gbc')).toBe('EU')
+    expect(rc('Pokemon - Gold Version (UE) [C][!].gbc')).toBe('US · EU')
+    expect(rg('Juego (S).gbc')).toBe('España')
+    expect(rc('Mario Kart - Super Circuit (Europe).gba')).toBe('EU')
+  })
+  it('picks the ROM archive, not the image pack', () => {
+    expect(archiveFileOf([{ name: 'Imgs GBC.zip', size: '145598725' }, { name: 'GBC.zip', size: '238549560' }])?.name).toBe('GBC.zip')
+  })
+})
+
+describe('archives made on a Mac', async () => {
+  const { isJunk } = await import('./archive')
+  it('skips __MACOSX and resource forks', () => {
+    expect(isJunk('__MACOSX/GB/._Tetris (W) (V1.1) [!].gb')).toBe(true)
+    expect(isJunk('GB/._Tetris.gb')).toBe(true)
+    expect(isJunk('GB/.DS_Store')).toBe(true)
+    expect(isJunk('GB/Tetris (W) (V1.1) [!].gb')).toBe(false)
+  })
+})
+
+describe('multi-disc games', async () => {
+  const { groupDiscs, m3uName } = await import('./archive')
+  it('groups discs in order and names the .m3u', () => {
+    const g = groupDiscs([
+      { name: 'CHD-PSX-EUR/Ape Escape (Europe).chd', size: 100 },
+      { name: 'CHD-PSX-EUR/Riven (Europe) (Disc 2).chd', size: 20 },
+      { name: 'CHD-PSX-EUR/Riven (Europe) (Disc 1).chd', size: 10 },
+    ])
+    expect(g).toHaveLength(2)
+    expect(g[1].discs?.map((d) => d.name)).toEqual(['CHD-PSX-EUR/Riven (Europe) (Disc 1).chd', 'CHD-PSX-EUR/Riven (Europe) (Disc 2).chd'])
+    expect(g[1].size).toBe(30)
+    expect(m3uName('CHD-PSX-EUR/Riven (Europe) (Disc 1).chd')).toBe('Riven (Europe).m3u')
+  })
+})
+
+describe('demos and per-console overrides', async () => {
+  const { isDemo: demo } = await import('./names')
+  const { officialName } = await import('./romdb')
+  it('spots demos but not games', () => {
+    expect(demo('CHD-PSX-EUR/Final Fantasy VIII (Europe) (Demo 1).chd')).toBe(true)
+    expect(demo('CHD-PSX-EUR/Euro Demo 64 (Europe).chd')).toBe(true)
+    expect(demo('CHD-PSX-EUR/Final Fantasy VIII (Europe, Australia) (Disc 1).chd')).toBe(false)
+    expect(demo('Demolition Racer (Europe).chd')).toBe(false)
+  })
+  it('keeps hand-picked box art on its own console', () => {
+    expect(officialName('International Karate (E) [C][!]', 'gbc')).toBe('International Karate 2000 (Europe)')
+    expect(officialName('International Karate + (Europe)', 'psx')).toBeNull()
+    expect(officialName('Pokémon Amarillo', 'gbc')).not.toBeNull()
+  })
+})
+
+describe('one release per game', async () => {
+  const { bestVariants } = await import('./names')
+  it('prefers Spanish, finished, original releases', () => {
+    const pick = (names: string[]) => bestVariants(names.map((name) => ({ name }))).map((e) => e.name)
+    expect(pick(['Asterix (Europe) (En,Fr,De,Nl).chd', 'Asterix (Europe) (En,Fr,Es,It).chd', 'Asterix (Europe) (De,Es,It) (Rev 1).chd'])).toEqual(['Asterix (Europe) (En,Fr,Es,It).chd'])
+    expect(pick(['Alfred Chicken (Europe) (Beta 1).chd', 'Alfred Chicken (Europe) (En,Fr,De,Es,It).chd'])).toEqual(['Alfred Chicken (Europe) (En,Fr,De,Es,It).chd'])
+    expect(pick(['Area 51 (Europe) (En,Fr,De,Es) (Midway Classics).chd', 'Area 51 (Europe) (En,Fr,De,Es).chd'])).toEqual(['Area 51 (Europe) (En,Fr,De,Es).chd'])
+    expect(pick(['Tetris (W) (V1.1) [!].gb', 'Mario (U).gb'])).toHaveLength(2)
+  })
+})

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { AppState } from '../App'
 import { Icon } from '../components/icons'
 import { Banner, Cover } from '../components/ui'
+import { UploadsPanel } from '../components/UploadsPanel'
 import { consoleById, consoleForFile, extension, isCartridge, UPLOAD_ACCEPT, type ConsoleId } from '../lib/consoles'
 import { uploadResumable } from '../lib/drive'
 import { formatBytes } from '../lib/format'
@@ -84,19 +85,29 @@ export function Subir({ state }: { state: AppState }) {
       const parent = toStick ? state.folders.jugando[item.console] : state.folders.coleccion[item.console]
       const fileName = `${item.name}.${extension(item.file.name)}`
       update(item.id, { status: 'uploading', progress: 0 })
+      const uid = state.uploadsApi.start({
+        key: `local/${item.id}`,
+        title: displayTitle(item.name),
+        console: item.console,
+        coverName: item.name,
+        total: item.file.size,
+        toStick,
+        detail: fileName !== item.file.name ? `renombrado a ${fileName}` : undefined,
+      })
       try {
         await uploadResumable(item.file, fileName, parent, (sent, total) => {
-          const progress = total ? sent / total : 1
-          update(item.id, { progress })
-          state.setUpload({ progress })
+          update(item.id, { progress: total ? sent / total : 1 })
+          state.uploadsApi.progress(uid, sent)
         })
         update(item.id, { status: 'done', progress: 1 })
+        state.uploadsApi.finish(uid)
       } catch (e) {
-        update(item.id, { status: 'error', error: e instanceof Error ? e.message : String(e) })
+        const msg = e instanceof Error ? e.message : String(e)
+        update(item.id, { status: 'error', error: msg })
+        state.uploadsApi.finish(uid, msg)
       }
     }
     setUploading(false)
-    state.setUpload(null)
     state.refresh()
   }
 
@@ -104,6 +115,8 @@ export function Subir({ state }: { state: AppState }) {
 
   return (
     <main className="screen">
+      <UploadsPanel uploads={state.uploads} onClear={state.uploadsApi.clear} />
+
       <label className={`dropzone ${!state.online || uploading ? 'disabled' : ''}`}>
         <span className="dropzone-ico">
           <Icon name="upload" strokeWidth={2.4} />

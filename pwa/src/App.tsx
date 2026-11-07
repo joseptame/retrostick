@@ -5,6 +5,7 @@ import { accountEmail, isConfigured, isSignedIn, setAccountEmail, signOut, Signe
 import { ensureFolders, fetchAccountEmail, forgetFolders, type Folders } from './lib/drive'
 import { cachedLibrary, loadLibrary, type Library } from './lib/library'
 import { saveOf } from './lib/names'
+import { isActive, newUploadId, withProgress, type UploadItem, type UploadsApi } from './lib/uploads'
 import { Coleccion } from './screens/Coleccion'
 import { Buscar } from './screens/Buscar'
 import { Ficha } from './screens/Ficha'
@@ -21,8 +22,9 @@ export interface AppState {
   setLibrary: (update: (l: Library) => Library) => void
   openGame: (key: string) => void
   notify: (message: string) => void
-  /** Upload in progress, shown on the tab bar (null when idle; progress null while downloading). */
-  setUpload: (u: { progress: number | null } | null) => void
+  /** Uploads in progress and recent ones (Subir → "Subidas", tab bar ring) */
+  uploads: UploadItem[]
+  uploadsApi: UploadsApi
 }
 
 const SAVES_SEEN = 'rs.savesSeenAt'
@@ -66,7 +68,36 @@ function Main({ onSignOut }: { onSignOut: () => void }) {
   const [loading, setLoading] = useState(false)
   const [selected, setSelected] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
-  const [upload, setUpload] = useState<{ progress: number | null } | null>(null)
+  const [uploads, setUploads] = useState<UploadItem[]>([])
+  const uploadsApi = useMemo<UploadsApi>(
+    () => ({
+      start(u) {
+        const id = newUploadId()
+        const now = Date.now()
+        const item: UploadItem = { status: 'uploading', ...u, id, sent: 0, speed: 0, startedAt: now, lastAt: now, lastSent: 0 }
+        setUploads((list) => [item, ...list.filter((x) => x.key !== u.key)])
+        return id
+      },
+      progress(id, sent, status) {
+        setUploads((list) => list.map((x) => (x.id === id ? withProgress(x, sent, status, Date.now()) : x)))
+      },
+      finish(id, error) {
+        setUploads((list) =>
+          list.map((x) =>
+            x.id === id ? { ...x, status: error ? 'error' : 'done', error, sent: error ? x.sent : x.total, finishedAt: Date.now() } : x,
+          ),
+        )
+      },
+      clear() {
+        setUploads((list) => list.filter(isActive))
+      },
+    }),
+    [],
+  )
+  const activeUpload = uploads.find(isActive)
+  const upload = activeUpload
+    ? { progress: activeUpload.status === 'downloading' || !activeUpload.total ? null : activeUpload.sent / activeUpload.total }
+    : null
   const [savesSeenAt, setSavesSeenAt] = useState(readSeen)
   /** What "new" means inside Partidas: the last visit before this one. */
   const [newSince, setNewSince] = useState(0)
@@ -152,7 +183,8 @@ function Main({ onSignOut }: { onSignOut: () => void }) {
     setLibrary: (update) => setLib((l) => (l ? update(l) : l)),
     openGame: setSelected,
     notify,
-    setUpload,
+    uploads,
+    uploadsApi,
   }
   const game = selected ? library?.games.find((g) => g.key === selected) : undefined
 

@@ -1,3 +1,5 @@
+import type { ConsoleId } from './consoles'
+
 /** archive.org collections opened in Buscar, most recent first (per-device convenience, localStorage). */
 export interface RecentCollection {
   id: string
@@ -40,4 +42,30 @@ export function removeRecent(id: string): RecentCollection[] {
     /* ignore */
   }
   return list
+}
+
+/** archive.org collection each console explores in Buscar, until the user picks another one. */
+const DEFAULT_COLLECTIONS: Partial<Record<ConsoleId, string>> = { gb: 'gameboy_202401', gbc: 'gbc_20240311', gba: 'gba-pal', psx: 'chd_psx_eur' }
+const BY_CONSOLE = 'rs.collectionByConsole'
+
+function byConsole(): Partial<Record<ConsoleId, string>> {
+  try {
+    const v: unknown = JSON.parse(localStorage.getItem(BY_CONSOLE) ?? '{}')
+    return v && typeof v === 'object' ? (v as Partial<Record<ConsoleId, string>>) : {}
+  } catch {
+    return {}
+  }
+}
+
+/** The collection to show for a console: the one picked last for it, else the built-in default. */
+export function collectionFor(c: ConsoleId): string | null {
+  return byConsole()[c] ?? DEFAULT_COLLECTIONS[c] ?? null
+}
+
+export function setCollectionFor(c: ConsoleId, id: string) {
+  try {
+    localStorage.setItem(BY_CONSOLE, JSON.stringify({ ...byConsole(), [c]: id }))
+  } catch {
+    /* not remembered */
+  }
 }
