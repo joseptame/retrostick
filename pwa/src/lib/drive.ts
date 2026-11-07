@@ -91,7 +91,9 @@ const FOLDERS_KEY = 'retrostick.folders'
 export async function ensureFolders(): Promise<Folders> {
   try {
     const cached = JSON.parse(localStorage.getItem(FOLDERS_KEY) ?? 'null') as Folders | null
-    if (cached) {
+    // A console added since the ids were cached (NES, SNES…) has no folder there yet: rebuild the tree.
+    const complete = cached && CONSOLES.every((c) => cached.coleccion?.[c.id] && cached.jugando?.[c.id])
+    if (cached && complete) {
       const root = await json<{ trashed?: boolean }>(`${API}/files/${cached.root}?fields=id,trashed`)
       if (!root.trashed) return cached
     }
