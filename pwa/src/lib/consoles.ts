@@ -1,4 +1,4 @@
-export type ConsoleId = 'gb' | 'gbc' | 'gba' | 'psx'
+export type ConsoleId = 'nes' | 'snes' | 'gb' | 'gbc' | 'gba' | 'psx'
 
 export interface ConsoleInfo {
   id: ConsoleId
@@ -10,6 +10,8 @@ export interface ConsoleInfo {
 }
 
 export const CONSOLES: ConsoleInfo[] = [
+  { id: 'nes', name: 'NES', short: 'NES', thumbs: 'Nintendo_-_Nintendo_Entertainment_System' },
+  { id: 'snes', name: 'Super Nintendo', short: 'SNES', thumbs: 'Nintendo_-_Super_Nintendo_Entertainment_System' },
   { id: 'gb', name: 'Game Boy', short: 'GB', thumbs: 'Nintendo_-_Game_Boy' },
   { id: 'gbc', name: 'Game Boy Color', short: 'GBC', thumbs: 'Nintendo_-_Game_Boy_Color' },
   { id: 'gba', name: 'Game Boy Advance', short: 'GBA', thumbs: 'Nintendo_-_Game_Boy_Advance' },
@@ -19,6 +21,9 @@ export const CONSOLES: ConsoleInfo[] = [
 export const consoleById = (id: ConsoleId): ConsoleInfo => CONSOLES.find((c) => c.id === id)!
 
 const BY_EXTENSION: Record<string, ConsoleId> = {
+  nes: 'nes',
+  sfc: 'snes',
+  smc: 'snes',
   gb: 'gb',
   gbc: 'gbc',
   gba: 'gba',
@@ -35,6 +40,9 @@ export function extension(fileName: string): string {
   const dot = fileName.lastIndexOf('.')
   return dot < 0 ? '' : fileName.slice(dot + 1).toLowerCase()
 }
+
+/** Usual ROM extension of a console (names a ROM listed only by its per-game .zip). */
+export const ROM_EXTENSION: Partial<Record<ConsoleId, string>> = { nes: 'nes', snes: 'sfc', gb: 'gb', gbc: 'gbc', gba: 'gba' }
 
 /** README 7.4: console from the extension; .bin/.chd/.cue/.m3u/.pbp are PlayStation. */
 export function consoleForFile(fileName: string): ConsoleId | null {

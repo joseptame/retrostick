@@ -28,6 +28,10 @@ data class Console(
 }
 
 val CONSOLES = listOf(
+    Console("nes", "NES", R.drawable.logo_nes, setOf("nes"),
+        "fceumm_libretro_android.so", "Nintendo_-_Nintendo_Entertainment_System"),
+    Console("snes", "Super Nintendo", R.drawable.logo_snes, setOf("sfc", "smc"),
+        "snes9x2010_libretro_android.so", "Nintendo_-_Super_Nintendo_Entertainment_System"),
     Console("gb", "Game Boy", R.drawable.logo_gb, setOf("gb"),
         "gambatte_libretro_android.so", "Nintendo_-_Game_Boy"),
     Console("gbc", "Game Boy Color", R.drawable.logo_gbc, setOf("gbc"),

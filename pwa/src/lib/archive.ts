@@ -19,6 +19,11 @@ export interface ArchiveMetadata {
 export interface ArchiveEntry {
   name: string
   size: number
+  /**
+   * Sets with one archive per game ("ActRaiser (Europe).zip"): that archive. `name` is then the ROM name
+   * it is expected to hold ("ActRaiser (Europe).sfc"), the real one is read from the archive on upload.
+   */
+  pack?: string
   /** A multi-disc game: its discs in order (`name`/`size` are the first disc's / the total). */
   discs?: ArchiveEntry[]
 }
@@ -57,7 +62,7 @@ export function m3uName(discName: string): string {
   return discName.replace(/^.*\//, '').replace(DISC, '').replace(/\.[^.]+$/, '') + '.m3u'
 }
 
-import { consoleForFile } from './consoles'
+import { consoleForFile, ROM_EXTENSION, type ConsoleId } from './consoles'
 
 const METADATA = 'https://archive.org/metadata'
 const DOWNLOAD = 'https://archive.org/download'
@@ -114,6 +119,17 @@ export function isJunk(path: string): boolean {
   return /(^|\/)__MACOSX\//.test(path) || /(^|\/)\._/.test(path) || /(^|\/)\.DS_Store$/.test(path)
 }
 
+/** The ROM inside a per-game archive (`entry.pack`): read from its listing, the biggest ROM file. */
+export async function packedRom(identifier: string, pack: string): Promise<ArchiveEntry> {
+  const res = await fetch(archiveListingUrl(identifier, pack))
+  if (!res.ok) throw new Error(`archive.org ${res.status}`)
+  const rom = parseArchiveListing(await res.text())
+    .filter((e) => consoleForFile(e.name))
+    .sort((a, b) => b.size - a.size)[0]
+  if (!rom) throw new Error(`${pack} no contiene ninguna ROM`)
+  return rom
+}
+
 /** Parses the HTML listing of `view_archive.php` into name/size pairs. */
 export function parseArchiveListing(html: string): ArchiveEntry[] {
   const out: ArchiveEntry[] = []
@@ -136,11 +152,28 @@ function decodeEntities(s: string): string {
     .replace(/&apos;/g, "'")
 }
 
-/** Lists the files of an item: inside its archive if it has one, otherwise its top-level files. */
+/** Fewest archives that make an item a "one archive per game" set (No-Intro_NES…), not one big ROM pack. */
+const MIN_PACKS = 5
+
+/**
+ * Lists the files of an item: inside its archive if it has one, otherwise its top-level files.
+ * `console` names the ROMs of a set with one archive per game (whose names carry no ROM extension).
+ */
 export async function listItemFiles(
   identifier: string,
+  console?: ConsoleId,
 ): Promise<{ entries: ArchiveEntry[]; archive: string | null; title: string }> {
   const meta = await fetchMetadata(identifier)
+  const ext = console && ROM_EXTENSION[console]
+  const packs = meta.files.filter((f) => /\.(zip|7z)$/i.test(f.name) && !NOT_ROMS.test(f.name) && !isJunk(f.name))
+  const loose = meta.files.filter((f) => consoleForFile(f.name) && !isJunk(f.name))
+  if (ext && packs.length >= MIN_PACKS && packs.length > loose.length) {
+    const entries: ArchiveEntry[] = [
+      ...loose.map((f) => ({ name: f.name, size: Number(f.size ?? 0) })),
+      ...packs.map((f) => ({ name: f.name.replace(/\.[^./]+$/, '.' + ext), size: Number(f.size ?? 0), pack: f.name })),
+    ]
+    return { entries, archive: null, title: meta.title }
+  }
   // Loose ROMs win over an archive: a PS1 set keeps its .chd files at the top and may carry an unrelated
   // .zip (subchannel data…).
   const looseRoms = meta.files.some((f) => consoleForFile(f.name) && !isJunk(f.name))

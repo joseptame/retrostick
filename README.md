@@ -183,6 +183,8 @@ El launcher declara `android.intent.category.HOME`, así que el stick arranca en
 ### 6.1 Núcleos
 | Consola | Núcleo | Carpeta |
 |---|---|---|
+| NES | FCEUmm | `/ROMs/nes` |
+| Super Nintendo | Snes9x 2010 (más ligero que Snes9x actual; el S805Y no mueve bien el actual) | `/ROMs/snes` |
 | Game Boy | Gambatte | `/ROMs/gb` |
 | Game Boy Color | Gambatte | `/ROMs/gbc` |
 | Game Boy Advance | mGBA (alternativa: gpSP si algún juego va lento) | `/ROMs/gba` |

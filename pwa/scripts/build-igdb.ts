@@ -20,6 +20,8 @@ const CONSOLES = [
   { id: 'gb', platform: 33 },
   { id: 'gbc', platform: 22 },
   { id: 'gba', platform: 24 },
+  { id: 'nes', platform: 18 },
+  { id: 'snes', platform: 19 },
   { id: 'psx', platform: 7 },
 ]
 
@@ -72,7 +74,10 @@ const genreList = await igdb<{ id: number; name: string }[]>('genres', 'fields n
 const genreName = new Map(genreList.map((g) => [g.id, g.name]))
 
 mkdirSync('public/db', { recursive: true })
+// `npm run build-igdb -- nes snes` rebuilds only those consoles.
+const only = process.argv.slice(2)
 for (const c of CONSOLES) {
+  if (only.length && !only.includes(c.id)) continue
   const games: Game[] = []
   for (let offset = 0; ; offset += PAGE) {
     const page = await igdb<Game[]>(

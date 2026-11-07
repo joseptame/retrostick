@@ -31,7 +31,8 @@ export interface UploadItem {
 
 export interface UploadsApi {
   start(u: Pick<UploadItem, 'key' | 'title' | 'console' | 'coverName' | 'total' | 'toStick'> & Partial<Pick<UploadItem, 'status' | 'detail' | 'retry'>>): string
-  progress(id: string, sent: number, status?: UploadStatus): void
+  /** `total` corrects the size once known (a ROM taken out of its .zip) */
+  progress(id: string, sent: number, status?: UploadStatus, total?: number): void
   finish(id: string, error?: string): void
   /** Removes finished and failed rows */
   clear(): void

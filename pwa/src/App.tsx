@@ -78,8 +78,8 @@ function Main({ onSignOut }: { onSignOut: () => void }) {
         setUploads((list) => [item, ...list.filter((x) => x.key !== u.key)])
         return id
       },
-      progress(id, sent, status) {
-        setUploads((list) => list.map((x) => (x.id === id ? withProgress(x, sent, status, Date.now()) : x)))
+      progress(id, sent, status, total) {
+        setUploads((list) => list.map((x) => (x.id === id ? withProgress(total ? { ...x, total } : x, sent, status, Date.now()) : x)))
       },
       finish(id, error) {
         setUploads((list) =>

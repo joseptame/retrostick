@@ -31,13 +31,25 @@ export interface Identification {
   by: 'sha1' | 'crc' | 'name'
 }
 
+/**
+ * The ROM as dumped and also without the header some files carry (the database hashes header-less
+ * data): iNES 16 bytes on NES ("NES\x1A"), a 512-byte copier header on SNES (size 512 over a multiple of 1 KiB).
+ */
+export function withoutHeader(id: ConsoleId, data: Uint8Array): Uint8Array[] {
+  if (id === 'nes' && data.length > 16 && data[0] === 0x4e && data[1] === 0x45 && data[2] === 0x53 && data[3] === 0x1a) {
+    return [data, data.subarray(16)]
+  }
+  if (id === 'snes' && data.length % 1024 === 512) return [data, data.subarray(512)]
+  return [data]
+}
+
 /** README 7.4: SHA-1 first, CRC32 as a fallback, then the file name. */
 export async function identify(id: ConsoleId, fileName: string, data: Uint8Array | null): Promise<Identification | null> {
   const db = await loadDb(id)
-  if (data) {
-    const s = db.sha1[await sha1(data)]
+  for (const d of data ? withoutHeader(id, data) : []) {
+    const s = db.sha1[await sha1(d)]
     if (s !== undefined) return { name: db.names[s], by: 'sha1' }
-    const c = db.crc[crc32(data)]
+    const c = db.crc[crc32(d)]
     if (c !== undefined) return { name: db.names[c], by: 'crc' }
   }
   const guess = guessByName(db.names, baseName(fileName))

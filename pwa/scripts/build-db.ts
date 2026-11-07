@@ -16,6 +16,8 @@ const consoles = [
   { id: 'gb', dat: `${DB}/no-intro/Nintendo%20-%20Game%20Boy.dat`, thumbs: 'Nintendo_-_Game_Boy' },
   { id: 'gbc', dat: `${DB}/no-intro/Nintendo%20-%20Game%20Boy%20Color.dat`, thumbs: 'Nintendo_-_Game_Boy_Color' },
   { id: 'gba', dat: `${DB}/no-intro/Nintendo%20-%20Game%20Boy%20Advance.dat`, thumbs: 'Nintendo_-_Game_Boy_Advance' },
+  { id: 'nes', dat: `${DB}/no-intro/Nintendo%20-%20Nintendo%20Entertainment%20System.dat`, thumbs: 'Nintendo_-_Nintendo_Entertainment_System' },
+  { id: 'snes', dat: `${DB}/no-intro/Nintendo%20-%20Super%20Nintendo%20Entertainment%20System.dat`, thumbs: 'Nintendo_-_Super_Nintendo_Entertainment_System' },
   // Redump: discs are identified by name only (hashing a CD image in the browser is too slow).
   { id: 'psx', dat: `${DB}/redump/Sony%20-%20PlayStation.dat`, thumbs: 'Sony_-_PlayStation' },
 ]
@@ -56,7 +58,10 @@ async function boxarts(repo: string): Promise<string[]> {
 }
 
 mkdirSync('public/db', { recursive: true })
+// `npm run build-db -- nes snes` rebuilds only those consoles.
+const only = process.argv.slice(2)
 for (const c of consoles) {
+  if (only.length && !only.includes(c.id)) continue
   const games = parseDat(await text(c.dat))
   const names = games.map((g) => g.name)
   const sha1: Record<string, number> = {}

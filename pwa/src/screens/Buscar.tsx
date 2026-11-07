@@ -5,7 +5,7 @@ import { SearchCard, type CardState } from '../components/SearchCard'
 import { Banner, Segmented, StickySearch } from '../components/ui'
 import { CollectionSheet } from '../components/CollectionSheet'
 import { FilterSheet, filtersActive, NO_FILTERS, UNRATED, type Filters, type FilterSection } from '../components/FilterSheet'
-import { archiveFileUrl, downloadUrl, groupDiscs, listItemFiles, m3uName, proxyPath, type ArchiveEntry } from '../lib/archive'
+import { archiveFileUrl, downloadUrl, groupDiscs, listItemFiles, m3uName, packedRom, proxyPath, type ArchiveEntry } from '../lib/archive'
 import { consoleForFile, CONSOLES, extension, isCartridge, type ConsoleId } from '../lib/consoles'
 import { uploadResumable } from '../lib/drive'
 import { formatBytes } from '../lib/format'
@@ -86,7 +86,7 @@ export function Buscar({ state }: { state: AppState }) {
     setError(null)
     setEntries(null)
     try {
-      const { entries: list, archive, title: t } = await listItemFiles(clean)
+      const { entries: list, archive, title: t } = await listItemFiles(clean, consoleId)
       setLoadedId(clean)
       setArchiveName(archive)
       setTitle(t)
@@ -188,7 +188,6 @@ export function Buscar({ state }: { state: AppState }) {
   async function upload(entry: ArchiveEntry) {
     if (!state.folders || !state.online || busy) return
     const console = consoleForFile(entry.name) ?? consoleId
-    const ext = extension(entry.name)
     const key = entry.name
     // Loose discs (PS1 .chd, hundreds of MB): the server copies them from archive.org into Drive,
     // so they never pass through the phone. Discs of one game go together, with their .m3u.
@@ -205,13 +204,19 @@ export function Buscar({ state }: { state: AppState }) {
     })
     setJob({ key, entry, phase: 'downloading', progress: 0 })
     try {
-      const url = archiveName
-        ? archiveFileUrl(loadedId, archiveName, entry.name)
-        : proxyPath(loadedId, entry.name)
+      // One archive per game (No-Intro_NES…): the ROM comes out of it (its real name may say .smc).
+      const rom = entry.pack ? await packedRom(loadedId, entry.pack) : null
+      const ext = rom ? extension(rom.name) : extension(entry.name)
+      const url = rom
+        ? archiveFileUrl(loadedId, entry.pack!, rom.name)
+        : archiveName
+          ? archiveFileUrl(loadedId, archiveName, entry.name)
+          : proxyPath(loadedId, entry.name)
       const res = await fetch(url)
       if (!res.ok) throw new Error(`Descarga ${res.status}`)
       const blob = await res.blob()
-      const f = new File([blob], entry.name)
+      if (rom) state.uploadsApi.progress(id, 0, undefined, blob.size)
+      const f = new File([blob], rom?.name ?? entry.name)
 
       let ident: Identification | null = null
       try {
@@ -488,7 +493,7 @@ export function Buscar({ state }: { state: AppState }) {
           progress={job?.key === ficha.entry.name && job.phase !== 'done' ? job.progress : null}
           uploaded={job?.key === ficha.entry.name && job.phase === 'done' && !job.error}
           uploadError={job?.key === ficha.entry.name ? job.error ?? null : null}
-          archiveHref={archiveName ? archiveFileUrl(loadedId, archiveName, ficha.entry.name) : downloadUrl(loadedId, ficha.entry.name)}
+          archiveHref={archiveName ? archiveFileUrl(loadedId, archiveName, ficha.entry.name) : downloadUrl(loadedId, ficha.entry.pack ?? ficha.entry.name)}
           onUpload={() => upload(ficha.entry)}
           onClose={() => setFicha(null)}
         />
@@ -502,6 +507,8 @@ export function Buscar({ state }: { state: AppState }) {
 
 /** Accent of each platform card (pairs with the console's box art colours). */
 const PLATFORM_LOOK: Record<ConsoleId, { from: string; to: string; glyph: string }> = {
+  nes: { from: '#b91c1c', to: '#3b0a0a', glyph: 'NES' },
+  snes: { from: '#6d28d9', to: '#1e1b4b', glyph: 'SNES' },
   gb: { from: '#4d6b3c', to: '#1f2d1a', glyph: 'GB' },
   gbc: { from: '#7c3aed', to: '#2e1065', glyph: 'GBC' },
   gba: { from: '#4f46e5', to: '#1e1b4b', glyph: 'GBA' },

@@ -16,12 +16,14 @@ export const PRESS_CONSOLES: Record<string, { qid: string; tags: RegExp }> = {
   gb: { qid: 'Q186437', tags: /^(gb|game ?boy|dmg)$/i },
   gbc: { qid: 'Q203992', tags: /^(gbc|game ?boy colou?r)$/i },
   gba: { qid: 'Q188642', tags: /^(gba|game ?boy advance)$/i },
+  nes: { qid: 'Q172742', tags: /^(nes|famicom|fc|nintendo entertainment system)$/i },
+  snes: { qid: 'Q183259', tags: /^(snes|sfc|super nes|super famicom|super nintendo( entertainment system)?)$/i },
   psx: { qid: 'Q10677', tags: /^(ps|ps1|psx|psone|ps one|playstation)$/i },
 }
 
 /** Any platform label that can prefix a score in a reviews table ("GBA: 85/100", "(PC) 88/100"). */
 const PLATFORM_TAG =
-  /^(gba|gbc|gb|game ?boy( advance| colou?r)?|dmg|nes|snes|sfc|n64|gc|ngc|gcn|gamecube|ds|nds|3ds|wii|wiiu|switch|ns|ps|ps1|ps2|ps3|ps4|ps5|psx|psp|ps one|psone|playstation( \d)?|vita|pc|win|windows|mac|xbox|xb|x360|xbox 360|ios|android|mobile|mob|arcade|arc|gen|genesis|md|smd|saturn|sat|dc|dreamcast|n-gage|ngage|gg|sms|tg16|pce|neo ?geo|3do|jag|lynx|cd|scd|32x|amiga|c64|zx|msx|dos)$/i
+  /^(gba|gbc|gb|game ?boy( advance| colou?r)?|dmg|nes|snes|sfc|famicom|fc|super famicom|super nes|super nintendo|n64|gc|ngc|gcn|gamecube|ds|nds|3ds|wii|wiiu|switch|ns|ps|ps1|ps2|ps3|ps4|ps5|psx|psp|ps one|psone|playstation( \d)?|vita|pc|win|windows|mac|xbox|xb|x360|xbox 360|ios|android|mobile|mob|arcade|arc|gen|genesis|md|smd|saturn|sat|dc|dreamcast|n-gage|ngage|gg|sms|tg16|pce|neo ?geo|3do|jag|lynx|cd|scd|32x|amiga|c64|zx|msx|dos)$/i
 
 /** Review fields that are not scores. */
 const NOT_SCORES = new Set(['title', 'state', 'platforms', 'na', 'award', 'awards', 'subtitle', 'width', 'align', 'noagg', 'qualifier', 'edition', 'collapsed', 'show', 'rev', 'revscore', 'aggregator', 'reviews'])
