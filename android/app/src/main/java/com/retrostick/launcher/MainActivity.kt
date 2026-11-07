@@ -11,6 +11,7 @@ import android.graphics.drawable.GradientDrawable
 import android.hardware.input.InputManager
 import android.net.ConnectivityManager
 import android.net.Network
+import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -132,7 +133,10 @@ class MainActivity : Activity() {
     private val syncListener: () -> Unit = {
         refreshStatus()
         // Games or saves may have changed on the stick
-        if (DriveSync.phase != DriveSync.Phase.SYNCING) reload()
+        if (DriveSync.phase != DriveSync.Phase.SYNCING) {
+            reload()
+            offerUpdate()
+        }
     }
     private val syncTicker = object : Runnable {
         override fun run() {
@@ -519,6 +523,17 @@ class MainActivity : Activity() {
             Setting("☁️", getString(R.string.set_account), "") {
                 if (driveAuth.isConnected) confirmDisconnect() else startDriveLogin()
             },
+            Setting("⬆️", getString(R.string.set_update), "") {
+                val update = Updater.available
+                when {
+                    update != null -> installUpdate(update)
+                    driveAuth.isConnected -> {
+                        DriveSync.sync(this)
+                        toast(R.string.update_checking)
+                    }
+                    else -> startDriveLogin()
+                }
+            },
         )
         settings.forEach { s ->
             val v = layoutInflater.inflate(R.layout.item_setting, settingsGrid, false)
@@ -568,6 +583,8 @@ class MainActivity : Activity() {
             else -> getString(R.string.drive_last_sync, ago)
         }
         settings[8].subtitle = if (connected) driveAuth.email ?: getString(R.string.drive_connected) else getString(R.string.drive_not_connected)
+        settings[9].subtitle = Updater.available?.let { getString(R.string.update_available_sub, it.versionName) }
+            ?: getString(R.string.update_current, BuildConfig.VERSION_NAME)
         settings[2].subtitle = net?.let { "Conectado por $it" } ?: getString(R.string.offline)
         settings[5].subtitle = if (pads.isEmpty()) "Ninguno" else pads.joinToString(", ")
         if (hasStorage) {
@@ -837,6 +854,42 @@ class MainActivity : Activity() {
                 }
             }
         }.start()
+    }
+
+    // ---- Launcher updates (Updater.kt) ----
+
+    private var updateDialog: AlertDialog? = null
+
+    /** After a sync: offers a newer launcher once per version (until "Ahora no" or a restart). */
+    private fun offerUpdate() {
+        val update = Updater.available ?: return
+        if (update.versionCode == Updater.dismissedVersion || updateDialog?.isShowing == true || isFinishing) return
+        updateDialog = AlertDialog.Builder(this, R.style.Dialog_RetroStick)
+            .setTitle(R.string.update_title)
+            .setMessage(getString(R.string.update_message, update.versionName, BuildConfig.VERSION_NAME))
+            .setPositiveButton(R.string.update_install) { _, _ -> installUpdate(update) }
+            .setNegativeButton(R.string.update_later) { _, _ -> Updater.dismissedVersion = update.versionCode }
+            .setOnCancelListener { Updater.dismissedVersion = update.versionCode }
+            .show()
+    }
+
+    private fun installUpdate(update: Updater.Update) {
+        // Android 8+: the user allows RetroStick to install apps once (Ajustes > Seguridad > Fuentes desconocidas).
+        if (!packageManager.canRequestPackageInstalls()) {
+            Toast.makeText(this, R.string.update_allow, Toast.LENGTH_LONG).show()
+            // Some TV builds lack the per-app screen: fall back to Android's security settings.
+            val perApp = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName"))
+            open(if (perApp.resolveActivity(packageManager) != null) perApp else Intent(Settings.ACTION_SECURITY_SETTINGS))
+            return
+        }
+        Toast.makeText(this, R.string.update_downloading, Toast.LENGTH_SHORT).show()
+        io.execute {
+            val result = runCatching { Updater.download(this, update) }
+            main.post {
+                result.onSuccess { open(Updater.installIntent(this)) }
+                    .onFailure { Toast.makeText(this, getString(R.string.update_failed, it.message ?: ""), Toast.LENGTH_LONG).show() }
+            }
+        }
     }
 
     private fun confirmDisconnect() {

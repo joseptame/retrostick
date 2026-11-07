@@ -110,6 +110,8 @@ object DriveSync {
             dir("Retro/Config/bios")
             runCatching { StickStatus.writeStatusJson(context) }
             listOf("saves", "states", ".stick").forEach { syncSaves(it) }
+            // A new launcher published with android/publish-update.mjs (before the ROMs, which can take long).
+            runCatching { Updater.check(context, drive, dir(Updater.FOLDER)) }.onFailure { Log.w("RetroStick", "Update check failed", it) }
             CONSOLES.forEach { syncRoms(it) }
         }
 

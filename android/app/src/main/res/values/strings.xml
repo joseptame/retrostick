@@ -74,4 +74,15 @@
     <string name="set_other_apps">Otras apps</string>
     <string name="set_other_apps_sub">Abre FLauncher</string>
     <string name="set_account">Cuenta de Drive</string>
+    <string name="set_update">Actualizar launcher</string>
+    <string name="update_current">Versión %1$s · al día</string>
+    <string name="update_available_sub">Nueva versión %1$s: pulsa para instalar</string>
+    <string name="update_checking">Buscando actualizaciones…</string>
+    <string name="update_title">Actualización del launcher</string>
+    <string name="update_message">Hay una versión nueva del launcher (%1$s; tienes la %2$s). Tus juegos y partidas no se tocan.</string>
+    <string name="update_install">Instalar</string>
+    <string name="update_later">Ahora no</string>
+    <string name="update_allow">Activa «Permitir» para RetroStick y vuelve a pulsar Instalar</string>
+    <string name="update_downloading">Descargando la actualización…</string>
+    <string name="update_failed">No se pudo descargar: %1$s</string>
 </resources>

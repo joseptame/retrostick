@@ -25,6 +25,7 @@ android/.gradle/
 android/build/
 android/app/build/
 android/local.properties
+android/.publish-token.json
 *.keystore
 *.jks
 .DS_Store
@@ -33,3 +34,5 @@ android/local.properties
 Thumbs.db
 .idea/
 .vercel/
+
+.vercel

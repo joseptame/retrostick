@@ -446,6 +446,17 @@ Al abrir la app y periódicamente (WorkManager, cada 60 min), escribir `/storage
 ```
 La sincronización lo sube a `Retro/Partidas/.stick/` y la PWA lo lee. Permiso: `WRITE_EXTERNAL_STORAGE` (Android 9).
 
+### 8.4 Actualizaciones del launcher
+El stick busca versiones nuevas en Drive (`Retro/Config/launcher`: `launcher.json` + `launcher.apk`) en cada sincronización y, si la hay, pregunta «Actualización del launcher · Instalar / Ahora no». También desde Ajustes → Actualizar launcher. Android siempre pide confirmar la instalación; la primera vez hay que permitir a RetroStick instalar apps.
+
+Publicar una versión (desde `android/`): subir `versionCode` en `app/build.gradle.kts` y
+
+```sh
+./gradlew assembleDebug && node publish-update.mjs
+```
+
+Usa el cliente OAuth del stick (`local.properties`); la primera vez muestra un código para aprobar en google.com/device y guarda el token en `android/.publish-token.json` (fuera de git). El APK nunca se publica en internet: lleva dentro el cliente OAuth y el repositorio es público.
+
 ---
 
 ## 9. Plan de trabajo por fases
