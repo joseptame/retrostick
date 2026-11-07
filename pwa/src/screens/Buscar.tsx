@@ -1,12 +1,16 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AppState } from '../App'
-import { Banner, Cover, Switch } from '../components/ui'
+import { GameSheet } from '../components/GameSheet'
+import { SearchCard, type CardState } from '../components/SearchCard'
+import { Banner, Segmented, StickySearch } from '../components/ui'
+import { CollectionSheet } from '../components/CollectionSheet'
 import { archiveFileUrl, downloadUrl, listItemFiles, proxyPath, type ArchiveEntry } from '../lib/archive'
 import { consoleForFile, CONSOLES, extension, isCartridge, type ConsoleId } from '../lib/consoles'
 import { uploadResumable } from '../lib/drive'
 import { formatBytes } from '../lib/format'
 import { fetchIgdb, type IgdbGame } from '../lib/igdb'
-import { baseName, displayTitle } from '../lib/names'
+import { baseName, displayTitle, looseKey, regionCode } from '../lib/names'
+import { loadRecents, removeRecent, saveRecent, type RecentCollection } from '../lib/recents'
 import { identify, type Identification } from '../lib/romdb'
 
 /** Hashing is only done for cartridges; bigger files are matched by name. */
@@ -29,12 +33,16 @@ interface Ficha {
   error: string | null
 }
 
+/** Error set when the file is already in Drive: shown as owned, not as a failure. */
+const DUPLICATE = 'Ya está en la colección'
+
 const norm = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
 
 export function Buscar({ state }: { state: AppState }) {
   const [consoleId, setConsoleId] = useState<ConsoleId>('gba')
-  const [identifier, setIdentifier] = useState('gba-pal')
-  const [loadedId, setLoadedId] = useState('gba-pal')
+  const [recents, setRecents] = useState<RecentCollection[]>(loadRecents)
+  const [loadedId, setLoadedId] = useState(() => recents[0]?.id ?? 'gba-pal')
+  const [sheetOpen, setSheetOpen] = useState(false)
   const [entries, setEntries] = useState<ArchiveEntry[] | null>(null)
   const [archiveName, setArchiveName] = useState<string | null>(null)
   const [title, setTitle] = useState('')
@@ -50,6 +58,17 @@ export function Buscar({ state }: { state: AppState }) {
   const existingNames = (c: ConsoleId) =>
     new Set(state.library?.games.filter((g) => g.console === c).flatMap((g) => g.files.map((f) => f.name)) ?? [])
 
+  /** Titles already in the library, per console, compared loosely (region, case, accents ignored). */
+  const ownedKeys = useMemo(() => {
+    const m = new Map<ConsoleId, Set<string>>()
+    for (const g of state.library?.games ?? []) {
+      if (!m.has(g.console)) m.set(g.console, new Set())
+      m.get(g.console)!.add(looseKey(g.name))
+    }
+    return m
+  }, [state.library])
+  const owns = (c: ConsoleId, fileName: string) => ownedKeys.get(c)?.has(looseKey(baseName(fileName))) ?? false
+
   async function load(id: string) {
     const clean = id.trim()
     if (!clean) return
@@ -62,6 +81,7 @@ export function Buscar({ state }: { state: AppState }) {
       setArchiveName(archive)
       setTitle(t)
       setEntries(list)
+      setRecents(saveRecent({ id: clean, title: t, count: list.length }))
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
       setEntries([])
@@ -73,7 +93,7 @@ export function Buscar({ state }: { state: AppState }) {
   useEffect(() => {
     if (loaded.current) return
     loaded.current = true
-    load(identifier)
+    load(loadedId)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -83,6 +103,7 @@ export function Buscar({ state }: { state: AppState }) {
     const ext = extension(entry.name)
     const key = entry.name
     setJob({ key, entry, phase: 'downloading', progress: 0 })
+    state.setUpload({ progress: null })
     try {
       const url = archiveName
         ? archiveFileUrl(loadedId, archiveName, entry.name)
@@ -102,20 +123,27 @@ export function Buscar({ state }: { state: AppState }) {
       const name = ident && !KEEP_NAME.has(ext) ? ident.name : baseName(entry.name)
       const fileName = `${name}.${ext}`
       if (existingNames(console).has(fileName)) {
-        setJob({ key, entry, phase: 'done', progress: 1, error: 'Ya está en la colección' })
+        setJob({ key, entry, phase: 'done', progress: 1, error: DUPLICATE })
+        state.notify(`${fileName}: ya estaba en tu colección`)
         return
       }
 
       const parent = toStick ? state.folders.jugando[console] : state.folders.coleccion[console]
       setJob({ key, entry, phase: 'uploading', progress: 0 })
-      await uploadResumable(blob, fileName, parent, (sent, total) =>
-        setJob({ key, entry, phase: 'uploading', progress: total ? sent / total : 1 }),
-      )
+      await uploadResumable(blob, fileName, parent, (sent, total) => {
+        const progress = total ? sent / total : 1
+        setJob({ key, entry, phase: 'uploading', progress })
+        state.setUpload({ progress })
+      })
       setJob({ key, entry, phase: 'done', progress: 1 })
       state.notify(`${fileName}: subido`)
       state.refresh()
     } catch (e) {
-      setJob({ key, entry, phase: 'done', progress: 0, error: e instanceof Error ? e.message : String(e) })
+      const msg = e instanceof Error ? e.message : String(e)
+      setJob({ key, entry, phase: 'done', progress: 0, error: msg })
+      state.notify(`No se pudo subir: ${msg}`)
+    } finally {
+      state.setUpload(null)
     }
   }
 
@@ -131,104 +159,122 @@ export function Buscar({ state }: { state: AppState }) {
     }
   }
 
+  const collName = title || loadedId
   const q = norm(query.trim())
   const filtered = entries?.filter((e) => consoleForFile(e.name) === consoleId && (!q || norm(e.name).includes(q))) ?? []
 
   return (
     <main className="screen">
-      <h1>Buscar juegos</h1>
-      <p className="sub">Explora una colección de archive.org y sube el juego que quieras</p>
+      <Segmented
+        label="Consola"
+        options={CONSOLES.map((c) => ({ id: c.id, label: c.short }))}
+        value={consoleId}
+        onChange={setConsoleId}
+      />
 
-      <div className="chips-row">
-        {CONSOLES.map((c) => (
-          <button key={c.id} className={`chip-tab ${consoleId === c.id ? 'on' : ''}`} onClick={() => setConsoleId(c.id)}>
-            {c.short}
-          </button>
-        ))}
-      </div>
+      <StickySearch value={query} onChange={setQuery} placeholder={`Buscar en ${collName}…`} label="Buscar juegos" />
 
-      <div className="search">
-        <input
-          value={identifier}
-          placeholder="Identificador de archive.org (ej. gba-pal)"
-          aria-label="Identificador de archive.org"
-          autoCapitalize="none"
-          autoCorrect="off"
-          onChange={(e) => setIdentifier(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && load(identifier)}
-        />
-        <button onClick={() => load(identifier)} disabled={loading || !identifier.trim()}>
-          {loading ? '…' : 'Cargar'}
+      <div className="bx-row">
+        <button className="bx-source" onClick={() => setSheetOpen(true)} aria-label={`Cambiar colección: ${collName}`}>
+          <svg className="bx-box" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" aria-hidden>
+            <path d="M3.5 7.5L12 3l8.5 4.5v9L12 21l-8.5-4.5z" />
+            <path d="M3.5 7.5L12 12l8.5-4.5M12 12v9" />
+          </svg>
+          <span>{loading ? 'Cargando…' : collName}</span>
+          <svg className="bx-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </button>
+        <button
+          role="switch"
+          aria-checked={toStick}
+          aria-label="Enviar también al stick"
+          className={`bx-stick ${toStick ? 'on' : ''}`}
+          onClick={() => setToStick((v) => !v)}
+          disabled={busy}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
+            <rect x="3" y="4" width="18" height="12" rx="2" />
+            <path d="M9 20h6M12 16v4" />
+          </svg>
+          Al stick
+          <span className="bx-sw" aria-hidden>
+            <i />
+          </span>
         </button>
       </div>
 
       {error && <Banner tone="error">{error}</Banner>}
 
-      {entries && !loading && (
-        <div className="search">
-          <input
-            value={query}
-            placeholder="Filtrar por nombre…"
-            aria-label="Filtrar juegos"
-            inputMode="search"
-            onChange={(e) => setQuery(e.target.value)}
-          />
+      {loading && (
+        <div className="coll-loading" aria-live="polite">
+          <p className="coll-status">
+            <span className="dots" aria-hidden>
+              <i />
+              <i />
+              <i />
+            </span>
+            Cargando colección de archive.org…
+          </p>
+          <div className="grid gp-grid">
+            {Array.from({ length: 6 }, (_, i) => (
+              <div key={i} className="gp-card skel-card" style={{ animationDelay: `${i * 70}ms` }}>
+                <div className="sk gp-art" />
+                <div className="gp-bar">
+                  <div className="gp-row">
+                    <div className="gp-txt">
+                      <span className="sk sk-line" style={{ width: `${60 + ((i * 17) % 35)}%` }} />
+                      <span className="sk sk-line short" />
+                    </div>
+                    <span className="sk gp-btn" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
-      {loading && <p className="loading">Cargando colección…</p>}
-
       {entries && !loading && (
         <>
-          <p className="sub">
-            {title ? `${title} · ` : ''}
-            {filtered.length} {filtered.length === 1 ? 'juego' : 'juegos'}
+          <p className="bx-count">
+            {q ? (
+              <>
+                {filtered.length} {filtered.length === 1 ? 'resultado' : 'resultados'} para <b>«{query.trim()}»</b>
+              </>
+            ) : (
+              <>
+                <b>{filtered.length}</b> {filtered.length === 1 ? 'juego' : 'juegos'}
+              </>
+            )}
           </p>
           {filtered.length === 0 ? (
             <div className="empty">No hay resultados.</div>
           ) : (
-            <div className="grid">
-              {filtered.map((e) => {
+            <div className="grid gp-grid">
+              {filtered.map((e, i) => {
                 const isJob = job?.key === e.name
+                const c = consoleForFile(e.name) ?? consoleId
+                let cardState: CardState = { kind: 'idle' }
+                if (isJob && job.phase === 'downloading') cardState = { kind: 'downloading' }
+                else if (isJob && job.phase === 'uploading') cardState = { kind: 'uploading', progress: job.progress }
+                else if (isJob && job.phase === 'done' && job.error && job.error !== DUPLICATE)
+                  cardState = { kind: 'failed', error: job.error }
+                else if ((isJob && job.phase === 'done') || owns(c, e.name)) cardState = { kind: 'owned' }
                 return (
-                  <div key={e.name} className="game-card" onClick={() => openFicha(e)}>
-                    <Cover console={consoleId} name={e.name} title={displayTitle(e.name)} />
-                    <div className="ft">
-                      <div className="nm">{displayTitle(e.name)}</div>
-                      <div className="st">{formatBytes(e.size)}</div>
-                      {isJob && job.phase !== 'done' && (
-                        <div className="prog">
-                          <i style={{ width: `${job.progress * 100}%` }} />
-                        </div>
-                      )}
-                      {isJob && job.error && <div className="pt error">{job.error}</div>}
-                      <div className="actions">
-                        {isJob && job.phase === 'done' && !job.error ? (
-                          <span className="chip g">Subido</span>
-                        ) : (
-                          <button
-                            className="pill"
-                            onClick={(ev) => {
-                              ev.stopPropagation()
-                              upload(e)
-                            }}
-                            disabled={!state.online || busy}
-                          >
-                            {isJob && busy ? `${Math.round(job.progress * 100)} %` : 'Subir'}
-                          </button>
-                        )}
-                        <a
-                          className="link"
-                          href={archiveName ? archiveFileUrl(loadedId, archiveName, e.name) : downloadUrl(loadedId, e.name)}
-                          target="_blank"
-                          rel="noreferrer"
-                          onClick={(ev) => ev.stopPropagation()}
-                        >
-                          Abrir
-                        </a>
-                      </div>
-                    </div>
-                  </div>
+                  <SearchCard
+                    key={e.name}
+                    console={c}
+                    fileName={e.name}
+                    title={displayTitle(e.name)}
+                    meta={[regionCode(e.name), formatBytes(e.size)].filter(Boolean).join(' · ')}
+                    state={cardState}
+                    locked={busy && !isJob}
+                    online={state.online}
+                    style={i < 12 ? { animationDelay: `${i * 45}ms` } : { animation: 'none' }}
+                    onOpen={() => openFicha(e)}
+                    onUpload={() => upload(e)}
+                  />
                 )
               })}
             </div>
@@ -238,92 +284,40 @@ export function Buscar({ state }: { state: AppState }) {
 
       {!entries && !loading && !error && <div className="empty">Carga una colección para ver sus juegos.</div>}
 
-      <div className="opt">
-        <span>Enviar también al stick</span>
-        <Switch on={toStick} onChange={setToStick} label="Enviar también al stick" disabled={busy} />
-      </div>
+
+      {sheetOpen && (
+        <CollectionSheet
+          current={loadedId}
+          recents={recents}
+          onLoad={(id) => {
+            setQuery('')
+            load(id)
+          }}
+          onForget={(id) => setRecents(removeRecent(id))}
+          onClose={() => setSheetOpen(false)}
+        />
+      )}
 
       {ficha && (
-        <div className="sheet-backdrop" onClick={() => setFicha(null)}>
-          <div className="sheet" onClick={(e) => e.stopPropagation()}>
-            <button className="back" onClick={() => setFicha(null)}>
-              ← Cerrar
-            </button>
-            {ficha.loading ? (
-              <p className="loading">Cargando ficha…</p>
-            ) : (
-              <>
-                <div className="ficha-head">
-                  {ficha.data?.coverUrl ? (
-                    <img className="ficha-cover" src={ficha.data.coverUrl} alt="" />
-                  ) : (
-                    <Cover console={consoleId} name={ficha.entry.name} title={displayTitle(ficha.entry.name)} className="ficha-cover" />
-                  )}
-                  <div className="grow">
-                    <h2>{ficha.data?.name || displayTitle(ficha.entry.name)}</h2>
-                    <p className="sub">
-                      {[ficha.data?.year ? String(ficha.data.year) : null, ...(ficha.data?.genres ?? [])]
-                        .filter(Boolean)
-                        .join(' · ')}
-                    </p>
-                    {ficha.data?.rating != null && <span className="chip g">★ {ficha.data.rating}</span>}
-                  </div>
-                </div>
-
-                {ficha.error && <Banner tone="error">{ficha.error}</Banner>}
-
-                {ficha.data?.description && <p className="desc">{ficha.data.description}</p>}
-                {ficha.data && !ficha.data.description && !ficha.error && <p className="hint">Sin descripción en IGDB.</p>}
-
-                {ficha.data?.trailerId && (
-                  <>
-                    <div className="sec">Tráiler</div>
-                    <div className="trailer">
-                      <iframe
-                        src={`https://www.youtube.com/embed/${ficha.data.trailerId}`}
-                        title="Tráiler"
-                        allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                        loading="lazy"
-                      />
-                    </div>
-                  </>
-                )}
-
-                {ficha.data?.screenshots && ficha.data.screenshots.length > 0 && (
-                  <>
-                    <div className="sec">Capturas</div>
-                    <div className="shots">
-                      {ficha.data.screenshots.map((s) => (
-                        <img key={s} src={s} alt="" loading="lazy" />
-                      ))}
-                    </div>
-                  </>
-                )}
-
-                {job?.key === ficha.entry.name && job.phase !== 'done' && (
-                  <div className="prog">
-                    <i style={{ width: `${job.progress * 100}%` }} />
-                  </div>
-                )}
-                {job?.key === ficha.entry.name && job.error && <p className="hint error">{job.error}</p>}
-
-                <button className="btn" onClick={() => upload(ficha.entry)} disabled={!state.online || busy}>
-                  {job?.key === ficha.entry.name && busy ? `Subiendo… ${Math.round(job.progress * 100)} %` : 'Subir a Drive'}
-                </button>
-                <a
-                  className="link"
-                  href={archiveName ? archiveFileUrl(loadedId, archiveName, ficha.entry.name) : downloadUrl(loadedId, ficha.entry.name)}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Abrir en archive.org
-                </a>
-              </>
-            )}
-          </div>
-        </div>
+        <GameSheet
+          consoleId={consoleForFile(ficha.entry.name) ?? consoleId}
+          fileName={ficha.entry.name}
+          fallbackTitle={displayTitle(ficha.entry.name)}
+          sizeLabel={formatBytes(ficha.entry.size)}
+          data={ficha.data}
+          loading={ficha.loading}
+          error={ficha.error}
+          online={state.online}
+          busy={busy}
+          progress={job?.key === ficha.entry.name && job.phase !== 'done' ? job.progress : null}
+          uploaded={job?.key === ficha.entry.name && job.phase === 'done' && !job.error}
+          uploadError={job?.key === ficha.entry.name ? job.error ?? null : null}
+          archiveHref={archiveName ? archiveFileUrl(loadedId, archiveName, ficha.entry.name) : downloadUrl(loadedId, ficha.entry.name)}
+          onUpload={() => upload(ficha.entry)}
+          onClose={() => setFicha(null)}
+        />
       )}
     </main>
   )
 }
+

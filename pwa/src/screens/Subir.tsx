@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { AppState } from '../App'
-import { Banner, Cover, Switch } from '../components/ui'
+import { Icon } from '../components/icons'
+import { Banner, Cover } from '../components/ui'
 import { consoleById, consoleForFile, extension, isCartridge, UPLOAD_ACCEPT, type ConsoleId } from '../lib/consoles'
 import { uploadResumable } from '../lib/drive'
 import { formatBytes } from '../lib/format'
@@ -84,13 +85,18 @@ export function Subir({ state }: { state: AppState }) {
       const fileName = `${item.name}.${extension(item.file.name)}`
       update(item.id, { status: 'uploading', progress: 0 })
       try {
-        await uploadResumable(item.file, fileName, parent, (sent, total) => update(item.id, { progress: total ? sent / total : 1 }))
+        await uploadResumable(item.file, fileName, parent, (sent, total) => {
+          const progress = total ? sent / total : 1
+          update(item.id, { progress })
+          state.setUpload({ progress })
+        })
         update(item.id, { status: 'done', progress: 1 })
       } catch (e) {
         update(item.id, { status: 'error', error: e instanceof Error ? e.message : String(e) })
       }
     }
     setUploading(false)
+    state.setUpload(null)
     state.refresh()
   }
 
@@ -98,15 +104,17 @@ export function Subir({ state }: { state: AppState }) {
 
   return (
     <main className="screen">
-      <h1>Subir copias</h1>
-      <p className="sub">Detecta la consola y pone el nombre correcto</p>
-
-      <label className={`drop ${!state.online ? 'disabled' : ''}`}>
-        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#9d8cff" strokeWidth="2">
-          <path d="M12 16V4M7 9l5-5 5 5M4 20h16" />
-        </svg>
-        <b>Elegir archivos</b>
-        .gb · .gbc · .gba · .chd · .cue · .bin · .m3u · .pbp
+      <label className={`dropzone ${!state.online || uploading ? 'disabled' : ''}`}>
+        <span className="dropzone-ico">
+          <Icon name="upload" strokeWidth={2.4} />
+        </span>
+        <b>Elige tus copias</b>
+        <small>Detecta la consola y pone el nombre correcto</small>
+        <span className="formats">
+          {['gb', 'gbc', 'gba', 'chd', 'cue', 'bin', 'm3u', 'pbp'].map((f) => (
+            <i key={f}>.{f}</i>
+          ))}
+        </span>
         <input
           type="file"
           multiple
@@ -119,67 +127,102 @@ export function Subir({ state }: { state: AppState }) {
         />
       </label>
 
-      {items.map((item) => {
-        const ext = extension(item.file.name)
-        const renamed = item.name !== baseName(item.file.name)
-        return (
-          <div key={item.id} className="up">
-            {item.console ? (
-              <Cover console={item.console} name={item.name} title={displayTitle(item.name)} className="thumb" />
-            ) : (
-              <div className="cover thumb" />
-            )}
-            <div className="i">
-              {renamed && <div className="f">{item.file.name}</div>}
-              {item.status === 'ready' && !item.ident && !KEEP_NAME.has(ext) ? (
-                <input
-                  className="name-input"
-                  value={item.name}
-                  aria-label="Nombre del juego"
-                  onChange={(e) => update(item.id, { name: e.target.value.trim() || baseName(item.file.name) })}
-                />
+      {items.length > 0 && (
+        <h3 className="sec2">
+          Archivos <span>{items.length}</span>
+        </h3>
+      )}
+      <div className="rows">
+        {items.map((item) => {
+          const ext = extension(item.file.name)
+          const renamed = item.name !== baseName(item.file.name)
+          return (
+            <div key={item.id} className={`row-card up-row ${item.status}`}>
+              {item.console ? (
+                <Cover console={item.console} name={item.name} title={displayTitle(item.name)} className="row-thumb big" />
               ) : (
-                <div className="n">{`${item.name}.${ext}`}</div>
+                <span className="row-ico big">
+                  <Icon name="file" />
+                </span>
               )}
-              <div className="chips">
-                {item.console && <span className="chip">{consoleById(item.console).short}</span>}
-                {item.ident && item.ident.by !== 'name' && <span className="chip g">✓ Reconocido</span>}
-                {item.ident?.by === 'name' && <span className="chip w">≈ Por nombre</span>}
-                {item.status === 'ready' && !item.ident && <span className="chip w">⚠ Revisar</span>}
-                {item.duplicate && <span className="chip w">Ya en la colección</span>}
+              <div className="grow">
+                {renamed && <div className="up-old">{item.file.name}</div>}
+                {item.status === 'ready' && !item.ident && !KEEP_NAME.has(ext) ? (
+                  <input
+                    className="up-name-input"
+                    value={item.name}
+                    aria-label="Nombre del juego"
+                    onChange={(e) => update(item.id, { name: e.target.value.trim() || baseName(item.file.name) })}
+                  />
+                ) : (
+                  <b className="up-name">{`${item.name}.${ext}`}</b>
+                )}
+                <div className="chips">
+                  {item.console && <span className="chip">{consoleById(item.console).short}</span>}
+                  {item.ident && item.ident.by !== 'name' && <span className="chip g">✓ Reconocido</span>}
+                  {item.ident?.by === 'name' && <span className="chip w">≈ Por nombre</span>}
+                  {item.status === 'ready' && !item.ident && <span className="chip w">Revisar nombre</span>}
+                  {item.duplicate && <span className="chip w">Ya en la colección</span>}
+                </div>
+                {item.duplicate && item.status === 'ready' && !item.force && (
+                  <button className="text-btn" onClick={() => update(item.id, { force: true })}>
+                    Subir igualmente
+                  </button>
+                )}
+                {(item.status === 'uploading' || item.status === 'done') && (
+                  <div className={`line-prog ${item.status === 'done' ? 'done' : ''}`}>
+                    <i style={{ width: `${item.progress * 100}%` }} />
+                  </div>
+                )}
+                <div className={`up-status ${item.status}`}>
+                  {item.status === 'reading' && 'Identificando…'}
+                  {item.status === 'ready' && `Listo · ${formatBytes(item.file.size)}`}
+                  {item.status === 'uploading' && `Subiendo · ${Math.round(item.progress * 100)} % de ${formatBytes(item.file.size)}`}
+                  {item.status === 'done' && `Subido · ${formatBytes(item.file.size)}`}
+                  {item.status === 'error' && item.error}
+                </div>
               </div>
-              {item.duplicate && item.status === 'ready' && !item.force && (
-                <button className="link" onClick={() => update(item.id, { force: true })}>
-                  Subir igualmente
+              {item.status !== 'uploading' && item.status !== 'done' && !uploading && (
+                <button className="icon-btn" aria-label={`Quitar ${item.file.name}`} onClick={() => setItems((l) => l.filter((i) => i.id !== item.id))}>
+                  <Icon name="x" />
                 </button>
               )}
-              <div className="prog">
-                <i style={{ width: `${item.progress * 100}%` }} className={item.status === 'done' ? 'done' : ''} />
-              </div>
-              <div className="pt">
-                {item.status === 'reading' && 'Identificando…'}
-                {item.status === 'ready' && `Listo · ${formatBytes(item.file.size)}`}
-                {item.status === 'uploading' && `Subiendo · ${Math.round(item.progress * 100)} % de ${formatBytes(item.file.size)}`}
-                {item.status === 'done' && `Subido · ${formatBytes(item.file.size)}`}
-                {item.status === 'error' && <span className="error">{item.error}</span>}
-              </div>
+              {item.status === 'done' && (
+                <span className="gp-btn ok sm" role="img" aria-label="Subido">
+                  <Icon name="check" strokeWidth={3.2} />
+                </span>
+              )}
             </div>
-          </div>
-        )
-      })}
+          )
+        })}
+      </div>
 
       {items.some((i) => KEEP_NAME.has(extension(i.file.name))) && (
         <Banner>Los .cue, .bin y .m3u se suben con su nombre original: el .cue y el .m3u nombran a los otros archivos.</Banner>
       )}
 
-      <div className="opt">
-        <span>Enviar también al stick</span>
-        <Switch on={toStick} onChange={setToStick} label="Enviar también al stick" disabled={uploading} />
-      </div>
-
-      <button className="btn" disabled={!pending || uploading || !state.online} onClick={uploadAll}>
-        {uploading ? 'Subiendo…' : pending ? `Subir ${pending} ${pending === 1 ? 'archivo' : 'archivos'}` : 'Elige archivos para subir'}
-      </button>
+      {items.length > 0 && (
+        <div className="action-bar">
+          <button
+            role="switch"
+            aria-checked={toStick}
+            aria-label="Enviar también al stick"
+            className={`bx-stick ${toStick ? 'on' : ''}`}
+            onClick={() => setToStick((v) => !v)}
+            disabled={uploading}
+          >
+            <Icon name="tv" />
+            Al stick
+            <span className="bx-sw" aria-hidden>
+              <i />
+            </span>
+          </button>
+          <button className="cta grow" disabled={!pending || uploading || !state.online} onClick={uploadAll}>
+            <Icon name="upload" strokeWidth={2.4} />
+            {uploading ? 'Subiendo…' : pending ? `Subir ${pending} ${pending === 1 ? 'archivo' : 'archivos'}` : 'Nada que subir'}
+          </button>
+        </div>
+      )}
     </main>
   )
 }

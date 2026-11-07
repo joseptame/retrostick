@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { BottomNav, Banner, type Tab } from './components/ui'
 import { PullToRefreshIndicator, usePullToRefresh } from './components/PullToRefresh'
 import { accountEmail, isConfigured, isSignedIn, setAccountEmail, signOut, SignedOutError } from './lib/auth'
 import { ensureFolders, fetchAccountEmail, forgetFolders, type Folders } from './lib/drive'
 import { cachedLibrary, loadLibrary, type Library } from './lib/library'
+import { saveOf } from './lib/names'
 import { Coleccion } from './screens/Coleccion'
 import { Buscar } from './screens/Buscar'
 import { Ficha } from './screens/Ficha'
@@ -20,6 +21,18 @@ export interface AppState {
   setLibrary: (update: (l: Library) => Library) => void
   openGame: (key: string) => void
   notify: (message: string) => void
+  /** Upload in progress, shown on the tab bar (null when idle; progress null while downloading). */
+  setUpload: (u: { progress: number | null } | null) => void
+}
+
+const SAVES_SEEN = 'rs.savesSeenAt'
+
+function readSeen(): number {
+  try {
+    return Number(localStorage.getItem(SAVES_SEEN)) || 0
+  } catch {
+    return 0
+  }
 }
 
 export default function App() {
@@ -53,6 +66,41 @@ function Main({ onSignOut }: { onSignOut: () => void }) {
   const [loading, setLoading] = useState(false)
   const [selected, setSelected] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
+  const [upload, setUpload] = useState<{ progress: number | null } | null>(null)
+  const [savesSeenAt, setSavesSeenAt] = useState(readSeen)
+  /** What "new" means inside Partidas: the last visit before this one. */
+  const [newSince, setNewSince] = useState(0)
+
+  const markSavesSeen = useCallback(() => {
+    const now = Date.now()
+    setSavesSeenAt(now)
+    try {
+      localStorage.setItem(SAVES_SEEN, String(now))
+    } catch {
+      /* not remembered: the badge just reappears next time */
+    }
+  }, [])
+
+  // First run: nothing counts as new. Visiting Partidas marks everything as seen.
+  useEffect(() => {
+    if (library && (savesSeenAt === 0 || tab === 'partidas')) markSavesSeen()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [library, tab])
+
+  const newSaves = useMemo(() => {
+    if (!library || savesSeenAt === 0) return 0
+    const games = new Set<string>()
+    for (const f of library.saves) {
+      if (Date.parse(f.modifiedTime) > savesSeenAt) games.add(saveOf(f.name)?.game ?? f.name)
+    }
+    return games.size
+  }, [library, savesSeenAt])
+
+  const stickBadge = library?.status
+    ? Date.now() - new Date(library.status.updatedAt).getTime() < 24 * 3600 * 1000
+      ? 'ok'
+      : 'stale'
+    : null
 
   const notify = useCallback((message: string) => {
     setToast(message)
@@ -104,6 +152,7 @@ function Main({ onSignOut }: { onSignOut: () => void }) {
     setLibrary: (update) => setLib((l) => (l ? update(l) : l)),
     openGame: setSelected,
     notify,
+    setUpload,
   }
   const game = selected ? library?.games.find((g) => g.key === selected) : undefined
 
@@ -122,10 +171,10 @@ function Main({ onSignOut }: { onSignOut: () => void }) {
         <Ficha game={game} state={state} onBack={() => setSelected(null)} />
       ) : (
         <>
-          {tab === 'coleccion' && <Coleccion state={state} onUpload={() => setTab('subir')} />}
+          {tab === 'coleccion' && <Coleccion state={state} onUpload={() => setTab('subir')} onSearch={() => setTab('buscar')} />}
           {tab === 'buscar' && <Buscar state={state} />}
           {tab === 'subir' && <Subir state={state} />}
-          {tab === 'partidas' && <Partidas state={state} />}
+          {tab === 'partidas' && <Partidas state={state} newSince={newSince} />}
           {tab === 'stick' && <Stick state={state} onSignOut={onSignOut} />}
         </>
       )}
@@ -133,9 +182,12 @@ function Main({ onSignOut }: { onSignOut: () => void }) {
       {toast && <div className="toast">{toast}</div>}
       <BottomNav
         tab={tab}
+        badges={{ upload, newSaves, stick: stickBadge }}
         onTab={(t) => {
+          if (t === 'partidas' && tab !== 'partidas') setNewSince(savesSeenAt)
           setSelected(null)
           setTab(t)
+          window.scrollTo({ top: 0 })
         }}
       />
     </div>

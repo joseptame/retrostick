@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Icon, type IconName } from '../components/icons'
 import { Banner } from '../components/ui'
 import { requestDeviceCode, waitForLogin, type DeviceCode } from '../lib/auth'
 
@@ -42,36 +43,62 @@ export function Login({ onDone }: { onDone: () => void }) {
 
   return (
     <main className="screen login">
+      <div className="login-mark" aria-hidden>
+        <Icon name="gamepad" strokeWidth={2} />
+      </div>
       <p className="brand">
         Retro<span>Stick</span>
       </p>
       <h1>Tu colección retro, en el móvil</h1>
-      <p className="sub">
-        Sube tus copias, elige qué juegos van al stick y gestiona tus partidas. Todo se guarda en tu Google Drive, en la
-        carpeta <b>Retro</b>.
-      </p>
+
+      <div className="rows login-feats">
+        <Feat icon="search" title="Busca y sube juegos" text="De archive.org o desde tus propias copias." />
+        <Feat icon="tv" title="Elige qué va al stick" text="Se sincroniza solo con la TV." />
+        <Feat icon="save" title="Tus partidas, a salvo" text="Copias en Drive con historial de versiones." />
+      </div>
 
       {message && <Banner tone="warn">{message}</Banner>}
 
       {!code ? (
-        <button className="btn" onClick={start}>
-          Conectar con Google Drive
+        <button className="cta wide" onClick={start}>
+          <Icon name="cloud" strokeWidth={2.4} /> Conectar con Google Drive
         </button>
       ) : (
-        <div className="card login-code">
-          <p className="sub">Abre google.com/device e introduce este código:</p>
+        <div className="code-card">
+          <small>Abre google.com/device e introduce este código</small>
           <p className="code">{code.userCode}</p>
-          <button className="btn" onClick={copyAndOpen}>
-            {copied ? 'Código copiado · abrir google.com/device' : 'Copiar código y abrir google.com/device'}
+          <button className="cta wide" onClick={copyAndOpen}>
+            {copied ? 'Copiado · abrir google.com/device' : 'Copiar código y abrir google.com/device'}
           </button>
-          <p className="hint">Elige tu cuenta y acepta. Esta pantalla seguirá sola. Esperando…</p>
+          <p className="waiting">
+            <span className="dots" aria-hidden>
+              <i />
+              <i />
+              <i />
+            </span>
+            Elige tu cuenta y acepta; esta pantalla seguirá sola
+          </p>
         </div>
       )}
 
-      <p className="hint">
-        RetroStick solo puede ver los archivos que crea él mismo en tu Drive.{' '}
+      <p className="hint center">
+        Todo se guarda en tu Google Drive, en la carpeta <b>Retro</b>. RetroStick solo ve los archivos que crea él mismo.{' '}
         <a href="https://joseptame.github.io/retrostick/privacidad.html">Política de privacidad</a>
       </p>
     </main>
+  )
+}
+
+function Feat({ icon, title, text }: { icon: IconName; title: string; text: string }) {
+  return (
+    <div className="row-card">
+      <span className="row-ico">
+        <Icon name={icon} />
+      </span>
+      <div className="grow">
+        <b>{title}</b>
+        <small>{text}</small>
+      </div>
+    </div>
   )
 }

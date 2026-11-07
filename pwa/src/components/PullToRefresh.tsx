@@ -20,7 +20,7 @@ export function usePullToRefresh(onRefresh: () => Promise<unknown>) {
     let busy = false
 
     const onStart = (e: TouchEvent) => {
-      if (window.scrollY > 0 || busy || e.touches.length !== 1) {
+      if (window.scrollY > 0 || busy || e.touches.length !== 1 || document.body.classList.contains('modal-open')) {
         tracking = false
         return
       }
