@@ -460,6 +460,8 @@ class MainActivity : Activity() {
             typeface = resources.getFont(R.font.inter_semibold)
         }
         coverRow.addView(add)
+        // Selectable: last card of the shelf, opens RetroShop on this console
+        coverViews += add
     }
 
     private fun renderShelf() {
@@ -491,7 +493,11 @@ class MainActivity : Activity() {
         val console = CONSOLES[tab]
         shelfTitle.text = getString(R.string.shelf_title, console.name)
         if (game == null) {
-            emptyText.text = if (hasStorage) getString(R.string.empty_console, console.name) else getString(R.string.need_storage)
+            emptyText.text = when {
+                !hasStorage -> getString(R.string.need_storage)
+                consoleGames.isEmpty() -> getString(R.string.empty_console, console.name)
+                else -> getString(R.string.shop_from_shelf, console.name)
+            }
             return
         }
         findViewById<TextView>(R.id.gameTitle).text = game.title
@@ -679,6 +685,7 @@ class MainActivity : Activity() {
         val g = glyphs(padStyle)
         when {
             settingsTab -> addHint(g.confirm, R.string.hint_open)
+            currentGame == null -> addHint(g.confirm, R.string.hint_open)
             currentGame != null -> {
                 addHint(g.confirm, R.string.hint_play)
                 g.back?.let { addHint(it, R.string.hint_back) }
@@ -820,8 +827,8 @@ class MainActivity : Activity() {
     }
 
     private fun moveGame(delta: Int) {
-        val size = consoleGames.size
-        if (size > 0) selected[tab] = (selected[tab] + delta).coerceIn(0, size - 1)
+        // Games, then the "Añade juegos desde RetroShop" card (index == number of games)
+        selected[tab] = (selected[tab] + delta).coerceIn(0, consoleGames.size)
     }
 
     // ---- Google Drive sign-in (code typed on the phone) ----
@@ -959,9 +966,15 @@ class MainActivity : Activity() {
     }
 
     private fun play() {
+        val game = currentGame ?: return openShop()
         DriveSync.cancel()
-        val game = currentGame ?: return
         if (!launchInRetroArch(this, game)) toast(R.string.retroarch_missing)
+    }
+
+    /** RetroShop on the console of the current tab (the "Añade juegos" card). */
+    private fun openShop() {
+        if (settingsTab) return
+        open(Intent(this, ShopActivity::class.java).putExtra(ShopActivity.EXTRA_CONSOLE, CONSOLES[tab].id))
     }
 
     private fun toggleFavorite() {

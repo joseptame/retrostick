@@ -43,9 +43,10 @@
     <string name="save_in_drive">✓ Copia en Drive</string>
     <string name="save_pending">Pendiente de subir</string>
     <string name="playing_badge">▶ Jugando</string>
-    <string name="add_games">+ Añade juegos desde la app del móvil</string>
+    <string name="add_games">+ Añade juegos desde RetroShop</string>
+    <string name="shop_from_shelf">Descubre más juegos de %1$s en RetroShop: pulsa para abrir la tienda.</string>
     <string name="shelf_title">%1$s · en el stick</string>
-    <string name="empty_console">Aún no hay juegos de %1$s en el stick.</string>
+    <string name="empty_console">Aún no hay juegos de %1$s en el stick: añádelos desde RetroShop.</string>
 
     <string name="hint_play">Jugar</string>
     <string name="hint_open">Abrir</string>
