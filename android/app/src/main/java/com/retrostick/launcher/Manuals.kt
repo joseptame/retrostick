@@ -49,8 +49,22 @@ object Manuals {
     fun isImages(name: String) = name.startsWith("img::")
     fun pages(name: String): List<String> = name.substringAfterLast("::").split('|')
 
-    /** One page of an image manual, downloaded the first time (blocking). */
-    fun pageFile(context: Context, console: Console, name: String, index: Int): File {
+    private val pageLocks = java.util.concurrent.ConcurrentHashMap<String, Any>()
+
+    /** Whether a page of an image manual is already on the stick. */
+    fun hasPage(context: Context, console: Console, name: String, index: Int): Boolean {
+        val id = name.removePrefix("img::").substringBefore("::")
+        return File(context.filesDir, "manuals/${console.id}/$id/$index.jpg").let { it.isFile && it.length() > 0 }
+    }
+
+    /**
+     * One page of an image manual, downloaded the first time (blocking). One download per page at a time: the
+     * reader and the background prefetch may ask for the same page together.
+     */
+    fun pageFile(context: Context, console: Console, name: String, index: Int): File =
+        synchronized(pageLocks.getOrPut("${console.id}|$name|$index") { Any() }) { downloadPage(context, console, name, index) }
+
+    private fun downloadPage(context: Context, console: Console, name: String, index: Int): File {
         val id = name.removePrefix("img::").substringBefore("::")
         val page = pages(name)[index]
         val dir = File(context.filesDir, "manuals/${console.id}/$id").apply { mkdirs() }

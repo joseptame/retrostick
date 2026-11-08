@@ -23,6 +23,9 @@ import java.util.concurrent.Executors
  */
 class ManualActivity : Activity() {
     private val io = Executors.newSingleThreadExecutor()
+    /** Downloads every page of an image manual in the background, in order (turning pages never waits on it). */
+    private val net = Executors.newSingleThreadExecutor()
+    private lateinit var loadingPage: TextView
     private lateinit var image: ImageView
     private lateinit var scroll: ScrollView
     private lateinit var info: TextView
@@ -66,10 +69,19 @@ class ManualActivity : Activity() {
             gravity = Gravity.CENTER
             text = "Descargando el manual…"
         }
+        loadingPage = TextView(this).apply {
+            setTextColor(getColor(R.color.text))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            typeface = resources.getFont(R.font.inter_semibold)
+            setPadding(dp(16), dp(8), dp(16), dp(8))
+            background = android.graphics.drawable.GradientDrawable().apply { setColor(Color.parseColor("#E61B1446")); cornerRadius = dp(14).toFloat() }
+            visibility = View.GONE
+        }
         setContentView(FrameLayout(this).apply {
             setBackgroundColor(Color.BLACK)
             addView(scroll, FrameLayout.LayoutParams(-1, -1))
             addView(status, FrameLayout.LayoutParams(-1, -1))
+            addView(loadingPage, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply { topMargin = dp(16) })
             addView(info, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = dp(14) })
         })
         info.visibility = View.GONE
@@ -78,6 +90,9 @@ class ManualActivity : Activity() {
             status.visibility = View.GONE
             info.visibility = View.VISIBLE
             show(prefs.getInt(name, 0))
+            // All the pages, from the current one on, then the ones before it
+            val start = prefs.getInt(name, 0).coerceIn(0, imagePages - 1)
+            ((start until imagePages) + (0 until start)).forEach { i -> net.execute { if (!isFinishing) runCatching { Manuals.pageFile(this, console, name, i) } } }
             return
         }
         io.execute {
@@ -147,7 +162,10 @@ class ManualActivity : Activity() {
         val want = page
         val wideNow = wide
         info.text = infoText()
-        if (bitmap == null) { status.visibility = View.VISIBLE; status.text = "Cargando la página…" }
+        // Not downloaded yet: say so (the page stays as it was until the new one is ready)
+        val ready = Manuals.hasPage(this, console, name, want)
+        loadingPage.text = "Cargando la página ${want + 1}…"
+        loadingPage.visibility = if (ready) View.GONE else View.VISIBLE
         io.execute {
             val r = runCatching {
                 val f = Manuals.pageFile(this, console, name, want)
@@ -162,14 +180,13 @@ class ManualActivity : Activity() {
             }
             runOnUiThread {
                 if (isFinishing || want != page) return@runOnUiThread
+                loadingPage.visibility = View.GONE
                 r.onSuccess { bmp ->
                     status.visibility = View.GONE
                     image.setImageBitmap(bmp)
                     bitmap?.recycle()
                     bitmap = bmp
                     scroll.scrollTo(0, 0)
-                    // Next page in the background, so turning is instant
-                    if (want + 1 < imagePages) io.execute { runCatching { Manuals.pageFile(this, console, name, want + 1) } }
                 }.onFailure {
                     status.visibility = View.VISIBLE
                     status.text = "No se pudo cargar la página: ${it.message}"
@@ -209,6 +226,7 @@ class ManualActivity : Activity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        net.shutdownNow()
         runCatching { renderer?.close() }
         runCatching { fd?.close() }
         bitmap?.recycle()
