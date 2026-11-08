@@ -140,9 +140,11 @@ class ShopActivity : Activity() {
     // ---- Layout (built in code: one screen, 960×540 dp) ----
 
     private fun build(): View {
-        val root = FrameLayout(this).apply { setBackgroundResource(R.drawable.bg_screen) }
+        val root = FrameLayout(this).apply { setBackgroundResource(R.drawable.bg_screen); clipChildren = false }
         val col = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            clipChildren = false
+            clipToPadding = false
             setPadding(dp(40), dp(24), dp(40), dp(16))
         }
         root.addView(col, FrameLayout.LayoutParams(-1, -1))
@@ -189,10 +191,11 @@ class ShopActivity : Activity() {
             filterViews += v
         }
 
-        grid = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        // The focused card grows 6 %: nothing may clip it.
+        grid = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; clipChildren = false; clipToPadding = false }
         col.addView(grid, LinearLayout.LayoutParams(-1, 0, 1f).apply { topMargin = dp(14) })
         repeat(ROWS) {
-            val row = LinearLayout(this)
+            val row = LinearLayout(this).apply { clipChildren = false; clipToPadding = false }
             grid.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
             repeat(COLUMNS) {
                 val card = Card()
@@ -389,7 +392,7 @@ class ShopActivity : Activity() {
             card.view.scaleY = card.view.scaleX
             card.view.elevation = if (focused) dp(6).toFloat() else 0f
             card.title.text = g.title
-            card.meta.text = listOfNotNull(g.year?.toString(), g.genres.firstOrNull()).joinToString(" · ")
+            card.meta.text = listOfNotNull(sizeOf(g), g.year?.toString(), g.genres.firstOrNull()).joinToString(" · ")
             card.rating.visibility = if (g.rating != null) View.VISIBLE else View.GONE
             card.rating.text = g.rating?.let { "★ " + String.format("%.1f", it).replace('.', ',') }
             val job = ShopDownloads.jobFor(g)
@@ -406,11 +409,17 @@ class ShopActivity : Activity() {
             if (card.bound !== g) {
                 card.bound = g
                 card.cover.setImageDrawable(null)
-                val probe = Game(console, File(console.romDir, "${g.name}.${g.file.substringAfterLast('.')}"))
+                // Multi-disc games: the box art is named without "(Disc 1)"
+                val coverName = g.name.replace(Regex("""\s*\(Disc \d+\)""", RegexOption.IGNORE_CASE), "")
+                val probe = Game(console, File(console.romDir, "$coverName.${g.file.substringAfterLast('.')}"))
                 covers.load(probe, dp(CARD_DP)) { bmp -> if (card.bound === g) card.cover.setImageBitmap(bmp) }
             }
         }
     }
+
+    /** Download size (all discs of a multi-disc game). */
+    private fun sizeOf(g: ShopGame) =
+        Formatter.formatShortFileSize(this, if (g.discs.isNotEmpty()) g.discs.sumOf { it.second } else g.size)
 
     private fun badge(card: Card, label: String, color: Int) {
         card.badge.visibility = View.VISIBLE
@@ -514,7 +523,7 @@ class ShopActivity : Activity() {
 
     private fun showGame(g: ShopGame) {
         val cat = catalog ?: return
-        val size = Formatter.formatShortFileSize(this, if (g.discs.isNotEmpty()) g.discs.sumOf { it.second } else g.size)
+        val size = sizeOf(g)
         val lines = listOfNotNull(
             listOfNotNull(g.rating?.let { "★ " + String.format("%.1f", it).replace('.', ',') }, g.year?.toString(), g.genres.joinToString(", ").takeIf { it.isNotEmpty() })
                 .joinToString(" · ").takeIf { it.isNotEmpty() },
