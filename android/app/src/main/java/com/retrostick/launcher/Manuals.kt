@@ -34,12 +34,39 @@ object Manuals {
 
     /**
      * Manuals outside the collections, by console and loose title: "identifier::file" on archive.org.
-     * Dragon Ball Final Bout: the US one is "Dragon Ball GT: Final Bout", not in the US-only collection; this is the
-     * Japanese manual translated into English.
+     * "img::identifier::page|page|…" is a manual scanned as photos of its pages (one image each, in order).
+     * Dragon Ball Final Bout: the US manual ("Dragon Ball GT: Final Bout") isn't in the collection; this is a scan of
+     * it, page spreads as photos (the PDF of the translated Japanese one sits on a very slow server).
      */
     private val EXTRA = mapOf(
-        "psx" to mapOf("dragonballfinalbout" to "dragon-ball-final-bout-manual-en::Dragon_Ball_Final_Bout_Manual_EN.pdf"),
+        "psx" to mapOf(
+            "dragonballfinalbout" to "img::19-ff-3-a-08-8-ac-9-4-ced-8-c-14-983-dbbc-312-f-1::Front Cover|Pages 0-1|Pages 02-03|" +
+                "Pages 04-05|Pages 06-07|Pages 08-09|Pages 10-11|Pages 12-13|Pages 14-15|Pages 16-17|Pages 18-19|Pages 20-21|" +
+                "Pages 22-23|Pages 24-25|Pages 27",
+        ),
     )
+
+    fun isImages(name: String) = name.startsWith("img::")
+    fun pages(name: String): List<String> = name.substringAfterLast("::").split('|')
+
+    /** One page of an image manual, downloaded the first time (blocking). */
+    fun pageFile(context: Context, console: Console, name: String, index: Int): File {
+        val id = name.removePrefix("img::").substringBefore("::")
+        val page = pages(name)[index]
+        val dir = File(context.filesDir, "manuals/${console.id}/$id").apply { mkdirs() }
+        val target = File(dir, "$index.jpg")
+        if (target.isFile && target.length() > 0) return target
+        val conn = ShopApi.open("https://archive.org/download/$id/${URLEncoder.encode(page, "UTF-8").replace("+", "%20")}")
+        val tmp = File(dir, "$index.jpg.part")
+        try {
+            if (conn.responseCode != 200) throw IllegalStateException("archive.org respondió ${conn.responseCode}")
+            conn.inputStream.use { input -> tmp.outputStream().use { input.copyTo(it, 64 * 1024) } }
+        } finally {
+            conn.disconnect()
+        }
+        if (!tmp.renameTo(target)) throw IllegalStateException("No se pudo guardar la página")
+        return target
+    }
 
     /** Spanish Pokémon editions under their English names, as the (US) manuals are called. */
     private val ALIASES = listOf(
@@ -120,18 +147,36 @@ object Manuals {
     }
 
     /** The manual on disk, downloaded the first time (blocking). */
-    fun file(context: Context, console: Console, name: String): File {
+    fun file(context: Context, console: Console, name: String, progress: (Long, Long) -> Unit = { _, _ -> }): File {
         val dir = File(context.filesDir, "manuals/${console.id}").apply { mkdirs() }
         // "identifier::file" for the manuals outside the collections (EXTRA)
         val id = if ("::" in name) name.substringBefore("::") else COLLECTIONS.getValue(console.id)
         val file = name.substringAfter("::")
         val target = File(dir, file)
         if (target.isFile && target.length() > 0) return target
-        val conn = ShopApi.open("https://archive.org/download/$id/${URLEncoder.encode(file, "UTF-8").replace("+", "%20")}")
         val tmp = File(dir, "$file.part")
+        val have = if (tmp.isFile) tmp.length() else 0L
+        val conn = ShopApi.open("https://archive.org/download/$id/${URLEncoder.encode(file, "UTF-8").replace("+", "%20")}", if (have > 0) "bytes=$have-" else null)
         try {
-            if (conn.responseCode != 200) throw IllegalStateException("archive.org respondió ${conn.responseCode}")
-            conn.inputStream.use { input -> tmp.outputStream().use { input.copyTo(it, 64 * 1024) } }
+            val code = conn.responseCode
+            if (code != 200 && code != 206) throw IllegalStateException("archive.org respondió $code")
+            val append = code == 206
+            var done = if (append) have else 0L
+            val total = done + conn.contentLengthLong.coerceAtLeast(0)
+            conn.inputStream.use { input ->
+                java.io.FileOutputStream(tmp, append).use { out ->
+                    val buf = ByteArray(64 * 1024)
+                    var last = 0L
+                    while (true) {
+                        val r = input.read(buf)
+                        if (r < 0) break
+                        out.write(buf, 0, r)
+                        done += r
+                        val now = System.currentTimeMillis()
+                        if (now - last > 400) { last = now; progress(done, total) }
+                    }
+                }
+            }
         } finally {
             conn.disconnect()
         }

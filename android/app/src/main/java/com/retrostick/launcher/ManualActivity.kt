@@ -6,6 +6,7 @@ import android.graphics.Color
 import android.graphics.pdf.PdfRenderer
 import android.os.Bundle
 import android.os.ParcelFileDescriptor
+import android.text.format.Formatter
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.KeyEvent
@@ -27,6 +28,10 @@ class ManualActivity : Activity() {
     private lateinit var info: TextView
     private lateinit var status: TextView
     private var renderer: PdfRenderer? = null
+    /** Image manual (photos of the pages): page count, 0 for a PDF */
+    private var imagePages = 0
+    private lateinit var console: Console
+    private val pageCount get() = renderer?.pageCount ?: imagePages
     private var fd: ParcelFileDescriptor? = null
     private var page = 0
     private var wide = false
@@ -38,7 +43,7 @@ class ManualActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val console = CONSOLES.firstOrNull { it.id == intent.getStringExtra(EXTRA_CONSOLE) } ?: return finish()
+        console = CONSOLES.firstOrNull { it.id == intent.getStringExtra(EXTRA_CONSOLE) } ?: return finish()
         Sounds.init(this)
         image = ImageView(this).apply { adjustViewBounds = true; scaleType = ImageView.ScaleType.FIT_CENTER }
         scroll = ScrollView(this).apply {
@@ -68,9 +73,22 @@ class ManualActivity : Activity() {
             addView(info, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = dp(14) })
         })
         info.visibility = View.GONE
+        if (Manuals.isImages(name)) {
+            imagePages = Manuals.pages(name).size
+            status.visibility = View.GONE
+            info.visibility = View.VISIBLE
+            show(prefs.getInt(name, 0))
+            return
+        }
         io.execute {
             val result = runCatching {
-                val file = Manuals.file(this, console, name)
+                val file = Manuals.file(this, console, name) { done, total ->
+                    runOnUiThread {
+                        status.text = "Descargando el manual…\n\n" + Formatter.formatShortFileSize(this, done) +
+                            (if (total > 0) " de " + Formatter.formatShortFileSize(this, total) else "") +
+                            "\n\nSe guarda: la próxima vez se abre al momento. Si sales, seguirá donde se quedó."
+                    }
+                }
                 val pfd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
                 pfd to PdfRenderer(pfd)
             }
@@ -91,6 +109,7 @@ class ManualActivity : Activity() {
     }
 
     private fun show(index: Int) {
+        if (imagePages > 0) return showImage(index)
         val r = renderer ?: return
         page = index.coerceIn(0, r.pageCount - 1)
         prefs.edit().putInt(name, page).apply()
@@ -113,7 +132,50 @@ class ManualActivity : Activity() {
         bitmap = bmp
         scroll.scrollTo(0, 0)
         val title = intent.getStringExtra(EXTRA_TITLE) ?: ""
-        info.text = "$title · página ${page + 1} de ${r.pageCount}      ◀ ▶ Página      ✕ ${if (wide) "Página entera" else "Ampliar"}      ○ Volver"
+        info.text = infoText()
+    }
+
+    private fun infoText(): String {
+        val title = intent.getStringExtra(EXTRA_TITLE) ?: ""
+        return "$title · página ${page + 1} de $pageCount      ◀ ▶ Página      ✕ ${if (wide) "Página entera" else "Ampliar"}      ○ Volver"
+    }
+
+    /** A page of an image manual: downloaded (once) and decoded at screen size off the UI thread. */
+    private fun showImage(index: Int) {
+        page = index.coerceIn(0, imagePages - 1)
+        prefs.edit().putInt(name, page).apply()
+        val want = page
+        val wideNow = wide
+        info.text = infoText()
+        if (bitmap == null) { status.visibility = View.VISIBLE; status.text = "Cargando la página…" }
+        io.execute {
+            val r = runCatching {
+                val f = Manuals.pageFile(this, console, name, want)
+                val screenW = resources.displayMetrics.widthPixels
+                val screenH = resources.displayMetrics.heightPixels
+                val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                android.graphics.BitmapFactory.decodeFile(f.path, bounds)
+                var sample = 1
+                val targetW = if (wideNow) screenW else minOf(screenW, (bounds.outWidth.toLong() * screenH / bounds.outHeight.coerceAtLeast(1)).toInt())
+                while (bounds.outWidth / (sample * 2) >= targetW) sample *= 2
+                android.graphics.BitmapFactory.decodeFile(f.path, android.graphics.BitmapFactory.Options().apply { inSampleSize = sample })
+            }
+            runOnUiThread {
+                if (isFinishing || want != page) return@runOnUiThread
+                r.onSuccess { bmp ->
+                    status.visibility = View.GONE
+                    image.setImageBitmap(bmp)
+                    bitmap?.recycle()
+                    bitmap = bmp
+                    scroll.scrollTo(0, 0)
+                    // Next page in the background, so turning is instant
+                    if (want + 1 < imagePages) io.execute { runCatching { Manuals.pageFile(this, console, name, want + 1) } }
+                }.onFailure {
+                    status.visibility = View.VISIBLE
+                    status.text = "No se pudo cargar la página: ${it.message}"
+                }
+            }
+        }
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
@@ -131,7 +193,7 @@ class ManualActivity : Activity() {
         }
         when (code) {
             KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_BUTTON_B -> { Sounds.play(Sounds.Sound.BACK); finish() }
-            KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_BUTTON_R1 -> if (renderer != null && page < renderer!!.pageCount - 1) { show(page + 1); Sounds.play(Sounds.Sound.MOVE) }
+            KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_BUTTON_R1 -> if (pageCount > 0 && page < pageCount - 1) { show(page + 1); Sounds.play(Sounds.Sound.MOVE) }
             KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_BUTTON_L1 -> if (page > 0) { show(page - 1); Sounds.play(Sounds.Sound.MOVE) }
             KeyEvent.KEYCODE_DPAD_DOWN -> scroll.smoothScrollBy(0, dp(160))
             KeyEvent.KEYCODE_DPAD_UP -> scroll.smoothScrollBy(0, -dp(160))
