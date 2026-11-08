@@ -31,6 +31,8 @@ class ShopGame(
     val rating: Double?,
     val genres: List<String>,
     val year: Int?,
+    /** Box art URL chosen by the webapp (resized WebP), or null */
+    val cover: String?,
 ) {
     val looseTitle = looseKey(title)
 }
@@ -167,6 +169,7 @@ object ShopApi {
                 rating = if (g.has("r")) g.getDouble("r") else null,
                 genres = gi?.let { a -> List(a.length()) { genres.getOrElse(a.getInt(it)) { "" } } }.orEmpty().filter { it.isNotEmpty() },
                 year = if (g.has("y")) g.getInt("y") else null,
+                cover = g.optString("c").takeIf { it.isNotEmpty() },
             )
         }
         return ShopCatalog(

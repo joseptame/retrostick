@@ -37,6 +37,37 @@ class CoverLoader(context: Context) {
         }
     }
 
+    /**
+     * A cover by URL (RetroShop: the webapp already picked it), cached on disk by URL. Falls back to the
+     * original image when the resizing CDN fails.
+     */
+    fun loadUrl(url: String, sizePx: Int, onLoaded: (Bitmap?) -> Unit) {
+        val memKey = "$url@$sizePx"
+        memory.get(memKey)?.let { onLoaded(it); return }
+        executor.execute {
+            val file = locked(url) { urlFile(url) }
+            val bitmap = file?.let { decode(it, sizePx) }
+            if (bitmap != null) memory.put(memKey, bitmap)
+            main.post { onLoaded(bitmap) }
+        }
+    }
+
+    private fun urlFile(url: String): File? {
+        val byUrl = File(dir, "url").apply { mkdirs() }
+        val name = java.security.MessageDigest.getInstance("SHA-1").digest(url.toByteArray())
+            .joinToString("") { "%02x".format(it) }
+        val local = File(byUrl, "$name.img")
+        if (local.length() > 0) return local
+        val missing = File(byUrl, "$name.none")
+        if (missing.exists() && System.currentTimeMillis() - missing.lastModified() < RETRY_MISSING_MS) return null
+        val original = Regex("""[?&]url=([^&]+)""").find(url)?.groupValues?.get(1)?.let { java.net.URLDecoder.decode(it, "UTF-8") }
+        return when (fetch(url, local).let { if (it == Result.ERROR && original != null) fetch(original, local) else it }) {
+            Result.OK -> local
+            Result.NOT_FOUND -> { missing.writeText(""); null }
+            Result.ERROR -> null
+        }
+    }
+
     private fun coverFile(game: Game): File? {
         val consoleDir = File(dir, game.console.id).apply { mkdirs() }
         val local = File(consoleDir, "${game.baseName}.png")

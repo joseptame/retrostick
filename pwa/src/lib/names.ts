@@ -78,7 +78,7 @@ const titleKey = (name: string) => name.replace(/\s*\(.*$/, '').toLowerCase()
  */
 export function bestBoxart(name: string, boxarts: string[]): string | null {
   const safe = safeThumbName(fileOnly(name))
-  const key = titleKey(safe)
+  const index = boxartIndex(boxarts)
   const rank = (n: string) => {
     const euro = EUROPEAN.test(n)
     if (n === safe && euro) return 0
@@ -87,39 +87,53 @@ export function bestBoxart(name: string, boxarts: string[]): string | null {
     if (n === safe) return 3
     return 4
   }
-  const pick = (match: (n: string) => boolean) => {
+  const pick = (candidates: Iterable<string>, match: (n: string) => boolean = () => true) => {
     let best: string | null = null
-    for (const n of boxarts) {
+    for (const n of candidates) {
       if (!match(n) || (n !== safe && UNRELEASED.test(n))) continue
       if (best === null || rank(n) < rank(best) || (rank(n) === rank(best) && n.length < best.length)) best = n
     }
     return best
   }
-  const exact = pick((n) => titleKey(n) === key)
+  const exact = pick(index.byTitle.get(titleKey(safe)) ?? [])
   if (exact) return exact
   // Other ROM sets (GoodTools…) spell titles differently: "Ghosts 'N Goblins" / "Ghosts'n Goblins",
   // "Disney's Tarzan" / "Tarzan". Compare loose keys, then let one end the other.
   const loose = looseKey(fileOnly(name))
   if (!loose) return null
-  const keys = looseKeysOf(boxarts)
-  const same = pick((n) => keys.get(n) === loose)
+  const same = pick(index.byLoose.get(loose) ?? [])
   if (same) return same
   if (loose.length < 6) return null
-  return pick((n) => {
-    const k = keys.get(n)!
+  return pick(index.loose.keys(), (n) => {
+    const k = index.loose.get(n)!
     return k.length >= 6 && (k.endsWith(loose) || loose.endsWith(k))
   })
 }
 
-/** looseKey of every box art name, computed once per list. */
-const boxartKeys = new WeakMap<string[], Map<string, string>>()
-function looseKeysOf(boxarts: string[]): Map<string, string> {
-  let m = boxartKeys.get(boxarts)
-  if (!m) {
-    m = new Map(boxarts.map((n) => [n, looseKey(n)]))
-    boxartKeys.set(boxarts, m)
+/**
+ * Box art names grouped by title and by loose key, built once per list: picking a cover then only looks at a
+ * handful of names instead of scanning thousands (it runs for every card on screen).
+ */
+interface BoxartIndex {
+  byTitle: Map<string, string[]>
+  byLoose: Map<string, string[]>
+  loose: Map<string, string>
+}
+const boxartIndexes = new WeakMap<string[], BoxartIndex>()
+function boxartIndex(boxarts: string[]): BoxartIndex {
+  let index = boxartIndexes.get(boxarts)
+  if (!index) {
+    index = { byTitle: new Map(), byLoose: new Map(), loose: new Map() }
+    for (const n of boxarts) {
+      const t = titleKey(n)
+      const l = looseKey(n)
+      index.loose.set(n, l)
+      ;(index.byTitle.get(t) ?? index.byTitle.set(t, []).get(t)!).push(n)
+      ;(index.byLoose.get(l) ?? index.byLoose.set(l, []).get(l)!).push(n)
+    }
+    boxartIndexes.set(boxarts, index)
   }
-  return m
+  return index
 }
 
 /**

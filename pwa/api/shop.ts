@@ -9,7 +9,8 @@
  *   console, collection, title, restricted, archive,   // archive: the .zip holding the ROMs, if any
  *   genres: string[],
  *   games: [{ t: title, f: file, s: size, n: name to save as (no extension), p?: per-game archive,
- *             d?: [{ f, s }] discs, r?: rating 0..10, g?: genre indexes, y?: year }]
+ *             d?: [{ f, s }] discs, r?: rating 0..10, g?: genre indexes, y?: year,
+ *             c?: box art URL (resized WebP, chosen like the webapp's covers) }]
  * }
  *
  * Only reachable with the stick's pass (x-stick-token, see api/pair.ts and middleware.ts). Cached per console for a few hours.
@@ -20,7 +21,7 @@ import { configureData } from '../src/lib/data.js'
 import { loadLookup } from '../src/lib/igdbdb.js'
 import { baseName, bestVariants, displayTitle, isDemo, looseKey } from '../src/lib/names.js'
 import { DEFAULT_COLLECTIONS } from '../src/lib/recents.js'
-import { loadDb } from '../src/lib/romdb.js'
+import { coverFor, loadDb } from '../src/lib/romdb.js'
 
 // Node.js, not edge: Vercel's edge adds a "Forwarded" header to outgoing requests and archive.org answers
 // those with 400. (Imports carry .js: Node resolves ES modules by exact file name.)
@@ -38,6 +39,7 @@ interface ShopGame {
   r?: number
   g?: number[]
   y?: number
+  c?: string
 }
 
 const cache = new Map<string, { at: number; body: Promise<string> }>()
@@ -85,6 +87,11 @@ async function build(id: ConsoleId, collection: string): Promise<string> {
     if (info?.genres.length) game.g = info.genres.map(genreIndex)
     if (info?.year) game.y = info.year
     return game
+  })
+  // Box art picked here (same choice as the webapp), so the stick needn't look up libretro's index itself.
+  const covers = await Promise.all(list.map((e) => coverFor(id, e.name).catch(() => null)))
+  covers.forEach((c, i) => {
+    if (c) games[i].c = c
   })
   games.sort((a, b) => (b.r ?? -1) - (a.r ?? -1) || a.t.localeCompare(b.t, 'es'))
   return JSON.stringify({ console: id, collection, title, restricted, archive, genres, games })

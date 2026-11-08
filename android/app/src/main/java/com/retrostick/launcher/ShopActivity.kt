@@ -409,13 +409,19 @@ class ShopActivity : Activity() {
             if (card.bound !== g) {
                 card.bound = g
                 card.cover.setImageDrawable(null)
-                covers.load(coverProbe(g), dp(CARD_DP)) { bmp -> if (card.bound === g) card.cover.setImageBitmap(bmp) }
+                loadCover(g) { bmp -> if (card.bound === g) card.cover.setImageBitmap(bmp) }
             }
         }
         // Next row ready before you get there
         for (i in (topRow + ROWS) * COLUMNS until (topRow + ROWS + 1) * COLUMNS) {
-            shown.getOrNull(i)?.let { covers.load(coverProbe(it), dp(CARD_DP)) {} }
+            shown.getOrNull(i)?.let { loadCover(it) {} }
         }
+    }
+
+    /** The webapp's box art when it sent one; otherwise looked up by name like the home screen. */
+    private fun loadCover(g: ShopGame, onLoaded: (android.graphics.Bitmap?) -> Unit) {
+        val url = g.cover
+        if (url != null) covers.loadUrl(url, dp(CARD_DP), onLoaded) else covers.load(coverProbe(g), dp(CARD_DP), onLoaded)
     }
 
     /** A Game named like the download, for CoverLoader (multi-disc box art is named without "(Disc 1)"). */
