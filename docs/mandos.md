@@ -55,10 +55,10 @@ Sin root no se puede añadir un `.kl` al sistema (`/vendor` es de solo lectura),
 
 | | NES (FCEUmm) | Super Nintendo (Snes9x 2010) | Game Boy / Color (Gambatte) | Game Boy Advance (mGBA) | PlayStation (PCSX ReARMed) |
 |---|---|---|---|---|---|
-| ✕ | A | B | A | A | ✕ |
+| ✕ | B | B | A | A | ✕ |
 | ○ | A | A | A | A | ○ |
 | □ | B | Y | B | B | □ |
-| △ | B | X | B | B | △ |
+| △ | A | X | B | B | △ |
 | Options | Start | Start | Start | Start | Start |
 | Create | Select | Select | Select | Select | Select |
 | Cruceta y stick izquierdo | Moverse | Moverse | Moverse | Moverse | Cruceta / stick |
@@ -79,7 +79,7 @@ Archivos (los instala `install.ps1`):
 | `stick/retroarch/overrides/Gambatte/Gambatte.cfg` | `RetroArch/config/Gambatte/` | L1 guardar, R1 avance rápido, x2 |
 | `stick/retroarch/remaps/mGBA/mGBA.rmp` | `RetroArch/config/remaps/mGBA/` | ✕○ → A, □△ → B, L2/R2 sin función, stick = cruceta |
 | `stick/retroarch/overrides/mGBA/mGBA.cfg` | `RetroArch/config/mGBA/` | L2 guardar, R2 avance rápido, x2 |
-| `stick/retroarch/remaps/FCEUmm/FCEUmm.rmp` | `RetroArch/config/remaps/FCEUmm/` | ✕○ → A, □△ → B, L/R sin función, stick = cruceta |
+| `stick/retroarch/remaps/FCEUmm/FCEUmm.rmp` | `RetroArch/config/remaps/FCEUmm/` | Como el mando original: ✕□ → B, ○△ → A, L/R sin función, stick = cruceta |
 | `stick/retroarch/overrides/FCEUmm/FCEUmm.cfg` | `RetroArch/config/FCEUmm/` | L1 guardar, R1 avance rápido, x2 |
 | `stick/retroarch/remaps/Snes9x 2010/Snes9x 2010.rmp` | `RetroArch/config/remaps/Snes9x 2010/` | Botones como el mando de SNES, L2/R2 sin función, stick = cruceta |
 | `stick/retroarch/overrides/Snes9x 2010/Snes9x 2010.cfg` | `RetroArch/config/Snes9x 2010/` | L2 guardar, R2 avance rápido, x2 |
