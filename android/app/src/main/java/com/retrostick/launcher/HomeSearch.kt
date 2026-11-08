@@ -23,6 +23,8 @@ class HomeSearch(private val ctx: Context, private val covers: CoverLoader) {
 
     var candidates: () -> List<Hit> = { emptyList() }
     var onPick: (Hit) -> Unit = {}
+    /** What is searched, shown under the query ("Juegos de NES en el stick y en tu Drive") */
+    var scope = ""
 
     private val kbRows = listOf(
         "1234567890".map { it.toString() },
@@ -40,6 +42,7 @@ class HomeSearch(private val ctx: Context, private val covers: CoverLoader) {
     private val queryText = text(20f, R.color.text).apply { typeface = ctx.resources.getFont(R.font.inter_bold) }
     private val countText = text(10.5f, R.color.text_3)
     private val results = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
+    private val scopeText = text(9.5f, R.color.text_3)
     private val keys = mutableListOf<List<TextView>>()
     val view: View
     val isOpen get() = view.visibility == View.VISIBLE
@@ -53,7 +56,7 @@ class HomeSearch(private val ctx: Context, private val covers: CoverLoader) {
                     text = if (label == DELETE) "⌫" else if (label == SPACE) "espacio" else label.uppercase()
                     gravity = Gravity.CENTER
                     typeface = ctx.resources.getFont(R.font.inter_semibold)
-                }.also { row.addView(it, LinearLayout.LayoutParams(dp(if (label.length > 1) 92 else 42), dp(36)).apply { setMargins(dp(3), dp(3), dp(3), dp(3)) }) }
+                }.also { row.addView(it, LinearLayout.LayoutParams(dp(if (label == SPACE) 130 else 42), dp(36)).apply { setMargins(dp(3), dp(3), dp(3), dp(3)) }) }
             }
             rows.addView(row)
         }
@@ -65,20 +68,18 @@ class HomeSearch(private val ctx: Context, private val covers: CoverLoader) {
         view = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(56), dp(34), dp(56), dp(18))
-            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(Color.parseColor("#F20D0B1F"), Color.parseColor("#FF0D0B1F")))
+            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(Color.parseColor("#FF0D0B1F"), Color.parseColor("#FF0D0B1F")))
             isClickable = true
             visibility = View.GONE
             addView(head)
-            addView(text(9.5f, R.color.text_3).apply {
-                text = "Tus juegos del stick y de tu Drive, de todas las consolas.      ✕ Escribir / Abrir      □ Borrar      ○ Cerrar"
-                setPadding(0, dp(4), 0, dp(10))
-            })
+            addView(scopeText.apply { setPadding(0, dp(4), 0, dp(10)) })
             addView(results, LinearLayout.LayoutParams(-1, 0, 1f))
             addView(rows, LinearLayout.LayoutParams(-1, -2))
         }
     }
 
     fun open() {
+        scopeText.text = "$scope.      ✕ Escribir / Abrir      □ Borrar      ○ Cerrar"
         query = ""
         kbRow = 1; kbCol = 0; hitFocus = -1
         view.visibility = View.VISIBLE
@@ -135,7 +136,7 @@ class HomeSearch(private val ctx: Context, private val covers: CoverLoader) {
     private fun refresh() {
         val words = query.split(Regex("""\s+""")).map(::looseKey).filter { it.isNotEmpty() }
         hits = if (words.isEmpty()) emptyList() else candidates().filter { h ->
-            val hay = looseKey(h.title) + " " + looseKey(h.console.name)
+            val hay = looseKey(h.title)
             words.all { it in hay }
         }.take(MAX)
         hitFocus = hitFocus.coerceAtMost(hits.size - 1)
@@ -151,7 +152,7 @@ class HomeSearch(private val ctx: Context, private val covers: CoverLoader) {
                 addView(text(12.5f, R.color.text).apply {
                     text = h.title; typeface = ctx.resources.getFont(R.font.inter_semibold); maxLines = 1; ellipsize = TextUtils.TruncateAt.END; tag = "t"
                 }, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(12) })
-                addView(text(10f, R.color.text_3).apply { text = h.console.name + if (h.drive != null) " · en tu Drive" else " · en el stick"; tag = "s" })
+                addView(text(10f, R.color.text_3).apply { text = if (h.drive != null) "En tu Drive" else "En el stick"; tag = "s" })
             }
             results.addView(row, LinearLayout.LayoutParams(-1, dp(42)).apply { bottomMargin = dp(3) })
         }

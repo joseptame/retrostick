@@ -1006,7 +1006,13 @@ class MainActivity : Activity() {
     private fun handleKey(code: Int) {
         when (code) {
             KeyEvent.KEYCODE_BUTTON_START -> { toggleView(); render(); return }
-            KeyEvent.KEYCODE_BUTTON_L2 -> { homeSearch.open(); keySound = Sounds.Sound.OPEN; return }
+            // Search in the selected console only
+            KeyEvent.KEYCODE_BUTTON_L2 -> {
+                if (settingsTab) return
+                homeSearch.scope = "Juegos de ${CONSOLES[tab].name} en el stick y en tu Drive"
+                homeSearch.view.bringToFront()
+                homeSearch.open(); keySound = Sounds.Sound.OPEN; return
+            }
             KeyEvent.KEYCODE_BUTTON_SELECT -> { openManual(); render(); return }
         }
         if (listMode && !settingsTab && zone == Zone.CONTENT && handleListKey(code)) { render(); return }
@@ -1469,7 +1475,7 @@ class MainActivity : Activity() {
 
     private fun searchCandidates(): List<HomeSearch.Hit> {
         val out = mutableListOf<HomeSearch.Hit>()
-        CONSOLES.forEach { c ->
+        CONSOLES.filter { !settingsTab && it == CONSOLES[tab] }.forEach { c ->
             games[c.id].orEmpty().forEach { g -> out += HomeSearch.Hit(g.title, c, g, null, g) }
             DriveCollection.items(this, c).forEach { d -> out += HomeSearch.Hit(d.title, c, null, d, d.probe()) }
         }
