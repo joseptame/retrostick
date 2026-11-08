@@ -14,16 +14,16 @@ import java.util.concurrent.Executors
  * The ficha of each game (description, rating, year, genres, players, trailer id, screenshot URLs: api/igdb.ts)
  * kept on the stick as a small JSON (filesDir/fichas/<console>/<hash of the title>.json, 2–3 KB), so the home
  * screen shows it at once and without internet. The screenshots and the trailer's thumbnail go to CoverLoader's
- * disk cache. Every game on the stick gets its ficha in the background ([prefetch]); a ficha is refreshed after
- * [REFRESH_MS], one IGDB doesn't know is asked again after [RETRY_NONE_MS]. A failed request (no internet,
+ * disk cache. Every game on the stick gets its ficha in the background ([prefetch]) and keeps it; one IGDB
+ * doesn't know is asked again after [RETRY_NONE_MS]. A failed request (no internet,
  * RetroShop not paired) isn't kept.
  */
 object Fichas {
     class Entry(val info: IgdbInfo?, val at: Long) {
-        val stale get() = System.currentTimeMillis() - at > if (info == null) RETRY_NONE_MS else REFRESH_MS
+        /** Only "IGDB doesn't know it" is asked again; a ficha found is kept for good (retro games don't change). */
+        val stale get() = info == null && System.currentTimeMillis() - at > RETRY_NONE_MS
     }
 
-    private const val REFRESH_MS = 30L * 24 * 60 * 60 * 1000
     private const val RETRY_NONE_MS = 24L * 60 * 60 * 1000
 
     private val memory = ConcurrentHashMap<String, Entry>()
