@@ -12,17 +12,19 @@
  * (archive.org/account/s3.php), sent as "Authorization: LOW access:secret" on every hop of the redirect.
  *
  * The response starts streaming right away (a space every few seconds) and ends with the JSON, so a slow
- * chunk is not cut by the edge's "first byte within 25 s" rule.
+ * chunk is not cut by a proxy waiting for the first byte.
  */
-export const config = { runtime: 'edge' }
+// Node.js, not edge: Vercel's edge adds a "Forwarded" header to outgoing requests and archive.org answers
+// those with 400 (same as api/shop.ts). Up to 300 s: a slow archive.org chunk takes up to ARCHIVE_TIMEOUT.
+export const config = { runtime: 'nodejs', maxDuration: 300 }
 
-import { fetchArchiveRange } from './_archive'
+import { fetchArchiveRange } from './_archive.js'
 
 /** Biggest chunk accepted (the PWA asks for 8 MiB). */
 const MAX_CHUNK = 32 * 1024 * 1024
 /**
  * archive.org can be slow (~150 KB/s) or leave a connection hanging: give up on a chunk after this
- * (the PWA retries). Below the edge's 300 s streaming limit.
+ * (the PWA retries). Below the function's 300 s limit.
  */
 const ARCHIVE_TIMEOUT = 150_000
 
@@ -30,7 +32,7 @@ function bad(message: string, status = 400): Response {
   return new Response(JSON.stringify({ error: message }), { status, headers: { 'content-type': 'application/json; charset=utf-8' } })
 }
 
-export default async function handler(request: Request): Promise<Response> {
+export async function GET(request: Request): Promise<Response> {
   const p = new URL(request.url).searchParams
   const id = p.get('id') ?? ''
   const file = p.get('file') ?? ''

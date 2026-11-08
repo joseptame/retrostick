@@ -1,5 +1,5 @@
 /**
- * Vercel Edge Function: streams an archive.org file.
+ * Vercel Function: streams an archive.org file.
  * archive.org does not send CORS headers on its file servers, so the PWA can't `fetch` the bytes
  * directly. This proxy is same-origin, and streaming has no 4.5 MB response-body limit (Vercel docs).
  * Called only for the identifiers/files the PWA picked from archive.org's own public API.
@@ -7,15 +7,17 @@
  * With a `Range: bytes=a-b` header (RetroShop on the stick, PS1 discs of restricted items) it returns that
  * piece (206), fetched with the user's archive.org keys (api/_archive.ts).
  */
-import { fetchArchiveRange } from './_archive'
+import { fetchArchiveRange } from './_archive.js'
 
-export const config = { runtime: 'edge' }
+// Node.js, not edge: Vercel's edge adds a "Forwarded" header to outgoing requests and archive.org answers
+// those with 400 (same as api/shop.ts).
+export const config = { runtime: 'nodejs', maxDuration: 300 }
 
 /** Biggest piece served per request (the stick asks for 8 MiB). */
 const MAX_RANGE = 32 * 1024 * 1024
 const RANGE_TIMEOUT = 150_000
 
-export default async function handler(request: Request): Promise<Response> {
+export async function GET(request: Request): Promise<Response> {
   const url = new URL(request.url)
   const id = url.searchParams.get('id')
   const file = url.searchParams.get('file')
