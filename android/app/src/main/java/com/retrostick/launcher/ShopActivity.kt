@@ -286,7 +286,7 @@ class ShopActivity : Activity() {
         root.addView(pairPanel, FrameLayout.LayoutParams(-1, -1))
 
         col.addView(text(9.5f, R.color.text_3).apply {
-            text = "OK  Ver juego     △ / Y  Buscar     L1 / R1  Consola     B  Volver"
+            text = hints("[X]  Ver juego      [TRI]  Buscar      L1 / R1  Consola      [O]  Volver")
             gravity = Gravity.END
         })
         return root
@@ -506,7 +506,7 @@ class ShopActivity : Activity() {
             }
             v.alpha = if (selected) 1f else 0.75f
         }
-        val labels = listOf(query?.let { "🔍  «$it»" } ?: "🔍  Buscar") + Sort.values().map { it.label } + "Género: ${genre ?: "Todos"}"
+        val labels = listOf(query?.let { "«$it»" } ?: "Buscar") + Sort.values().map { it.label } + "Género: ${genre ?: "Todos"}"
         filterViews.forEachIndexed { i, v ->
             v.text = labels[i]
             val on = when {
@@ -519,6 +519,7 @@ class ShopActivity : Activity() {
                 setStroke(dp(if (focus) 2 else 1), if (focus) Color.WHITE else getColor(R.color.surface_border))
             }
             v.setTextColor(if (on || focus) Color.WHITE else getColor(R.color.chip_text))
+            if (i == 0) v.icon(R.drawable.ic_shop_search, 13, v.currentTextColor)
         }
         message.visibility = if (shown.isEmpty()) View.VISIBLE else View.GONE
         message.text = when {
@@ -555,7 +556,7 @@ class ShopActivity : Activity() {
             card.rating.text = g.rating?.let { "★ " + String.format("%.1f", it).replace('.', ',') }
             val job = ShopDownloads.jobFor(g)
             when {
-                isOwned(g) -> badge(card, "✓ En el stick", getColor(R.color.ok))
+                isOwned(g) -> badge(card, "En el stick", getColor(R.color.ok), R.drawable.ic_shop_check)
                 job?.state == ShopDownloads.State.RUNNING -> badge(card, "${(job.progress * 100).toInt()} %", Color.WHITE)
                 job?.state == ShopDownloads.State.QUEUED -> badge(card, "En cola", Color.WHITE)
                 job?.state == ShopDownloads.State.ERROR -> badge(card, "Error", Color.parseColor("#F87171"))
@@ -592,9 +593,10 @@ class ShopActivity : Activity() {
     private fun sizeOf(g: ShopGame) =
         Formatter.formatShortFileSize(this, if (g.discs.isNotEmpty()) g.discs.sumOf { it.second } else g.size)
 
-    private fun badge(card: Card, label: String, color: Int) {
+    private fun badge(card: Card, label: String, color: Int, icon: Int? = null) {
         card.badge.visibility = View.VISIBLE
         card.badge.text = label
+        card.badge.icon(icon, 10, getColor(R.color.button_text))
         card.badge.background = round(color, 6)
     }
 
@@ -603,11 +605,19 @@ class ShopActivity : Activity() {
         val queued = ShopDownloads.jobs.count { it.state == ShopDownloads.State.QUEUED } - if (job?.state == ShopDownloads.State.QUEUED) 1 else 0
         val last = ShopDownloads.jobs.lastOrNull()
         status.text = when {
-            job != null -> "⬇  ${job.game.title}  ${(job.progress * 100).toInt()} %" + if (queued > 0) "  ·  $queued en cola" else ""
-            last?.state == ShopDownloads.State.ERROR -> "✕  No se pudo descargar ${last.game.title}"
-            last != null -> "✓  ${last.game.title} ya está en el stick"
+            job != null -> "${job.game.title}  ${(job.progress * 100).toInt()} %" + if (queued > 0) "  ·  $queued en cola" else ""
+            last?.state == ShopDownloads.State.ERROR -> "No se pudo descargar ${last.game.title}"
+            last != null -> "${last.game.title} ya está en el stick"
             else -> ""
         }
+        status.icon(
+            when {
+                job != null -> R.drawable.ic_shop_download
+                last?.state == ShopDownloads.State.ERROR -> R.drawable.ic_shop_x
+                else -> R.drawable.ic_shop_check
+            },
+            12, getColor(if (job == null && last?.state == ShopDownloads.State.ERROR) R.color.xbox_b else R.color.ok),
+        )
         statusPill.visibility = if (last == null) View.GONE else View.VISIBLE
         statusBar.background = round(getColor(if (last?.state == ShopDownloads.State.ERROR) R.color.xbox_b else R.color.ok), 2)
         statusBar.layoutParams = (statusBar.layoutParams as FrameLayout.LayoutParams).apply {
@@ -741,7 +751,7 @@ class ShopActivity : Activity() {
             visibility = View.GONE
             addView(kbText)
             addView(text(9.5f, R.color.text_3).apply {
-                text = "✕  Escribir     □  Borrar     L1 / R1  Consola     ○  Cerrar"
+                text = hints("[X]  Escribir      [SQ]  Borrar      L1 / R1  Consola      [O]  Cerrar")
                 setPadding(0, dp(4), 0, dp(8))
             })
             addView(rows)
@@ -762,7 +772,8 @@ class ShopActivity : Activity() {
     }
 
     private fun renderKeyboard() {
-        kbText.text = "🔍  " + (query ?: "") + "▌" + if (query != null) "     ${shown.size} juegos" else ""
+        kbText.icon(R.drawable.ic_shop_search, 20, getColor(R.color.text))
+        kbText.text = (query ?: "") + "▌" + if (query != null) "     ${shown.size} juegos" else ""
         kbKeys.forEachIndexed { r, row ->
             row.forEachIndexed { c, v ->
                 val focus = r == kbRow && c == kbCol
@@ -770,6 +781,7 @@ class ShopActivity : Activity() {
                     setStroke(dp(1), if (focus) Color.WHITE else getColor(R.color.surface_border))
                 }
                 v.setTextColor(if (focus) getColor(R.color.button_text) else getColor(R.color.text))
+                if (kbRows[r][c] == KB_DELETE) v.text = iconText(R.drawable.ic_shop_backspace, 18, v.currentTextColor)
             }
         }
     }
@@ -856,12 +868,12 @@ class ShopActivity : Activity() {
         val job = ShopDownloads.jobFor(g)
         val state = job?.state
         val (first, status) = when {
-            isOwned(g) -> "✓  En el stick" to "Ya está en el stick: aparece en la pestaña ${console.name} del inicio."
-            state == ShopDownloads.State.RUNNING -> "Descargando  ${(job.progress * 100).toInt()} %" to
+            isOwned(g) -> OWNED to "Ya está en el stick: aparece en la pestaña ${console.name} del inicio."
+            state == ShopDownloads.State.RUNNING -> "Descargando ${(job.progress * 100).toInt()} %" to
                 "${Formatter.formatShortFileSize(this, job.done)} de ${Formatter.formatShortFileSize(this, job.total)} · puedes seguir mirando la tienda"
             state == ShopDownloads.State.QUEUED -> "En cola…" to "Empezará cuando termine la descarga anterior."
-            state == ShopDownloads.State.ERROR -> "↻  Reintentar" to "No se pudo descargar: ${job.error}"
-            else -> "⬇  Descargar" to "Se guarda en el stick y se copia a tu Drive."
+            state == ShopDownloads.State.ERROR -> RETRY to "No se pudo descargar: ${job.error}"
+            else -> DOWNLOAD to "Se guarda en el stick y se copia a tu Drive."
         }
         fichaStatus.text = status
         val running = state == ShopDownloads.State.RUNNING || state == ShopDownloads.State.QUEUED
@@ -880,6 +892,14 @@ class ShopActivity : Activity() {
                 setStroke(dp(1), if (focus) Color.WHITE else getColor(R.color.surface_border))
             }
             b.setTextColor(if (focus) getColor(R.color.button_text) else getColor(R.color.text))
+            val icon = when (labels[i]) {
+                DOWNLOAD -> R.drawable.ic_shop_download
+                TRAILER -> R.drawable.ic_shop_play
+                OWNED -> R.drawable.ic_shop_check
+                RETRY -> R.drawable.ic_shop_retry
+                else -> null
+            }
+            b.icon(icon, 15, b.currentTextColor)
         }
         val shots = fichaShots
         fichaShotsTitle.visibility = if (shots.isEmpty()) View.GONE else View.VISIBLE
@@ -954,7 +974,7 @@ class ShopActivity : Activity() {
         viewerImage.setImageDrawable(null)
         viewerImage.tag = url
         covers.loadUrl(url, dp(900)) { if (viewerImage.tag == url) viewerImage.setImageBitmap(it) }
-        viewerCount.text = "${viewerIndex + 1} / ${shots.size}      ◀ ▶  Cambiar      ○  Cerrar"
+        viewerCount.text = hints("${viewerIndex + 1} / ${shots.size}      ◀ ▶  Cambiar      [O]  Cerrar")
     }
 
     private fun viewerKey(code: Int) {
@@ -969,6 +989,37 @@ class ShopActivity : Activity() {
     }
 
     // ---- Helpers ----
+
+    /** Line icon before the text, tinted like it (null removes it). */
+    private fun TextView.icon(res: Int?, sizeDp: Int, color: Int) {
+        val d = res?.let { getDrawable(it)!!.mutate().apply { setTint(color); setBounds(0, 0, dp(sizeDp), dp(sizeDp)) } }
+        setCompoundDrawablesRelative(d, null, null, null)
+        compoundDrawablePadding = dp(6)
+    }
+
+    /** A line icon as text (keyboard keys). */
+    private fun iconText(res: Int, sizeDp: Int, color: Int): CharSequence {
+        val d = getDrawable(res)!!.mutate().apply { setTint(color); setBounds(0, 0, dp(sizeDp), dp(sizeDp)) }
+        return android.text.SpannableString(" ").apply { setSpan(android.text.style.ImageSpan(d, android.text.style.DynamicDrawableSpan.ALIGN_BOTTOM), 0, 1, 0) }
+    }
+
+    /** Controller hints with the home screen's glyphs: [X] [O] [SQ] [TRI]. */
+    private fun hints(text: String): CharSequence {
+        val glyphs = mapOf(
+            "[X]" to R.drawable.ic_hint_cross, "[O]" to R.drawable.ic_hint_circle,
+            "[SQ]" to R.drawable.ic_hint_square, "[TRI]" to R.drawable.ic_hint_triangle,
+        )
+        val out = android.text.SpannableStringBuilder(text)
+        for ((token, res) in glyphs) {
+            var at = out.indexOf(token)
+            while (at >= 0) {
+                val d = getDrawable(res)!!.mutate().apply { setBounds(0, 0, dp(14), dp(14)) }
+                out.setSpan(android.text.style.ImageSpan(d, android.text.style.DynamicDrawableSpan.ALIGN_BOTTOM), at, at + token.length, 0)
+                at = out.indexOf(token, at + token.length)
+            }
+        }
+        return out
+    }
 
     private fun text(sp: Float, color: Int) = TextView(this).apply {
         setTextSize(TypedValue.COMPLEX_UNIT_SP, sp)
@@ -988,7 +1039,10 @@ class ShopActivity : Activity() {
         private const val POLL_MS = 3000L
         private const val FICHA_BAR_DP = 320
         private const val MAX_SHOTS = 6
-        private const val TRAILER = "▶  Tráiler"
+        private const val TRAILER = "Tráiler"
+        private const val DOWNLOAD = "Descargar"
+        private const val OWNED = "En el stick"
+        private const val RETRY = "Reintentar"
         private const val BACK = "Volver"
         private const val KB_DELETE = "⌫"
         private const val KB_SPACE = "espacio"
