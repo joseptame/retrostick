@@ -53,19 +53,21 @@ Sin root no se puede añadir un `.kl` al sistema (`/vendor` es de solo lectura),
 
 ## Botones en cada consola (DualSense)
 
-| | Game Boy / Color (Gambatte) | Game Boy Advance (mGBA) | PlayStation (PCSX ReARMed) |
-|---|---|---|---|
-| ✕ / ○ | A | A | ✕ / ○ |
-| □ / △ | B | B | □ / △ |
-| Options | Start | Start | Start |
-| Create | Select | Select | Select |
-| Cruceta y stick izquierdo | Moverse | Moverse | Cruceta / stick |
-| L1 | **Guardado rápido** | L | L1 |
-| R1 | **Avance rápido x2** (pulsar para activar/desactivar) | R | R1 |
-| L2 | — | **Guardado rápido** | L2 |
-| R2 | — | **Avance rápido x2** (activar/desactivar) | R2 |
-| PS | Menú de RetroArch | Menú de RetroArch | Menú de RetroArch |
-| Panel táctil (clic) | **Quitar / poner el marco** | **Quitar / poner el marco** | **Quitar / poner el marco** |
+| | NES (FCEUmm) | Super Nintendo (Snes9x 2010) | Game Boy / Color (Gambatte) | Game Boy Advance (mGBA) | PlayStation (PCSX ReARMed) |
+|---|---|---|---|---|---|
+| ✕ | A | B | A | A | ✕ |
+| ○ | A | A | A | A | ○ |
+| □ | B | Y | B | B | □ |
+| △ | B | X | B | B | △ |
+| Options | Start | Start | Start | Start | Start |
+| Create | Select | Select | Select | Select | Select |
+| Cruceta y stick izquierdo | Moverse | Moverse | Moverse | Moverse | Cruceta / stick |
+| L1 | **Guardado rápido** | L | **Guardado rápido** | L | L1 |
+| R1 | **Avance rápido x2** (activar/desactivar) | R | **Avance rápido x2** (activar/desactivar) | R | R1 |
+| L2 | — | **Guardado rápido** | — | **Guardado rápido** | L2 |
+| R2 | — | **Avance rápido x2** (activar/desactivar) | — | **Avance rápido x2** (activar/desactivar) | R2 |
+| PS | Menú de RetroArch | Menú de RetroArch | Menú de RetroArch | Menú de RetroArch | Menú de RetroArch |
+| Panel táctil (clic) | **Quitar / poner el marco** | **Quitar / poner el marco** | **Quitar / poner el marco** | **Quitar / poner el marco** | **Quitar / poner el marco** |
 
 También abre el menú **Create + Options** (`input_menu_toggle_gamepad_combo = 4`).
 
@@ -77,6 +79,10 @@ Archivos (los instala `install.ps1`):
 | `stick/retroarch/overrides/Gambatte/Gambatte.cfg` | `RetroArch/config/Gambatte/` | L1 guardar, R1 avance rápido, x2 |
 | `stick/retroarch/remaps/mGBA/mGBA.rmp` | `RetroArch/config/remaps/mGBA/` | ✕○ → A, □△ → B, L2/R2 sin función, stick = cruceta |
 | `stick/retroarch/overrides/mGBA/mGBA.cfg` | `RetroArch/config/mGBA/` | L2 guardar, R2 avance rápido, x2 |
+| `stick/retroarch/remaps/FCEUmm/FCEUmm.rmp` | `RetroArch/config/remaps/FCEUmm/` | ✕○ → A, □△ → B, L/R sin función, stick = cruceta |
+| `stick/retroarch/overrides/FCEUmm/FCEUmm.cfg` | `RetroArch/config/FCEUmm/` | L1 guardar, R1 avance rápido, x2 |
+| `stick/retroarch/remaps/Snes9x 2010/Snes9x 2010.rmp` | `RetroArch/config/remaps/Snes9x 2010/` | Botones como el mando de SNES, L2/R2 sin función, stick = cruceta |
+| `stick/retroarch/overrides/Snes9x 2010/Snes9x 2010.cfg` | `RetroArch/config/Snes9x 2010/` | L2 guardar, R2 avance rápido, x2 |
 | `stick/retroarch/overrides/<Núcleo>/<consola>.cfg` | `RetroArch/config/<Núcleo>/` | Tamaño fijo del juego y marco de esa consola (ver README 6.4) |
 | `stick/retroarch/overlays/retrostick/` | `RetroArch/overlays/retrostick/` | Marcos (PNG 1920×1080) |
 
@@ -85,5 +91,5 @@ que añadir sus códigos cuando se empareje.
 
 `remap_save_on_exit = "false"` evita que RetroArch reescriba los remapeos al salir.
 
-El guardado rápido (L1 en GB/GBC, L2 en GBA) va a la posición 0 (`<juego>.state` en `/Partidas/states`). Para cargarlo:
+El guardado rápido (L1 en NES y GB/GBC, L2 en SNES y GBA) va a la posición 0 (`<juego>.state` en `/Partidas/states`). Para cargarlo:
 PS → *Cargar guardado rápido*. Al abrir un juego se carga solo el `.state.auto` del cierre anterior.
