@@ -72,6 +72,8 @@ class ShopActivity : Activity() {
     private lateinit var fichaInfo: TextView
     private lateinit var fichaLangs: TextView
     private lateinit var fichaDesc: TextView
+    /** Pulsing bars in place of the description until IGDB answers */
+    private lateinit var fichaLoading: LoadingBars
     private lateinit var fichaStatus: TextView
     private lateinit var fichaTrack: View
     private lateinit var fichaBar: View
@@ -371,6 +373,8 @@ class ShopActivity : Activity() {
             addView(fichaInfo, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(6) })
             addView(fichaLangs, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(5) })
             addView(fichaDesc, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) })
+            fichaLoading = LoadingBars(this@ShopActivity, lines = 4)
+            addView(fichaLoading, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(14) })
             addView(fichaButtonsRow, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(16) })
             addView(fichaStatus, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(10) })
             addView(fichaTrack, LinearLayout.LayoutParams(dp(FICHA_BAR_DP), dp(5)).apply { topMargin = dp(6) })
@@ -923,7 +927,9 @@ class ShopActivity : Activity() {
                 }
             }
         }
-        fichaDesc.text = "Cargando la ficha…"
+        fichaDesc.text = ""
+        fichaDesc.visibility = View.GONE
+        fichaLoading.show(true)
         fichaPanel.visibility = View.VISIBLE
         renderFicha()
         // Description, trailer and screenshots, like the webapp
@@ -932,6 +938,8 @@ class ShopActivity : Activity() {
             runOnUiThread {
                 if (ficha !== g) return@runOnUiThread
                 fichaIgdb = info
+                fichaLoading.show(false)
+                fichaDesc.visibility = View.VISIBLE
                 fichaDesc.text = info?.description ?: "Sin descripción en IGDB."
                 if (g.rating == null && info?.rating != null) {
                     fichaMeta.text = "★ " + String.format("%.1f", info.rating).replace('.', ',') + "   ·   " + fichaMeta.text
@@ -950,6 +958,7 @@ class ShopActivity : Activity() {
 
     private fun closeFicha() {
         closeTrailer()
+        fichaLoading.show(false)
         if (driveItem != null || stickGame != null) return finish()
         ficha = null
         fichaPanel.visibility = View.GONE

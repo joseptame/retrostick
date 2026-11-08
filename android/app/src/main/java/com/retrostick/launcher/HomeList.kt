@@ -67,6 +67,8 @@ class HomeList(private val ctx: Context, private val covers: CoverLoader) {
     private val langs = text(10f, R.color.text_2)
     private val statLast = stat(); private val statTime = stat(); private val statSave = stat()
     private val desc = text(11f, R.color.text_2).apply { setLineSpacing(0f, 1.3f); maxLines = 3; ellipsize = TextUtils.TruncateAt.END }
+    /** Pulsing bars while IGDB answers (description + thumbnails) */
+    private val loading = LoadingBars(ctx, lines = 3, thumbs = 4)
     private val playBtn = button(true)
     private val manualBtn = button(false)
     private val mediaTitle = text(8.5f, R.color.text_3).apply { letterSpacing = 0.15f; text = "TRÁILER Y CAPTURAS" }
@@ -117,6 +119,7 @@ class HomeList(private val ctx: Context, private val covers: CoverLoader) {
             clipChildren = false
             addView(top)
             addView(desc, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(10) })
+            addView(loading, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) })
             addView(buttons, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(10) })
             addView(mediaTitle, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(12) })
             addView(mediaRow, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(5) })
@@ -131,7 +134,7 @@ class HomeList(private val ctx: Context, private val covers: CoverLoader) {
         view.visibility = v
         shade.visibility = v
         backdrop.visibility = if (visible && backdrop.drawable != null) View.VISIBLE else View.GONE
-        if (!visible) mediaFocus = -1
+        if (!visible) { mediaFocus = -1; loading.show(false) }
     }
 
     /** Draws the list (rebuilt only when its entries change) and the sheet of the selected entry. */
@@ -179,6 +182,8 @@ class HomeList(private val ctx: Context, private val covers: CoverLoader) {
             cover.setImageBitmap(null)
             mediaTitle.visibility = View.GONE
             mediaRow.visibility = View.GONE
+            desc.visibility = View.VISIBLE
+            loading.show(false)
             return
         }
         listOf(statLast, statTime, statSave).forEach { it.first.visibility = View.VISIBLE }
@@ -190,7 +195,7 @@ class HomeList(private val ctx: Context, private val covers: CoverLoader) {
         playBtn.text = "✕  ${sheet.playLabel}"
         styleButton(playBtn, mediaFocus < 0)
         manualBtn.visibility = if (sheet.manual) View.VISIBLE else View.GONE
-        manualBtn.text = "${sheet.manualGlyph}  Manual"
+        manualBtn.text = if (sheet.manualGlyph.isEmpty()) "📖  Manual" else "📖  Manual  ·  ${sheet.manualGlyph}"
         styleButton(manualBtn, false)
         langs.text = android.text.SpannableStringBuilder().apply {
             if (sheet.languages.isNotEmpty()) {
@@ -223,8 +228,11 @@ class HomeList(private val ctx: Context, private val covers: CoverLoader) {
             i?.players?.takeIf { it >= 2 }?.let { "👥 Hasta $it" },
             sheet.consoleName.takeIf { i == null } ,
         ).joinToString("   ·   ")
+        // Loading: the pulsing bars stand in for the description and the screenshots
+        desc.visibility = if (known) View.VISIBLE else View.GONE
+        loading.show(!known && view.visibility == View.VISIBLE)
         desc.text = when {
-            !known -> "Cargando la ficha…"
+            !known -> ""
             i?.description != null -> i.description
             ShopApi.token == null -> "Vincula RetroShop (Retro Ajustes) para ver la descripción, el tráiler y las capturas."
             else -> "Sin descripción."
@@ -406,5 +414,6 @@ class HomeList(private val ctx: Context, private val covers: CoverLoader) {
     private fun round(color: Int, r: Int) = GradientDrawable().apply { setColor(color); cornerRadius = dp(r).toFloat() }
     private fun dp(v: Number) = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v.toFloat(), ctx.resources.displayMetrics).toInt()
 
-    companion object { const val MAX_MEDIA = 6 }
+    // Five 104 dp thumbnails fill the sheet's width; a sixth would be cut by the screen edge
+    companion object { const val MAX_MEDIA = 5 }
 }

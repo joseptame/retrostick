@@ -1391,7 +1391,7 @@ class MainActivity : Activity() {
         val g = currentGame ?: currentDrive?.let { item -> driveInfo.getOrPut(item.key) { item.probe().also { library.describe(it) } } }
         val manual = g?.let { Manuals.find(this, it.console, it.baseName) }
         manualPill.visibility = if (manual != null && !active) View.VISIBLE else View.GONE
-        manualPill.text = "${manualGlyph()}  📖 Manual".trim()
+        manualPill.text = manualGlyph().let { if (it.isEmpty()) "📖  Manual" else "📖  Manual  ·  $it" }
         if (!active) return
         gamePanel.visibility = View.GONE
         emptyText.visibility = View.GONE
