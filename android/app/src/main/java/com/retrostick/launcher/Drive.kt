@@ -169,6 +169,27 @@ class DriveClient(private val auth: DriveAuth) {
         if (code != 204 && code != 404) throw DriveException("delete: HTTP $code", code)
     }
 
+    /** Moves a file to another folder (a game taken off the stick: JugandoAhora -> Coleccion). */
+    fun move(id: String, toParent: String, fromParent: String) {
+        patch("$DRIVE_API/files/$id?addParents=$toParent&removeParents=$fromParent&fields=id", JSONObject())
+    }
+
+    /** Sends a file to Drive's bin (recoverable for 30 days), as the webapp does. */
+    fun trash(id: String) {
+        patch("$DRIVE_API/files/$id?fields=id", JSONObject().put("trashed", true))
+    }
+
+    // HttpURLConnection has no PATCH; Google APIs accept the override header.
+    private fun patch(url: String, body: JSONObject) {
+        val conn = open("POST", url).apply { setRequestProperty("X-HTTP-Method-Override", "PATCH") }
+        conn.doOutput = true
+        conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+        conn.outputStream.use { it.write(body.toString().toByteArray()) }
+        val code = conn.responseCode
+        val json = readJson(conn)
+        if (code !in 200..299) throw DriveException("PATCH ${url.substringBefore('?')}: HTTP $code $json", code)
+    }
+
     /** Resumable upload; updates [existingId] in place (keeps Drive's revision history) or creates a new file. */
     fun upload(local: File, parentId: String, existingId: String?): RemoteFile {
         val meta = JSONObject().put("modifiedTime", rfc3339(local.lastModified()))

@@ -88,6 +88,80 @@ object DriveSync {
         }
     }
 
+    /**
+     * Takes a game off the stick (its ROM files: the .m3u/.cue and the discs or tracks it lists). Saves stay.
+     *  - [alsoDrive] false: the copy in Retro/JugandoAhora moves to Retro/Coleccion (the webapp shows it there
+     *    and can send it back); a game Drive doesn't have yet (just downloaded from RetroShop) is uploaded first.
+     *  - [alsoDrive] true: the Drive copy goes to the bin (recoverable for 30 days).
+     * Runs on the sync thread, after any sync in progress, so the sync never downloads it again halfway.
+     * Without Drive it only deletes the files. [done] gets null or the error, on the main thread.
+     */
+    fun removeGame(context: Context, game: Game, alsoDrive: Boolean, done: (String?) -> Unit) {
+        val app = context.applicationContext
+        cancel()
+        executor.execute {
+            val error = try {
+                val files = romFiles(game)
+                val auth = DriveAuth(app)
+                if (auth.isConfigured && auth.isConnected) {
+                    val drive = DriveClient(auth)
+                    val playing = folderId(app, drive, "Retro/JugandoAhora/${game.console.id}")
+                    val remote = drive.list(playing).filter { !it.isFolder }.associateBy { it.name }
+                    val collection = if (alsoDrive) null else folderId(app, drive, "Retro/Coleccion/${game.console.id}")
+                    val kept = collection?.let { id -> drive.list(id).filter { !it.isFolder }.associateBy { it.name } }.orEmpty()
+                    for (f in files) {
+                        val r = remote[f.name]
+                        when {
+                            alsoDrive -> if (r != null) drive.trash(r.id)
+                            // Already in the collection (same size): the JugandoAhora copy is a duplicate.
+                            kept[f.name]?.size == f.length() -> if (r != null) drive.trash(r.id)
+                            r != null -> drive.move(r.id, collection!!, playing)
+                            else -> drive.upload(f, collection!!, null)
+                        }
+                    }
+                }
+                val manifest = prefs(app).getStringSet("roms", emptySet())!!.toMutableSet()
+                for (f in files) {
+                    f.delete()
+                    manifest -= "${game.console.id}/${f.name}"
+                }
+                prefs(app).edit().putStringSet("roms", manifest).apply()
+                null
+            } catch (e: Exception) {
+                Log.w("RetroStick", "Remove ${game.file.name} failed", e)
+                e.message ?: e.toString()
+            }
+            main.post { done(error) }
+        }
+    }
+
+    /** The game's file plus the ones it points to: discs listed in a .m3u, tracks in a .cue (and theirs). */
+    private fun romFiles(game: Game): List<File> {
+        val out = linkedSetOf<File>()
+        fun add(f: File) {
+            if (!f.isFile || !out.add(f)) return
+            val refs = when (f.extension.lowercase()) {
+                "m3u" -> f.readLines().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("#") }
+                "cue" -> f.readLines().mapNotNull { Regex("""^\s*FILE\s+"(.+)"""").find(it)?.groupValues?.get(1) }
+                else -> emptyList()
+            }
+            refs.forEach { add(File(f.parentFile, it)) }
+        }
+        add(game.file)
+        return out.toList()
+    }
+
+    /** Drive folder id for a "Retro/..." path (same cache as the sync), created when missing. */
+    private fun folderId(context: Context, drive: DriveClient, path: String): String {
+        val folders = JSONObject(prefs(context).getString("folders", "{}")!!)
+        folders.optString(path).takeIf { it.isNotEmpty() }?.let { return it }
+        val parent = if ('/' in path) folderId(context, drive, path.substringBeforeLast('/')) else "root"
+        val id = drive.folder(parent, path.substringAfterLast('/'))
+        val latest = JSONObject(prefs(context).getString("folders", "{}")!!).put(path, id)
+        prefs(context).edit().putString("folders", latest.toString()).apply()
+        return id
+    }
+
     fun forget(context: Context) {
         prefs(context).edit().clear().apply()
         saveState = null

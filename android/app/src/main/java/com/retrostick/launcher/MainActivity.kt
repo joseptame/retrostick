@@ -1006,7 +1006,36 @@ class MainActivity : Activity() {
             .setTitle(game.title)
             .setMessage(text.trim())
             .setPositiveButton("Cerrar", null)
+            .setNeutralButton("Borrar…") { _, _ -> confirmRemove(game) }
             .showForPad()
+    }
+
+    /** Off the stick only (kept in the Drive collection) or also from Drive (to its bin). Saves always stay. */
+    private fun confirmRemove(game: Game) {
+        val auth = DriveAuth(this)
+        val withDrive = auth.isConfigured && auth.isConnected
+        val options = if (withDrive) arrayOf(
+            "Quitar solo del stick (se queda en tu colección de Drive)",
+            "Borrar también de Drive (va a la papelera de Drive)",
+        ) else arrayOf("Borrar del stick")
+        AlertDialog.Builder(this, R.style.Dialog_RetroStick)
+            .setTitle("Borrar ${game.title}")
+            .setItems(options) { _, which -> removeGame(game, alsoDrive = withDrive && which == 1) }
+            .setNegativeButton("Cancelar", null)
+            .showForPad()
+    }
+
+    private fun removeGame(game: Game, alsoDrive: Boolean) {
+        Toast.makeText(this, "Borrando ${game.title}…", Toast.LENGTH_SHORT).show()
+        DriveSync.removeGame(this, game, alsoDrive) { error ->
+            val msg = when {
+                error != null -> "No se pudo borrar ${game.title}: $error"
+                alsoDrive -> "${game.title} borrado del stick y de Drive. Las partidas guardadas se conservan."
+                else -> "${game.title} quitado del stick. Sigue en tu colección de Drive."
+            }
+            Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
+            reload()
+        }
     }
 
     private fun render() {
