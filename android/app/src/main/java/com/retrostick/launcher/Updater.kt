@@ -32,6 +32,27 @@ object Updater {
     /** Version the user answered "Ahora no" to (asked again after the launcher restarts). */
     @Volatile var dismissedVersion = 0
 
+    @Volatile private var lastCheck = 0L
+
+    /**
+     * Check on its own, without waiting for a full sync (which starts late after boot and stops when a game
+     * opens): when the launcher shows up and then every half hour. Blocking; returns whether a newer one exists.
+     */
+    fun checkNow(context: Context, force: Boolean = false): Boolean {
+        val now = System.currentTimeMillis()
+        if (!force && now - lastCheck < CHECK_EVERY_MS) return available != null
+        val auth = DriveAuth(context)
+        if (!auth.isConfigured || !auth.isConnected) return false
+        val drive = DriveClient(auth)
+        var dir = "root"
+        for (name in FOLDER.split('/')) dir = drive.folder(dir, name)
+        check(context, drive, dir)
+        lastCheck = now
+        return available != null
+    }
+
+    private const val CHECK_EVERY_MS = 30 * 60_000L
+
     /** Reads launcher.json from Drive (folder id from the sync) and remembers a newer version. */
     fun check(context: Context, drive: DriveClient, folderId: String) {
         val files = drive.list(folderId)

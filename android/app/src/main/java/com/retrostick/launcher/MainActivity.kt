@@ -273,6 +273,12 @@ class MainActivity : Activity() {
         main.post(statusJsonTicker)
         // Back from a game or from boot: sync if the last one is older than a minute, then every 15 min.
         if (hasStorage && System.currentTimeMillis() - DriveSync.lastSuccess(this) > 60_000) DriveSync.sync(this)
+        // A new launcher in Drive: ask right away (not only after a whole sync).
+        io.execute {
+            val found = runCatching { Updater.checkNow(this) }.onFailure { android.util.Log.w("RetroStick", "Update check failed", it) }
+                .getOrDefault(false)
+            if (found) main.post { refreshStatus(); offerUpdate() }
+        }
         main.postDelayed(syncTicker, SYNC_PERIOD_MS)
     }
 
@@ -552,8 +558,15 @@ class MainActivity : Activity() {
                 when {
                     update != null -> installUpdate(update)
                     driveAuth.isConnected -> {
-                        DriveSync.sync(this)
                         toast(R.string.update_checking)
+                        io.execute {
+                            val found = runCatching { Updater.checkNow(this, force = true) }.getOrDefault(false)
+                            main.post {
+                                refreshStatus()
+                                if (found) Updater.available?.let(::installUpdate)
+                                else Toast.makeText(this, getString(R.string.update_current, BuildConfig.VERSION_NAME), Toast.LENGTH_SHORT).show()
+                            }
+                        }
                     }
                     else -> startDriveLogin()
                 }
