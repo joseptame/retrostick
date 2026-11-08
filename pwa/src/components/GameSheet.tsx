@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import type { ConsoleId } from '../lib/consoles'
 import type { IgdbGame } from '../lib/igdb'
+import { languages } from '../lib/names'
 import { Banner, Cover, fitWideArt, useCoverUrl } from './ui'
 
 const EXIT_MS = 280
@@ -105,6 +106,7 @@ export function GameSheet(p: Props) {
   const boxart = useCoverUrl(p.consoleId, p.fileName)
   const d = p.data
   const title = d?.name || p.fallbackTitle
+  const langs = languages(p.fileName)
   const heroImg = d?.screenshots?.[0] ?? d?.coverUrl ?? null
   const longDesc = (d?.description?.length ?? 0) > 220
   const sheetStyle: CSSProperties = drag
@@ -158,6 +160,16 @@ export function GameSheet(p: Props) {
                   {d?.rating != null && <Rating value={d.rating} />}
                   {d?.year && <span className="gs-tag year">{d.year}</span>}
                   <span className="gs-tag">{p.sizeLabel}</span>
+                </div>
+              )}
+              {langs.names.length > 0 && (
+                <div className="gs-langs" title={langs.listed ? undefined : 'Según la región de esta versión'}>
+                  <span>Idiomas</span>
+                  {langs.names.map((l) => (
+                    <b key={l} className={l === 'Español' ? 'es' : undefined}>
+                      {l}
+                    </b>
+                  ))}
                 </div>
               )}
             </div>

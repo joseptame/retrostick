@@ -228,3 +228,32 @@ export function bestVariants<T extends { name: string }>(entries: T[]): T[] {
   const keep = new Set(best.values())
   return entries.filter((e) => keep.has(e))
 }
+
+const LANGUAGE_NAMES: Record<string, string> = {
+  Es: 'Español', En: 'Inglés', Fr: 'Francés', De: 'Alemán', It: 'Italiano', Pt: 'Portugués', Nl: 'Neerlandés',
+  Sv: 'Sueco', No: 'Noruego', Da: 'Danés', Fi: 'Finés', Ca: 'Catalán', Pl: 'Polaco', Ru: 'Ruso', El: 'Griego',
+  Ja: 'Japonés', Zh: 'Chino', Ko: 'Coreano',
+}
+/** Language of a release that lists none (No-Intro / Redump omit it when there is only the region's own). */
+const REGION_LANGUAGE: Record<string, string> = {
+  Spain: 'Es', Mexico: 'Es', Argentina: 'Es', Europe: 'En', USA: 'En', UK: 'En', Australia: 'En', Canada: 'En', World: 'En',
+  France: 'Fr', Germany: 'De', Austria: 'De', Switzerland: 'De', Italy: 'It', Portugal: 'Pt', Brazil: 'Pt', Netherlands: 'Nl',
+  Sweden: 'Sv', Norway: 'No', Denmark: 'Da', Finland: 'Fi', Japan: 'Ja', China: 'Zh', Korea: 'Ko', Russia: 'Ru', Poland: 'Pl',
+  Greece: 'El',
+}
+
+/**
+ * Languages of a ROM from its No-Intro / Redump name, Spanish first: the "(En,Fr,Es)" list when there is one,
+ * otherwise the language of its first region ("(Spain)" → Español, "(Europe)" → Inglés). `listed` tells which.
+ */
+export function languages(name: string): { names: string[]; spanish: boolean; listed: boolean } {
+  const groups = [...fileOnly(name).matchAll(/\(([^)]*)\)/g)].map((m) => m[1])
+  const list = groups.find((g) => /^[A-Z][a-z](-[A-Z][a-z]+)?(,[A-Z][a-z](-[A-Z][a-z]+)?)*$/.test(g) && g.split(',').every((c) => c.slice(0, 2) in LANGUAGE_NAMES))
+  let codes = list ? list.split(',').map((c) => c.slice(0, 2)) : []
+  if (!codes.length) {
+    const region = groups.map((g) => g.split(',')[0].trim()).find((r) => r in REGION_LANGUAGE)
+    if (region) codes = [REGION_LANGUAGE[region]]
+  }
+  codes = [...new Set(codes)].sort((a, b) => (a === 'Es' ? -1 : b === 'Es' ? 1 : 0))
+  return { names: codes.map((c) => LANGUAGE_NAMES[c]), spanish: codes.includes('Es'), listed: !!list }
+}

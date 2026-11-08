@@ -382,3 +382,33 @@ object ShopDownloads {
     private fun enc(s: String) = URLEncoder.encode(s, "UTF-8").replace("+", "%20")
     private fun encPath(s: String) = s.split('/').joinToString("/") { enc(it) }
 }
+
+/**
+ * Languages of a ROM from its No-Intro / Redump name, Spanish first: the "(En,Fr,Es)" list when there is one,
+ * otherwise the language of its first region ("(Spain)" → Español, "(Europe)" → Inglés). Same as the webapp.
+ */
+object Languages {
+    private val NAMES = mapOf(
+        "Es" to "Español", "En" to "Inglés", "Fr" to "Francés", "De" to "Alemán", "It" to "Italiano", "Pt" to "Portugués",
+        "Nl" to "Neerlandés", "Sv" to "Sueco", "No" to "Noruego", "Da" to "Danés", "Fi" to "Finés", "Ca" to "Catalán",
+        "Pl" to "Polaco", "Ru" to "Ruso", "El" to "Griego", "Ja" to "Japonés", "Zh" to "Chino", "Ko" to "Coreano",
+    )
+    private val REGION = mapOf(
+        "Spain" to "Es", "Mexico" to "Es", "Argentina" to "Es", "Europe" to "En", "USA" to "En", "UK" to "En",
+        "Australia" to "En", "Canada" to "En", "World" to "En", "France" to "Fr", "Germany" to "De", "Austria" to "De",
+        "Switzerland" to "De", "Italy" to "It", "Portugal" to "Pt", "Brazil" to "Pt", "Netherlands" to "Nl", "Sweden" to "Sv",
+        "Norway" to "No", "Denmark" to "Da", "Finland" to "Fi", "Japan" to "Ja", "China" to "Zh", "Korea" to "Ko",
+        "Russia" to "Ru", "Poland" to "Pl", "Greece" to "El",
+    )
+    private val LIST = Regex("^[A-Z][a-z](-[A-Z][a-z]+)?(,[A-Z][a-z](-[A-Z][a-z]+)?)*$")
+
+    fun of(name: String): List<String> {
+        val groups = Regex("""\(([^)]*)\)""").findAll(name.substringAfterLast('/')).map { it.groupValues[1] }.toList()
+        val list = groups.firstOrNull { g -> LIST.matches(g) && g.split(',').all { it.take(2) in NAMES } }
+        var codes = list?.split(',')?.map { it.take(2) }.orEmpty()
+        if (codes.isEmpty()) {
+            groups.map { it.split(',')[0].trim() }.firstOrNull { it in REGION }?.let { codes = listOf(REGION.getValue(it)) }
+        }
+        return codes.distinct().sortedBy { if (it == "Es") 0 else 1 }.map { NAMES.getValue(it) }
+    }
+}

@@ -237,3 +237,15 @@ describe('one release per game', async () => {
     expect(pick(['Tetris (W) (V1.1) [!].gb', 'Mario (U).gb'])).toHaveLength(2)
   })
 })
+
+import { languages } from './names'
+describe('languages', () => {
+  it('reads the list, Spanish first', () => {
+    expect(languages('Asterix - Mega Madness (Europe) (En,Fr,De,Es,It,Nl).chd').names).toEqual(['Español', 'Inglés', 'Francés', 'Alemán', 'Italiano', 'Neerlandés'])
+  })
+  it('infers it from the region when there is no list', () => {
+    expect(languages('Spider-Man (Europe).chd')).toEqual({ names: ['Inglés'], spanish: false, listed: false })
+    expect(languages('Ape Escape - La Invasion de los Monos (Spain).chd').spanish).toBe(true)
+    expect(languages('Spider-Man 2 - Enter - Electro (Europe, Australia) (Rev 1).chd').names).toEqual(['Inglés'])
+  })
+})

@@ -9,7 +9,7 @@ import { formatAgo, formatBytes, formatWhen } from '../lib/format'
 import { fetchIgdb, type IgdbGame } from '../lib/igdb'
 import { loadLookup } from '../lib/igdbdb'
 import { deleteGame, savesFor, setInStick, type Game } from '../lib/library'
-import { regionCode, saveLabel, saveOf } from '../lib/names'
+import { languages, regionCode, saveLabel, saveOf } from '../lib/names'
 
 export function Ficha({ game, state, onBack }: { game: Game; state: AppState; onBack: () => void }) {
   const [revisionsOf, setRevisionsOf] = useState<DriveFile | null>(null)
@@ -74,6 +74,7 @@ export function Ficha({ game, state, onBack }: { game: Game; state: AppState; on
 
   const desc = info?.description
   const longDesc = (desc?.length ?? 0) > 220
+  const langs = languages(game.files[0]?.name ?? game.name)
 
   return (
     <main className="screen detail">
@@ -102,6 +103,16 @@ export function Ficha({ game, state, onBack }: { game: Game; state: AppState; on
               </span>
             )}
           </div>
+          {langs.names.length > 0 && (
+            <div className="gs-langs" title={langs.listed ? undefined : 'Según la región de esta versión'}>
+              <span>Idiomas</span>
+              {langs.names.map((l) => (
+                <b key={l} className={l === 'Español' ? 'es' : undefined}>
+                  {l}
+                </b>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

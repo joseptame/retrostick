@@ -68,6 +68,7 @@ class ShopActivity : Activity() {
     private lateinit var fichaTitle: TextView
     private lateinit var fichaMeta: TextView
     private lateinit var fichaInfo: TextView
+    private lateinit var fichaLangs: TextView
     private lateinit var fichaDesc: TextView
     private lateinit var fichaStatus: TextView
     private lateinit var fichaTrack: View
@@ -315,6 +316,7 @@ class ShopActivity : Activity() {
         fichaTitle = text(23f, R.color.text).apply { typeface = resources.getFont(R.font.inter_extrabold); maxLines = 2 }
         fichaMeta = text(12f, R.color.brand_accent).apply { typeface = resources.getFont(R.font.inter_semibold) }
         fichaInfo = text(10.5f, R.color.text_3)
+        fichaLangs = text(10.5f, R.color.text_2)
         fichaDesc = text(11.5f, R.color.text_2).apply {
             setLineSpacing(0f, 1.3f)
             maxLines = 5
@@ -341,6 +343,7 @@ class ShopActivity : Activity() {
             addView(fichaTitle)
             addView(fichaMeta, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(6) })
             addView(fichaInfo, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(6) })
+            addView(fichaLangs, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(5) })
             addView(fichaDesc, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) })
             addView(fichaButtonsRow, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(16) })
             addView(fichaStatus, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(10) })
@@ -838,6 +841,20 @@ class ShopActivity : Activity() {
         ).joinToString("   ·   ")
         val size = sizeOf(g)
         fichaInfo.text = listOf(if (g.discs.size > 1) "${g.discs.size} discos · $size" else size, console.name, g.name).joinToString("   ·   ")
+        // Languages of this release (from its file name), Spanish highlighted
+        val langs = Languages.of(g.file).ifEmpty { Languages.of(g.name) }
+        fichaLangs.visibility = if (langs.isEmpty()) View.GONE else View.VISIBLE
+        fichaLangs.text = android.text.SpannableStringBuilder("Idiomas   ").apply {
+            langs.forEachIndexed { i, l ->
+                if (i > 0) append("  ·  ")
+                val start = length
+                append(l)
+                if (l == "Español") {
+                    setSpan(android.text.style.ForegroundColorSpan(getColor(R.color.ok)), start, length, 0)
+                    setSpan(android.text.style.StyleSpan(Typeface.BOLD), start, length, 0)
+                }
+            }
+        }
         fichaDesc.text = "Cargando la ficha…"
         fichaPanel.visibility = View.VISIBLE
         renderFicha()
