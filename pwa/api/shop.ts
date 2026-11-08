@@ -90,6 +90,21 @@ async function build(id: ConsoleId, collection: string): Promise<string> {
 
 export default async function handler(request: Request): Promise<Response> {
   const url = new URL(request.url)
+  if (url.searchParams.has('debug')) {
+    // TEMPORARY: why does archive.org answer 400 from here?
+    const out: Record<string, unknown> = {}
+    out.echo = await (await fetch('https://httpbin.org/headers')).json().catch((e) => String(e))
+    for (const [name, init] of [
+      ['plain', {}],
+      ['ua', { headers: { 'User-Agent': 'Mozilla/5.0 RetroStick' } }],
+    ] as const) {
+      const r = await fetch('https://archive.org/metadata/gba-pal', init as RequestInit)
+      out[name] = `${r.status} ${(await r.text()).slice(0, 80)}`
+    }
+    const r2 = await fetch('https://archive.org/metadata/gba-pal/metadata/title')
+    out.sub = `${r2.status} ${(await r2.text()).slice(0, 80)}`
+    return new Response(JSON.stringify(out, null, 2), { headers: { 'content-type': 'application/json' } })
+  }
   const id = url.searchParams.get('console') as ConsoleId | null
   if (!id || !CONSOLES.some((c) => c.id === id)) return new Response('Consola desconocida', { status: 400 })
   const collection = url.searchParams.get('collection') || DEFAULT_COLLECTIONS[id]
