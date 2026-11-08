@@ -128,6 +128,7 @@ class ShopActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         consoleIndex = CONSOLES.indexOfFirst { it.id == intent.getStringExtra(EXTRA_CONSOLE) }.coerceAtLeast(0)
+        Sounds.init(this)
         setContentView(build())
         ShopApi.token = ShopPairing.token(this)
         intent.getStringExtra(EXTRA_DRIVE_FILE)?.let { name ->
@@ -667,10 +668,28 @@ class ShopActivity : Activity() {
                 code == KeyEvent.KEYCODE_BUTTON_B -> KeyEvent.KEYCODE_BUTTON_A
                 else -> code
             }
+            val before = navState()
             onKey(key)
+            val changed = navState() != before
+            val sound = when {
+                isFinishing -> Sounds.Sound.BACK
+                !changed -> null
+                key == KeyEvent.KEYCODE_BUTTON_L1 || key == KeyEvent.KEYCODE_BUTTON_R1 -> Sounds.Sound.TAB
+                key == KeyEvent.KEYCODE_BACK || key == KeyEvent.KEYCODE_BUTTON_B -> Sounds.Sound.BACK
+                key in CONFIRM_KEYS || key == KeyEvent.KEYCODE_BUTTON_Y -> Sounds.Sound.OPEN
+                else -> Sounds.Sound.MOVE
+            }
+            sound?.let(Sounds::play)
         }
         return true
     }
+
+    /** Everything a key can change on screen: a different value after the key = a sound. */
+    private fun navState() = listOf(
+        consoleIndex, zone, sel, filterIndex, ficha?.file, fichaRow, fichaButton, fichaShot, viewerIndex,
+        kbOpen, kbRow, kbCol, query, trailer != null, driveItem?.let { DriveCollection.jobFor(it)?.state },
+        ficha?.let { ShopDownloads.jobFor(it)?.state }, sort, genre,
+    ).joinToString("|")
 
     private fun onKey(code: Int) {
         if (pairPanel.visibility == View.VISIBLE) {
@@ -1144,6 +1163,9 @@ class ShopActivity : Activity() {
 
     companion object {
         const val EXTRA_CONSOLE = "console"
+        private val CONFIRM_KEYS = setOf(
+            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_BUTTON_A,
+        )
         const val EXTRA_DRIVE_FILE = "driveFile"
         private const val PASS = "Pasar al stick"
         private const val POLL_MS = 3000L

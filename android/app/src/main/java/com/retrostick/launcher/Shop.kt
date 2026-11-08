@@ -237,12 +237,14 @@ object ShopDownloads {
             try {
                 download(job)
                 job.state = State.DONE
+                Sounds.play(Sounds.Sound.DONE)
                 // Backs the new ROM up to Retro/JugandoAhora: the webapp lists it as "en el stick".
                 main.post { DriveSync.sync(app) }
             } catch (e: Exception) {
                 Log.w("RetroStick", "RetroShop download failed", e)
                 job.error = e.message ?: e.javaClass.simpleName
                 job.state = State.ERROR
+                Sounds.play(Sounds.Sound.ERROR)
             }
             notifyListeners()
         }

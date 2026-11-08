@@ -39,6 +39,8 @@ import java.util.Locale
 import java.util.concurrent.Executors
 
 private const val SETTINGS_COLUMNS = 4
+/** Index of the "Sonidos" card in Retro Ajustes (the last one). */
+private const val SOUNDS_SETTING = 11
 private const val PERMISSION_REQUEST = 1
 private const val CONNECT_INPUT = "com.google.android.intent.action.CONNECT_INPUT"
 private const val FLAUNCHER_PACKAGE = "me.efesser.flauncher"
@@ -231,6 +233,7 @@ class MainActivity : Activity() {
         buildTabs()
         buildSettings()
         // Only on a cold start (boot, reinstall), not when coming back from a game.
+        Sounds.init(this)
         if (savedInstanceState == null) startSplash()
     }
 
@@ -238,6 +241,7 @@ class MainActivity : Activity() {
 
     private fun startSplash() {
         splash.visibility = View.VISIBLE
+        Sounds.play(Sounds.Sound.BOOT)
         // Initial state equals the window background (glow + icon), so the hand-over is invisible.
         listOf(R.id.splashRetro, R.id.splashStick).forEach { findViewById<View>(it).alpha = 0f }
         findViewById<View>(R.id.splashFill).apply {
@@ -684,6 +688,12 @@ class MainActivity : Activity() {
                     else -> startDriveLogin()
                 }
             },
+            Setting("🔊", getString(R.string.set_sounds), Sounds.level.label) {
+                val level = Sounds.nextLevel()
+                settings[SOUNDS_SETTING].subtitle = level.label
+                // Heard at the new volume (nothing when switched off)
+                keySound = Sounds.Sound.OPEN
+            },
         )
         settings.forEach { s ->
             val v = layoutInflater.inflate(R.layout.item_setting, settingsGrid, false)
@@ -737,6 +747,7 @@ class MainActivity : Activity() {
             else -> getString(R.string.drive_last_sync, ago)
         }
         settings[8].subtitle = if (connected) driveAuth.email ?: getString(R.string.drive_connected) else getString(R.string.drive_not_connected)
+        settings[SOUNDS_SETTING].subtitle = Sounds.level.label
         settings[10].subtitle = Updater.available?.let { getString(R.string.update_available_sub, it.versionName) }
             ?: getString(R.string.update_current, BuildConfig.VERSION_NAME)
         settings[2].subtitle = net?.let { "Conectado por $it" } ?: getString(R.string.offline)
@@ -895,7 +906,26 @@ class MainActivity : Activity() {
         renderPlayGlyph()
     }
 
+    /** Sound picked by the action itself (open, launch…); otherwise one follows from what the key changed. */
+    private var keySound: Sounds.Sound? = null
+
+    private fun navState() =
+        "$tab/$zone/$settingIndex/${selected.joinToString()}/${inDrive.joinToString()}/${driveSel.joinToString()}"
+
     private fun onKey(code: Int) {
+        val before = navState()
+        keySound = null
+        handleKey(code)
+        val changed = navState() != before
+        val sound = keySound ?: when (code) {
+            KeyEvent.KEYCODE_BUTTON_L1, KeyEvent.KEYCODE_BUTTON_R1 -> Sounds.Sound.TAB.takeIf { changed }
+            KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_BUTTON_B -> Sounds.Sound.BACK.takeIf { changed }
+            else -> Sounds.Sound.MOVE.takeIf { changed }
+        }
+        sound?.let(Sounds::play)
+    }
+
+    private fun handleKey(code: Int) {
         val tabsZone = zone == Zone.TABS
         when (code) {
             KeyEvent.KEYCODE_BUTTON_L1 -> switchTab(-1)
@@ -924,7 +954,7 @@ class MainActivity : Activity() {
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER,
             KeyEvent.KEYCODE_BUTTON_A -> when {
                 tabsZone -> zone = Zone.CONTENT
-                settingsTab -> settings[settingIndex].action()
+                settingsTab -> { keySound = Sounds.Sound.OPEN; settings[settingIndex].action() }
                 else -> play()
             }
             // The home screen never closes: Back only leaves the tab row.
@@ -1084,11 +1114,16 @@ class MainActivity : Activity() {
         currentDrive?.let { return openDriveGame(it) }
         val game = currentGame ?: return openShop()
         DriveSync.cancel()
-        if (!launchInRetroArch(this, game)) toast(R.string.retroarch_missing)
+        keySound = Sounds.Sound.LAUNCH
+        if (!launchInRetroArch(this, game)) {
+            keySound = Sounds.Sound.ERROR
+            toast(R.string.retroarch_missing)
+        }
     }
 
     /** The ficha of a game in the Drive collection, with "Pasar al stick" (ShopActivity in Drive mode). */
     private fun openDriveGame(item: DriveCollection.Item) {
+        keySound = Sounds.Sound.OPEN
         open(Intent(this, ShopActivity::class.java)
             .putExtra(ShopActivity.EXTRA_CONSOLE, item.console.id)
             .putExtra(ShopActivity.EXTRA_DRIVE_FILE, item.name))
@@ -1097,11 +1132,13 @@ class MainActivity : Activity() {
     /** RetroShop on the console of the current tab (the "Añade juegos" card). */
     private fun openShop() {
         if (settingsTab) return
+        keySound = Sounds.Sound.OPEN
         open(Intent(this, ShopActivity::class.java).putExtra(ShopActivity.EXTRA_CONSOLE, CONSOLES[tab].id))
     }
 
     private fun toggleFavorite() {
         val game = currentGame ?: return
+        keySound = Sounds.Sound.OPEN
         library.setFavorite(game, !game.favorite)
         toast(if (game.favorite) R.string.favorite_added else R.string.favorite_removed)
         reload()
@@ -1109,6 +1146,7 @@ class MainActivity : Activity() {
 
     private fun showDetails() {
         val game = currentGame ?: return
+        keySound = Sounds.Sound.OPEN
         val date = SimpleDateFormat("d MMM yyyy, HH:mm", Locale("es", "ES"))
         val text = buildString {
             appendLine("Archivo: ${game.file.name}")
@@ -1151,6 +1189,7 @@ class MainActivity : Activity() {
     private fun removeGame(game: Game, alsoDrive: Boolean) {
         Toast.makeText(this, "Borrando ${game.title}…", Toast.LENGTH_SHORT).show()
         DriveSync.removeGame(this, game, alsoDrive) { error ->
+            Sounds.play(if (error != null) Sounds.Sound.ERROR else Sounds.Sound.BACK)
             val msg = when {
                 error != null -> "No se pudo borrar ${game.title}: $error"
                 alsoDrive -> "${game.title} borrado del stick y de Drive. Las partidas guardadas se conservan."

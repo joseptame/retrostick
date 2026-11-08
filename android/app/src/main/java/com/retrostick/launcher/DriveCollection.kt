@@ -159,12 +159,14 @@ object DriveCollection {
                     references(target).forEach { queue.addLast(it) }
                 }
                 job.state = State.DONE
+                Sounds.play(Sounds.Sound.DONE)
                 listing = listing + (c.id to listing[c.id].orEmpty().filterKeys { it !in seen })
                 saveCache(app)
             } catch (e: Exception) {
                 Log.w("RetroStick", "Pass ${item.name} to the stick failed", e)
                 job.error = e.message ?: e.toString()
                 job.state = State.ERROR
+                Sounds.play(Sounds.Sound.ERROR)
             }
             notifyListeners()
         }
