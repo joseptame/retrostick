@@ -14,7 +14,7 @@
  *
  * Only reachable with the stick's pass (x-stick-token, see api/pair.ts and middleware.ts). Cached per console for a few hours.
  */
-import { groupDiscs, listItemFiles, type ArchiveEntry } from '../src/lib/archive'
+import { configureArchive, groupDiscs, listItemFiles, type ArchiveEntry } from '../src/lib/archive'
 import { consoleForFile, CONSOLES, isCartridge, type ConsoleId } from '../src/lib/consoles'
 import { configureData } from '../src/lib/data'
 import { loadLookup } from '../src/lib/igdbdb'
@@ -97,6 +97,8 @@ export default async function handler(request: Request): Promise<Response> {
 
   // The data files sit behind the login too: fetch them from this deployment with the stick's key.
   configureData(url.origin, { 'x-stick-token': request.headers.get('x-stick-token') ?? '' })
+  // archive.org answers 400 to anonymous requests from Vercel's edge: say who is asking.
+  configureArchive({ 'User-Agent': 'RetroStick/1.0 (+https://retrostick.vercel.app)', Accept: 'application/json, text/html' })
   const key = `${id}/${collection}`
   let hit = cache.get(key)
   if (!hit || Date.now() - hit.at > CACHE_MS) {

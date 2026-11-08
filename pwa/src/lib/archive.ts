@@ -67,6 +67,12 @@ export function m3uName(discName: string): string {
 import { consoleForFile, ROM_EXTENSION, type ConsoleId } from './consoles'
 
 const METADATA = 'https://archive.org/metadata'
+
+/** Extra headers for archive.org: none in the browser; the server (api/shop.ts) identifies itself. */
+let archiveHeaders: Record<string, string> = {}
+export function configureArchive(headers: Record<string, string>) {
+  archiveHeaders = headers
+}
 const DOWNLOAD = 'https://archive.org/download'
 
 /** Encodes each path segment but keeps "/" as a separator (archive.org uses it to select a file inside an archive). */
@@ -75,7 +81,7 @@ function encodePath(path: string): string {
 }
 
 export async function fetchMetadata(identifier: string): Promise<ArchiveMetadata> {
-  const res = await fetch(`${METADATA}/${encodeURIComponent(identifier)}`)
+  const res = await fetch(`${METADATA}/${encodeURIComponent(identifier)}`, { headers: archiveHeaders })
   if (!res.ok) throw new Error(`archive.org ${res.status} (metadata): ${(await res.text()).slice(0, 160)}`)
   const json = (await res.json()) as {
     metadata?: { title?: string; identifier?: string; 'access-restricted-item'?: string | boolean }
@@ -185,7 +191,7 @@ export async function listItemFiles(
   const looseRoms = meta.files.some((f) => consoleForFile(f.name) && !isJunk(f.name))
   const archive = looseRoms ? null : archiveFileOf(meta.files)
   if (archive) {
-    const res = await fetch(archiveListingUrl(identifier, archive.name))
+    const res = await fetch(archiveListingUrl(identifier, archive.name), { headers: archiveHeaders })
     if (!res.ok) throw new Error(`archive.org ${res.status} (listado): ${(await res.text()).slice(0, 160)}`)
     return { entries: parseArchiveListing(await res.text()), archive: archive.name, title: meta.title, restricted: meta.restricted }
   }
