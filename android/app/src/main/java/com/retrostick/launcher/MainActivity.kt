@@ -144,6 +144,17 @@ class MainActivity : Activity() {
             offerUpdate()
         }
     }
+    /** RetroShop downloads: progress in the top bar; a finished game shows up in its tab right away. */
+    private var shopDone = 0
+    private val shopListener: () -> Unit = {
+        refreshStatus()
+        val done = ShopDownloads.jobs.count { it.state == ShopDownloads.State.DONE }
+        if (done != shopDone) {
+            shopDone = done
+            reload()
+        }
+    }
+
     private val syncTicker = object : Runnable {
         override fun run() {
             if (hasStorage) DriveSync.sync(this@MainActivity)
@@ -257,6 +268,7 @@ class MainActivity : Activity() {
         getSystemService(InputManager::class.java).registerInputDeviceListener(inputListener, main)
         getSystemService(ConnectivityManager::class.java).registerDefaultNetworkCallback(networkCallback)
         DriveSync.addListener(syncListener)
+        ShopDownloads.addListener(shopListener)
         main.post(statusTicker)
         main.post(statusJsonTicker)
         // Back from a game or from boot: sync if the last one is older than a minute, then every 15 min.
@@ -269,6 +281,7 @@ class MainActivity : Activity() {
         getSystemService(InputManager::class.java).unregisterInputDeviceListener(inputListener)
         getSystemService(ConnectivityManager::class.java).unregisterNetworkCallback(networkCallback)
         DriveSync.removeListener(syncListener)
+        ShopDownloads.removeListener(shopListener)
         main.removeCallbacks(statusTicker)
         main.removeCallbacks(statusJsonTicker)
         main.removeCallbacks(syncTicker)
@@ -574,7 +587,11 @@ class MainActivity : Activity() {
         }
         val connected = driveAuth.isConfigured && driveAuth.isConnected
         val ago = formatAgo(DriveSync.lastSuccess(this))
+        val download = ShopDownloads.active
         val (dot, syncText) = when {
+            // A RetroShop download keeps going here: show its progress instead of Drive's state.
+            download != null -> R.drawable.dot_ok to "Descargando ${download.game.title} · ${(download.progress * 100).toInt()} %" +
+                ShopDownloads.jobs.count { it.state == ShopDownloads.State.QUEUED && it !== download }.let { if (it > 0) " · $it en cola" else "" }
             !connected -> R.drawable.dot_off to getString(R.string.drive_not_connected)
             DriveSync.phase == DriveSync.Phase.SYNCING -> R.drawable.dot_ok to getString(R.string.drive_syncing)
             DriveSync.phase == DriveSync.Phase.ERROR -> R.drawable.dot_error to getString(R.string.drive_error)
