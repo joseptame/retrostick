@@ -866,7 +866,8 @@ class MainActivity : Activity() {
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         val code = StickStatus.standardKey(event.device, event.keyCode)
         if (code !in HANDLED_KEYS) return super.dispatchKeyEvent(event)
-        if (event.action == KeyEvent.ACTION_DOWN && splash.visibility != View.VISIBLE) {
+        val shoulder = code == KeyEvent.KEYCODE_BUTTON_L1 || code == KeyEvent.KEYCODE_BUTTON_R1
+        if (event.action == KeyEvent.ACTION_DOWN && splash.visibility != View.VISIBLE && !(shoulder && event.repeatCount > 0)) {
             val style = StickStatus.padStyle(event.device)
             forcedPadStyle = null
             setPadStyle(style)

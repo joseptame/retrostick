@@ -452,11 +452,16 @@ class ShopActivity : Activity() {
 
     private fun loadCatalog() {
         val c = console
-        catalog = ShopApi.cached(this, c)
+        catalog = null
         error = null
         loading = true
         applyFilters(resetSelection = true)
         io.execute {
+            // The last copy first (parsing the PlayStation one takes a moment: never on the UI thread)
+            val cached = ShopApi.cached(this, c)
+            if (cached != null) runOnUiThread {
+                if (c == console && loading) { catalog = cached; applyFilters(resetSelection = true) }
+            }
             val result = runCatching { ShopApi.fetch(this, c) }
             runOnUiThread {
                 if (c != console) return@runOnUiThread
@@ -651,7 +656,9 @@ class ShopActivity : Activity() {
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         val code = StickStatus.standardKey(event.device, event.keyCode)
         if (code !in KEYS) return super.dispatchKeyEvent(event)
-        if (event.action == KeyEvent.ACTION_DOWN) {
+        // A held shoulder button repeats (more so while a big catalog loads): one press = one console
+        val shoulder = code == KeyEvent.KEYCODE_BUTTON_L1 || code == KeyEvent.KEYCODE_BUTTON_R1
+        if (event.action == KeyEvent.ACTION_DOWN && !(shoulder && event.repeatCount > 0)) {
             padStyle = StickStatus.padStyle(event.device)
             // Nintendo pads confirm with the right button (see MainActivity.semanticKey)
             val key = when {
@@ -707,8 +714,11 @@ class ShopActivity : Activity() {
         }
     }
 
+    /** Stops at the first and last console (no wrapping round to the other end). */
     private fun switchConsole(delta: Int) {
-        consoleIndex = (consoleIndex + delta + CONSOLES.size) % CONSOLES.size
+        val next = (consoleIndex + delta).coerceIn(0, CONSOLES.size - 1)
+        if (next == consoleIndex) return
+        consoleIndex = next
         genre = null
         loadCatalog()
     }
