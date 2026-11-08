@@ -93,3 +93,24 @@ que añadir sus códigos cuando se empareje.
 
 El guardado rápido (L1 en NES y GB/GBC, L2 en SNES y GBA) va a la posición 0 (`<juego>.state` en `/Partidas/states`). Para cargarlo:
 PS → *Cargar guardado rápido*. Al abrir un juego se carga solo el `.state.auto` del cierre anterior.
+
+## Botones en el inicio del launcher (DualSense)
+
+| Botón | Qué hace |
+|---|---|
+| ✕ | Jugar / abrir |
+| ○ | Atrás |
+| △ | Favorito |
+| □ | Detalles (borrar, «Lo he terminado») |
+| L1 / R1 | Cambiar de consola |
+| L2 | Buscar entre tus juegos del stick y de Drive |
+| Options | Cambiar la vista del inicio: carátulas o lista |
+| Create | Manual del juego (si hay) |
+| ▶ (vista de lista) | Ir al tráiler y las capturas de la ficha |
+
+## Jugar a dos
+
+Empareja el segundo mando en Retro Ajustes → Emparejar mando. RetroArch da los puestos por orden de conexión: el
+primero que se conecta es el jugador 1 y el segundo, el jugador 2 (el launcher lo avisa al conectarlo). En NES y Super
+Nintendo el jugador 2 tiene la misma distribución que el 1 (`input_player2_*` en los `.rmp`). La tienda tiene el filtro
+«👥 Para dos» y la ficha dice hasta cuántos jugadores (datos de IGDB, `pwa/scripts/build-players.ts`).

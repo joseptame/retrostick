@@ -33,6 +33,8 @@ class ShopGame(
     val year: Int?,
     /** Box art URL chosen by the webapp (resized WebP), or null */
     val cover: String?,
+    /** Players on one console when two or more (catalog "m"), else 0 */
+    val players: Int = 0,
 ) {
     val looseTitle = looseKey(title)
 }
@@ -48,7 +50,12 @@ class ShopCatalog(
 )
 
 /** IGDB data shown in the ficha (same as the webapp). */
-class IgdbInfo(val description: String?, val trailerId: String?, val screenshots: List<String>, val rating: Double?)
+class IgdbInfo(
+    val description: String?, val trailerId: String?, val screenshots: List<String>, val rating: Double?,
+    val genres: List<String> = emptyList(), val year: Int? = null,
+    /** Local players (1 = single player), null when IGDB doesn't say */
+    val players: Int? = null,
+)
 
 /** Same idea as the webapp's looseKey: lower case, no accents, letters and digits only. */
 fun looseKey(s: String): String =
@@ -160,6 +167,9 @@ object ShopApi {
             trailerId = json.optString("trailerId").takeIf { it.isNotEmpty() && it != "null" },
             screenshots = if (shots == null) emptyList() else List(shots.length()) { shots.getString(it) },
             rating = if (json.isNull("rating")) null else json.optDouble("rating").takeIf { !it.isNaN() },
+            genres = json.optJSONArray("genres")?.let { a -> List(a.length()) { a.getString(it) } }.orEmpty(),
+            year = if (json.isNull("year")) null else json.optInt("year").takeIf { it > 0 },
+            players = if (json.isNull("players")) null else json.optInt("players").takeIf { it > 0 },
         )
     }
 
@@ -192,6 +202,7 @@ object ShopApi {
                 genres = gi?.let { a -> List(a.length()) { genres.getOrElse(a.getInt(it)) { "" } } }.orEmpty().filter { it.isNotEmpty() },
                 year = if (g.has("y")) g.getInt("y") else null,
                 cover = g.optString("c").takeIf { it.isNotEmpty() },
+                players = g.optInt("m", 0),
             )
         }
         return ShopCatalog(

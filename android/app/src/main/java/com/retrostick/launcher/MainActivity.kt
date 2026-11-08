@@ -30,6 +30,7 @@ import android.view.animation.OvershootInterpolator
 import android.widget.GridLayout
 import android.widget.HorizontalScrollView
 import android.widget.ImageView
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -41,6 +42,8 @@ import java.util.concurrent.Executors
 private const val SETTINGS_COLUMNS = 4
 /** Index of the "Sonidos" card in Retro Ajustes (the last one). */
 private const val SOUNDS_SETTING = 11
+/** Index of the "Vista del inicio" card (after Sonidos). */
+private const val VIEW_SETTING = 12
 private const val PERMISSION_REQUEST = 1
 private const val CONNECT_INPUT = "com.google.android.intent.action.CONNECT_INPUT"
 private const val FLAUNCHER_PACKAGE = "me.efesser.flauncher"
@@ -57,6 +60,8 @@ private val HANDLED_KEYS = setOf(
     KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_BACK,
     KeyEvent.KEYCODE_BUTTON_A, KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_BUTTON_X, KeyEvent.KEYCODE_BUTTON_Y,
     KeyEvent.KEYCODE_BUTTON_L1, KeyEvent.KEYCODE_BUTTON_R1,
+    // Options = list / covers view, Create = manual, L2 = search
+    KeyEvent.KEYCODE_BUTTON_START, KeyEvent.KEYCODE_BUTTON_SELECT, KeyEvent.KEYCODE_BUTTON_L2,
 )
 
 class MainActivity : Activity() {
@@ -66,6 +71,14 @@ class MainActivity : Activity() {
     private class Setting(val icon: String, val title: String, var subtitle: String, val action: () -> Unit)
 
     private lateinit var library: Library
+    /** List view of the home screen (Options or Retro Ajustes switch it with the covers view) */
+    private lateinit var homeList: HomeList
+    private lateinit var homeSearch: HomeSearch
+    private lateinit var manualPill: TextView
+    private val homePrefs by lazy { getSharedPreferences("home", MODE_PRIVATE) }
+    private var listMode: Boolean
+        get() = homePrefs.getBoolean("list", false)
+        set(value) = homePrefs.edit().putBoolean("list", value).apply()
     private lateinit var covers: CoverLoader
     private val io = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
@@ -148,6 +161,10 @@ class MainActivity : Activity() {
         override fun onInputDeviceAdded(deviceId: Int) {
             InputDevice.getDevice(deviceId)?.takeIf(StickStatus::isGamepad)?.let { setPadStyle(StickStatus.padStyle(it)) }
             refreshStatus()
+            // A second pad: RetroArch gives it the next player port by itself (connection order)
+            if (InputDevice.getDevice(deviceId)?.let(StickStatus::isGamepad) == true && StickStatus.controllers().size == 2) {
+                Toast.makeText(this@MainActivity, "Mando 2 conectado: en los juegos será el jugador 2", Toast.LENGTH_LONG).show()
+            }
         }
         override fun onInputDeviceRemoved(deviceId: Int) {
             setPadStyle(StickStatus.firstPadStyle())
@@ -229,6 +246,42 @@ class MainActivity : Activity() {
         hints = findViewById(R.id.hints)
         hero.clipToOutline = true
         splash = findViewById(R.id.splash)
+
+        val root = splash.parent as FrameLayout
+        homeList = HomeList(this, covers).also { hl ->
+            root.addView(hl.backdrop, 0, FrameLayout.LayoutParams(-1, -1))
+            root.addView(hl.shade, 1, FrameLayout.LayoutParams(-1, -1))
+            root.addView(hl.view, root.indexOfChild(splash), FrameLayout.LayoutParams(-1, -1).apply { topMargin = dp(150); bottomMargin = dp(40) })
+            hl.onUpdate = { render() }
+        }
+        homeSearch = HomeSearch(this, covers).also { hs ->
+            root.addView(hs.view, root.indexOfChild(splash), FrameLayout.LayoutParams(-1, -1))
+            hs.candidates = { searchCandidates() }
+            hs.onPick = { pickSearch(it) }
+        }
+        // Covers view: "Manual" next to "Jugar" (shown when the game has one)
+        val play = findViewById<View>(R.id.playText).parent as View
+        val col = play.parent as LinearLayout
+        val at = col.indexOfChild(play)
+        val playLp = play.layoutParams
+        col.removeView(play)
+        manualPill = TextView(this).apply {
+            setTextColor(getColor(R.color.text))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            typeface = resources.getFont(R.font.inter_bold)
+            gravity = Gravity.CENTER
+            setPadding(dp(16), 0, dp(18), 0)
+            background = GradientDrawable().apply { setColor(Color.parseColor("#1FFFFFFF")); cornerRadius = dp(10).toFloat(); setStroke(dp(1), Color.parseColor("#33FFFFFF")) }
+            visibility = View.GONE
+        }
+        col.addView(LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            addView(play, LinearLayout.LayoutParams(-2, -2))
+            addView(manualPill, LinearLayout.LayoutParams(-2, dp(38)).apply { marginStart = dp(10) })
+        }, at, playLp)
+        ShopApi.token = ShopPairing.token(this)
+        Manuals.addListener { render() }
+        Manuals.load(this)
 
         buildTabs()
         buildSettings()
@@ -496,7 +549,10 @@ class MainActivity : Activity() {
             inner.background = fallbackGradient(game, 8)
             inner.clipToOutline = true
             v.findViewById<TextView>(R.id.coverTitle).text = game.title
-            v.findViewById<View>(R.id.coverFavorite).visibility = if (game.favorite) View.VISIBLE else View.GONE
+            v.findViewById<TextView>(R.id.coverFavorite).apply {
+                text = listOfNotNull("★".takeIf { game.favorite }, "🏆".takeIf { game.finished != null }).joinToString(" ")
+                visibility = if (text.isEmpty()) View.GONE else View.VISIBLE
+            }
             v.findViewById<View>(R.id.coverBadge).visibility = if (game == playing) View.VISIBLE else View.GONE
             val image = v.findViewById<ImageView>(R.id.coverImage)
             image.tag = game.key
@@ -608,7 +664,10 @@ class MainActivity : Activity() {
         }
         findViewById<TextView>(R.id.gameTitle).text = game.title
         findViewById<TextView>(R.id.gameMeta).text =
-            listOfNotNull(console.name, game.region, if (drive != null) getString(R.string.in_drive_meta) else null).joinToString(" · ")
+            listOfNotNull(
+                console.name, game.region, if (drive != null) getString(R.string.in_drive_meta) else null,
+                game.finished?.let { "🏆 Terminado" },
+            ).joinToString(" · ")
         findViewById<TextView>(R.id.lastPlayed).text = formatWhen(game.lastPlayed)
         findViewById<TextView>(R.id.timePlayed).text = formatDuration(game.runtimeSeconds)
         findViewById<TextView>(R.id.saveState).apply {
@@ -694,6 +753,7 @@ class MainActivity : Activity() {
                 // Heard at the new volume (nothing when switched off)
                 keySound = Sounds.Sound.OPEN
             },
+            Setting("🗂️", getString(R.string.set_view), viewLabel()) { toggleView() },
         )
         settings.forEach { s ->
             val v = layoutInflater.inflate(R.layout.item_setting, settingsGrid, false)
@@ -719,7 +779,7 @@ class MainActivity : Activity() {
         findViewById<TextView>(R.id.controllerText).text = when {
             pads.isEmpty() -> getString(R.string.no_controller)
             pads.size == 1 -> "${StickStatus.shortControllerName(pads[0])} · J1"
-            else -> "${StickStatus.shortControllerName(pads[0])} · J1 +${pads.size - 1}"
+            else -> "${pads.size} mandos · " + (1..pads.size).joinToString(" ") { "J$it" }
         }
         val connected = driveAuth.isConfigured && driveAuth.isConnected
         val ago = formatAgo(DriveSync.lastSuccess(this))
@@ -748,6 +808,7 @@ class MainActivity : Activity() {
         }
         settings[8].subtitle = if (connected) driveAuth.email ?: getString(R.string.drive_connected) else getString(R.string.drive_not_connected)
         settings[SOUNDS_SETTING].subtitle = Sounds.level.label
+        settings[VIEW_SETTING].subtitle = viewLabel()
         settings[10].subtitle = Updater.available?.let { getString(R.string.update_available_sub, it.versionName) }
             ?: getString(R.string.update_current, BuildConfig.VERSION_NAME)
         settings[2].subtitle = net?.let { "Conectado por $it" } ?: getString(R.string.offline)
@@ -816,6 +877,10 @@ class MainActivity : Activity() {
             }
         }
         addHint(g.shoulders, if (padStyle == PadStyle.REMOTE) R.string.hint_consoles else R.string.hint_switch)
+        if (!settingsTab && padStyle != PadStyle.REMOTE) {
+            addHint(Glyph.Pill(when (padStyle) { PadStyle.XBOX -> "LT"; PadStyle.NINTENDO -> "ZL"; else -> "L2" }), R.string.hint_search)
+            addHint(Glyph.Pill(when (padStyle) { PadStyle.XBOX -> "Menu"; PadStyle.NINTENDO -> "+"; else -> "Options" }), R.string.hint_view)
+        }
     }
 
     /** Glyph inside the "Continuar partida" button. */
@@ -910,9 +975,13 @@ class MainActivity : Activity() {
     private var keySound: Sounds.Sound? = null
 
     private fun navState() =
-        "$tab/$zone/$settingIndex/${selected.joinToString()}/${inDrive.joinToString()}/${driveSel.joinToString()}"
+        "$tab/$zone/$settingIndex/${selected.joinToString()}/${inDrive.joinToString()}/${driveSel.joinToString()}/$listMode/${homeList.mediaFocus}"
 
     private fun onKey(code: Int) {
+        if (homeSearch.isOpen) {
+            homeSearch.onKey(code)?.let(Sounds::play)
+            return
+        }
         val before = navState()
         keySound = null
         handleKey(code)
@@ -926,6 +995,12 @@ class MainActivity : Activity() {
     }
 
     private fun handleKey(code: Int) {
+        when (code) {
+            KeyEvent.KEYCODE_BUTTON_START -> { toggleView(); render(); return }
+            KeyEvent.KEYCODE_BUTTON_L2 -> { homeSearch.open(); keySound = Sounds.Sound.OPEN; return }
+            KeyEvent.KEYCODE_BUTTON_SELECT -> { openManual(); render(); return }
+        }
+        if (listMode && !settingsTab && zone == Zone.CONTENT && handleListKey(code)) { render(); return }
         val tabsZone = zone == Zone.TABS
         when (code) {
             KeyEvent.KEYCODE_BUTTON_L1 -> switchTab(-1)
@@ -1154,6 +1229,7 @@ class MainActivity : Activity() {
             appendLine("Consola: ${game.console.name}")
             appendLine("Veces jugado: ${game.playCount}")
             appendLine("Tiempo jugado: ${formatDuration(game.runtimeSeconds)}")
+            game.finished?.let { appendLine("🏆 Terminado el ${date.format(it.at)} (${formatDuration(it.seconds)})") }
             appendLine()
             if (game.saveFiles.isEmpty()) appendLine("Sin partidas guardadas en el stick.")
             else {
@@ -1168,7 +1244,22 @@ class MainActivity : Activity() {
             .setMessage(text.trim())
             .setPositiveButton("Cerrar", null)
             .setNeutralButton("Borrar…") { _, _ -> confirmRemove(game) }
+            .setNegativeButton(if (game.finished == null) "🏆 Lo he terminado" else "Quitar de terminados") { _, _ -> toggleFinished(game) }
             .showForPad()
+    }
+
+    private fun toggleFinished(game: Game) {
+        val done = game.finished == null
+        io.execute {
+            val r = runCatching { Finished.set(game, done) }
+            main.post {
+                r.onSuccess {
+                    Sounds.play(if (done) Sounds.Sound.DONE else Sounds.Sound.BACK)
+                    Toast.makeText(this, if (done) "🏆 ${game.title}: ¡terminado! (${formatDuration(game.runtimeSeconds)})" else "${game.title} ya no está en terminados", Toast.LENGTH_LONG).show()
+                }.onFailure { Toast.makeText(this, "No se pudo guardar: ${it.message}", Toast.LENGTH_LONG).show() }
+                reload()
+            }
+        }
     }
 
     /** Off the stick only (kept in the Drive collection) or also from Drive (to its bin). Saves always stay. */
@@ -1207,8 +1298,181 @@ class MainActivity : Activity() {
         renderContent()
         renderShelf()
         renderSettings()
+        renderList()
         renderHints()
         renderPlayGlyph()
+    }
+
+    // ---- List view, search, manuals ----
+
+    private fun viewLabel() = (if (listMode) "Lista" else "Carátulas") + " · Options la cambia"
+
+    private fun toggleView() {
+        listMode = !listMode
+        if (::homeList.isInitialized) homeList.leaveMedia()
+        if (settings.size > VIEW_SETTING) settings[VIEW_SETTING].subtitle = viewLabel()
+        keySound = Sounds.Sound.TAB
+    }
+
+    private fun listEntries(): List<HomeList.Entry> {
+        val games = consoleGames
+        val playing = games.filter { it.lastPlayed > 0 }.maxByOrNull { it.lastPlayed }
+        val out = mutableListOf<HomeList.Entry>()
+        games.forEach { out += HomeList.Entry.Stick(it, it == playing) }
+        if (driveItems.isNotEmpty()) {
+            out += HomeList.Entry.Header("En tu Drive · no están en el stick")
+            driveItems.forEach { out += HomeList.Entry.Drive(it, it.probe()) }
+        }
+        out += HomeList.Entry.Add
+        return out
+    }
+
+    private fun listIndex(entries: List<HomeList.Entry>): Int {
+        val n = consoleGames.size
+        return when {
+            driveRow -> (n + 1 + driveSel[tab]).coerceAtMost(entries.size - 1)
+            selected[tab] < n -> selected[tab]
+            else -> entries.size - 1
+        }
+    }
+
+    private fun setListIndex(entries: List<HomeList.Entry>, i: Int) {
+        when (val e = entries[i]) {
+            is HomeList.Entry.Stick -> { inDrive[tab] = false; selected[tab] = i }
+            is HomeList.Entry.Drive -> { inDrive[tab] = true; driveSel[tab] = driveItems.indexOf(e.item).coerceAtLeast(0) }
+            HomeList.Entry.Add -> { inDrive[tab] = false; selected[tab] = consoleGames.size }
+            else -> Unit
+        }
+    }
+
+    /** ▲ ▼ through the list (headers skipped), ▶ into the trailer / screenshots, ✕ on one opens it. */
+    private fun handleListKey(code: Int): Boolean {
+        val entries = listEntries()
+        val idx = listIndex(entries)
+        val media = homeList.mediaFocus >= 0
+        fun step(d: Int): Int? {
+            var i = idx + d
+            while (i in entries.indices && entries[i] is HomeList.Entry.Header) i += d
+            return i.takeIf { it in entries.indices }
+        }
+        when (code) {
+            KeyEvent.KEYCODE_DPAD_UP -> { if (!media) step(-1)?.let { setListIndex(entries, it) } ?: run { zone = Zone.TABS }; return true }
+            KeyEvent.KEYCODE_DPAD_DOWN -> { if (!media) step(1)?.let { setListIndex(entries, it) }; return true }
+            KeyEvent.KEYCODE_DPAD_RIGHT -> { homeList.moveMedia(1); return true }
+            KeyEvent.KEYCODE_DPAD_LEFT -> { if (media) homeList.moveMedia(-1); return true }
+            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_BUTTON_A ->
+                if (media) { openMedia(homeList.mediaFocus); return true }
+            KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_BUTTON_B -> if (media) { homeList.leaveMedia(); return true }
+        }
+        return false
+    }
+
+    /** The trailer / a screenshot of the selected game, full screen (RetroShop's ficha opens straight on it). */
+    private fun openMedia(index: Int) {
+        val intent = Intent(this, ShopActivity::class.java)
+            .putExtra(ShopActivity.EXTRA_CONSOLE, CONSOLES[tab].id)
+            .putExtra(ShopActivity.EXTRA_MEDIA, index)
+        val game = currentGame
+        val drive = currentDrive
+        when {
+            game != null -> intent.putExtra(ShopActivity.EXTRA_STICK_FILE, game.file.name)
+            drive != null -> intent.putExtra(ShopActivity.EXTRA_DRIVE_FILE, drive.name)
+            else -> return
+        }
+        keySound = Sounds.Sound.OPEN
+        open(intent)
+    }
+
+    private fun renderList() {
+        val active = listMode && !settingsTab && hasStorage
+        homeList.show(active)
+        shelfClip.visibility = if (active) View.GONE else View.VISIBLE
+        // The covers view's "Manual" button
+        val g = currentGame ?: currentDrive?.let { item -> driveInfo.getOrPut(item.key) { item.probe().also { library.describe(it) } } }
+        val manual = g?.let { Manuals.find(this, it.console, it.baseName) }
+        manualPill.visibility = if (manual != null && !active) View.VISIBLE else View.GONE
+        manualPill.text = "${manualGlyph()}  📖 Manual".trim()
+        if (!active) return
+        gamePanel.visibility = View.GONE
+        emptyText.visibility = View.GONE
+        val entries = listEntries()
+        val idx = listIndex(entries)
+        val console = CONSOLES[tab]
+        val sheet = when (val e = entries[idx]) {
+            is HomeList.Entry.Stick -> sheetFor(e.game, inDrive = false)
+            is HomeList.Entry.Drive -> sheetFor(driveInfo.getOrPut(e.item.key) { e.probe.also { library.describe(it) } }, inDrive = true)
+            else -> null
+        }
+        val n = consoleGames.size
+        homeList.bind("${console.name} · en el stick · $n ${if (n == 1) "juego" else "juegos"}", entries, idx, zone == Zone.CONTENT, sheet)
+    }
+
+    private fun sheetFor(game: Game, inDrive: Boolean): HomeList.Sheet {
+        val backedUp = game.hasProgress && driveAuth.isConnected && DriveSync.isBackedUp(this, game)
+        val save = getString(when {
+            !game.hasProgress -> R.string.no_save
+            backedUp -> R.string.save_in_drive
+            driveAuth.isConnected -> R.string.save_pending
+            else -> R.string.save_on_stick
+        })
+        val date = SimpleDateFormat("d MMM yyyy", Locale("es", "ES"))
+        return HomeList.Sheet(
+            title = game.title, consoleId = game.console.id, consoleName = game.console.name, coverGame = game,
+            last = formatWhen(game.lastPlayed), time = formatDuration(game.runtimeSeconds), save = save, saveOk = backedUp,
+            playLabel = when { inDrive -> "Ver ficha y pasar al stick"; game.hasProgress -> getString(R.string.continue_game); else -> getString(R.string.play) },
+            languages = Languages.of(game.file.name),
+            finished = game.finished?.let { "Terminado el ${date.format(it.at)} · ${formatDuration(it.seconds)}" },
+            manual = Manuals.find(this, game.console, game.baseName) != null, manualGlyph = manualGlyph(), inDrive = inDrive,
+        )
+    }
+
+    /** The button that opens the manual, as this controller labels it. */
+    private fun manualGlyph() = when (padStyle) {
+        PadStyle.XBOX -> "View"
+        PadStyle.NINTENDO -> "−"
+        PadStyle.REMOTE -> ""
+        else -> "Create"
+    }
+
+    private fun openManual() {
+        val game = currentGame ?: currentDrive?.probe() ?: return
+        val name = Manuals.find(this, game.console, game.baseName)
+        if (name == null) {
+            keySound = Sounds.Sound.ERROR
+            Toast.makeText(this, "No hay manual de ${game.title}", Toast.LENGTH_SHORT).show()
+            return
+        }
+        keySound = Sounds.Sound.OPEN
+        open(Intent(this, ManualActivity::class.java)
+            .putExtra(ManualActivity.EXTRA_CONSOLE, game.console.id)
+            .putExtra(ManualActivity.EXTRA_FILE, name)
+            .putExtra(ManualActivity.EXTRA_TITLE, game.title))
+    }
+
+    private fun searchCandidates(): List<HomeSearch.Hit> {
+        val out = mutableListOf<HomeSearch.Hit>()
+        CONSOLES.forEach { c ->
+            games[c.id].orEmpty().forEach { g -> out += HomeSearch.Hit(g.title, c, g, null, g) }
+            DriveCollection.items(this, c).forEach { d -> out += HomeSearch.Hit(d.title, c, null, d, d.probe()) }
+        }
+        return out
+    }
+
+    /** A search result: its tab, selected (on the stick or in the Drive row / section). */
+    private fun pickSearch(hit: HomeSearch.Hit) {
+        val i = CONSOLES.indexOf(hit.console)
+        if (i < 0) return
+        tab = i
+        zone = Zone.CONTENT
+        buildShelf()
+        if (hit.game != null) {
+            inDrive[i] = false
+            selected[i] = games[hit.console.id].orEmpty().indexOfFirst { it.key == hit.game.key }.coerceAtLeast(0)
+        } else if (hit.drive != null) {
+            inDrive[i] = true
+            driveSel[i] = driveItems.indexOfFirst { it.key == hit.drive.key }.coerceAtLeast(0)
+        }
+        render()
     }
 
     // ---- Helpers ----

@@ -38,6 +38,8 @@ class ShopActivity : Activity() {
     private var filterIndex = 0
     private var sort = Sort.RATING
     private var genre: String? = null
+    /** «Para dos»: only games two people can play on one console */
+    private var twoPlayers = false
     /** Text search (🔍 chip or the top face button): every word must appear in the title */
     private var query: String? = null
     private var catalog: ShopCatalog? = null
@@ -90,6 +92,10 @@ class ShopActivity : Activity() {
     private var fichaButton = 0
     /** Drive mode (EXTRA_DRIVE_FILE): only the ficha of a game in the Drive collection, to pass it to the stick. */
     private var driveItem: DriveCollection.Item? = null
+    /** Stick mode (EXTRA_STICK_FILE): the ficha of a game already on the stick, whose first button plays it. */
+    private var stickGame: Game? = null
+    /** Opened from the home list on a trailer / screenshot (EXTRA_MEDIA): show it, and close with it. */
+    private var mediaDirect = -1
     private val driveListener: () -> Unit = { renderFicha() }
 
     // Pairing (first time): QR + code on screen, the phone leaves the pass in Drive (ShopPairing).
@@ -131,6 +137,14 @@ class ShopActivity : Activity() {
         Sounds.init(this)
         setContentView(build())
         ShopApi.token = ShopPairing.token(this)
+        mediaDirect = intent.getIntExtra(EXTRA_MEDIA, -1)
+        intent.getStringExtra(EXTRA_STICK_FILE)?.let { name ->
+            val file = File(console.romDir, name).takeIf { it.isFile } ?: return finish()
+            val game = Game(console, file)
+            stickGame = game
+            showGame(ShopGame(game.title, name, file.length(), game.baseName, null, emptyList(), null, emptyList(), null, null))
+            return
+        }
         intent.getStringExtra(EXTRA_DRIVE_FILE)?.let { name ->
             val item = DriveCollection.find(this, console, name) ?: return finish()
             driveItem = item
@@ -243,7 +257,7 @@ class ShopActivity : Activity() {
         filters = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         col.addView(filters, LinearLayout.LayoutParams(-1, dp(30)).apply { topMargin = dp(12) })
         // 🔍 Buscar · the sorts · Género
-        repeat(Sort.values().size + 2) {
+        repeat(Sort.values().size + 3) {
             val v = text(10f, R.color.chip_text).apply {
                 gravity = Gravity.CENTER
                 setPadding(dp(13), 0, dp(13), 0)
@@ -492,6 +506,7 @@ class ShopActivity : Activity() {
     private fun applyFilters(resetSelection: Boolean) {
         val all = catalog?.games.orEmpty()
         var list = if (genre != null) all.filter { genre in it.genres } else all
+        if (twoPlayers) list = list.filter { it.players >= 2 }
         val words = query?.split(Regex("""\s+"""))?.map(::looseKey)?.filter { it.isNotEmpty() }.orEmpty()
         if (words.isNotEmpty()) list = list.filter { g ->
             val hay = g.looseTitle + " " + looseKey(g.name)
@@ -533,13 +548,14 @@ class ShopActivity : Activity() {
             }
             v.alpha = if (selected) 1f else 0.75f
         }
-        val labels = listOf(query?.let { "«$it»" } ?: "Buscar") + Sort.values().map { it.label } + "Género: ${genre ?: "Todos"}"
+        val labels = listOf(query?.let { "«$it»" } ?: "Buscar") + Sort.values().map { it.label } + "Género: ${genre ?: "Todos"}" + "👥 Para dos"
         filterViews.forEachIndexed { i, v ->
             v.text = labels[i]
             val on = when {
                 i == 0 -> query != null
                 i <= Sort.values().size -> Sort.values()[i - 1] == sort
-                else -> genre != null
+                i == Sort.values().size + 1 -> genre != null
+                else -> twoPlayers
             }
             val focus = zone == Zone.FILTERS && i == filterIndex
             v.background = round(if (on) getColor(R.color.accent_start) else getColor(R.color.surface), 13).apply {
@@ -554,6 +570,8 @@ class ShopActivity : Activity() {
             loading -> "Cargando el catálogo de ${console.name}…"
             error != null -> "No se pudo cargar el catálogo:\n$error"
             query != null -> "Ningún juego coincide con «$query»."
+            twoPlayers && genre != null -> "Ningún juego para dos de ese género."
+            twoPlayers -> "No hay juegos para dos en esta colección."
             genre != null -> "Ningún juego de ese género."
             else -> "No hay juegos para ${console.name}."
         }
@@ -750,6 +768,11 @@ class ShopActivity : Activity() {
             applyFilters(resetSelection = true)
             return
         }
+        if (filterIndex == Sort.values().size + 2) {
+            twoPlayers = !twoPlayers
+            applyFilters(resetSelection = true)
+            return
+        }
         val counts = catalog?.games.orEmpty().flatMap { it.genres }.groupingBy { it }.eachCount()
             .entries.sortedByDescending { it.value }
         val options = listOf("Todos") + counts.map { "${it.key} (${it.value})" }
@@ -882,6 +905,7 @@ class ShopActivity : Activity() {
             g.rating?.let { "★ " + String.format("%.1f", it).replace('.', ',') },
             g.year?.toString(),
             g.genres.joinToString(", ").takeIf { it.isNotEmpty() },
+            g.players.takeIf { it >= 2 }?.let { "👥 Hasta $it jugadores" },
         ).joinToString("   ·   ")
         val size = sizeOf(g)
         fichaInfo.text = listOf(if (g.discs.size > 1) "${g.discs.size} discos · $size" else size, console.name, g.name).joinToString("   ·   ")
@@ -914,13 +938,19 @@ class ShopActivity : Activity() {
                 }
                 info?.screenshots?.firstOrNull()?.let { url -> covers.loadUrl(url, dp(480)) { if (ficha === g) fichaHero.setImageBitmap(it) } }
                 renderFicha()
+                if (mediaDirect >= 0) {
+                    fichaRow = 1
+                    fichaShot = mediaDirect.coerceAtMost((fichaMedia.size - 1).coerceAtLeast(0))
+                    if (info == null || fichaMedia.isEmpty()) finish()
+                    else if (hasTrailer && fichaShot == 0) playTrailer() else openViewer(fichaShot - if (hasTrailer) 1 else 0)
+                }
             }
         }
     }
 
     private fun closeFicha() {
         closeTrailer()
-        if (driveItem != null) return finish()
+        if (driveItem != null || stickGame != null) return finish()
         ficha = null
         fichaPanel.visibility = View.GONE
         renderGrid()
@@ -940,6 +970,7 @@ class ShopActivity : Activity() {
         val item = driveItem
         val passing = item?.let { DriveCollection.jobFor(it) }
         val (first, status) = when {
+            stickGame != null -> PLAY to "Está en el stick."
             item != null -> when (passing?.state) {
                 DriveCollection.State.RUNNING -> "Pasando al stick ${(passing.progress * 100).toInt()} %" to
                     "${Formatter.formatShortFileSize(this, passing.done)} de ${Formatter.formatShortFileSize(this, passing.total)} · puedes volver al inicio y seguirá"
@@ -980,6 +1011,7 @@ class ShopActivity : Activity() {
             b.setTextColor(if (focus) getColor(R.color.button_text) else getColor(R.color.text))
             val icon = when (labels[i]) {
                 DOWNLOAD, PASS -> R.drawable.ic_shop_download
+                PLAY -> R.drawable.ic_shop_play
                 OWNED -> R.drawable.ic_shop_check
                 RETRY -> R.drawable.ic_shop_retry
                 else -> null
@@ -1014,7 +1046,7 @@ class ShopActivity : Activity() {
 
     private fun fichaKey(code: Int) {
         if (trailer != null) {
-            if (code == KeyEvent.KEYCODE_BACK || code == KeyEvent.KEYCODE_BUTTON_B) closeTrailer()
+            if (code == KeyEvent.KEYCODE_BACK || code == KeyEvent.KEYCODE_BUTTON_B) { closeTrailer(); if (mediaDirect >= 0) finish() }
             return
         }
         if (viewerIndex >= 0) return viewerKey(code)
@@ -1043,6 +1075,10 @@ class ShopActivity : Activity() {
     }
 
     private fun download(g: ShopGame) {
+        stickGame?.let { game ->
+            if (launchInRetroArch(this, game)) { Sounds.play(Sounds.Sound.LAUNCH); finish() }
+            return
+        }
         driveItem?.let { item ->
             val s = DriveCollection.jobFor(item)?.state
             if (s != DriveCollection.State.RUNNING && s != DriveCollection.State.DONE) DriveCollection.passToStick(this, item)
@@ -1177,6 +1213,7 @@ class ShopActivity : Activity() {
             KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_BUTTON_A -> {
                 viewerIndex = -1
                 viewer.visibility = View.GONE
+                if (mediaDirect >= 0) finish()
             }
             KeyEvent.KEYCODE_DPAD_LEFT -> openViewer((viewerIndex - 1 + fichaShots.size) % fichaShots.size)
             KeyEvent.KEYCODE_DPAD_RIGHT -> openViewer((viewerIndex + 1) % fichaShots.size)
@@ -1237,6 +1274,9 @@ class ShopActivity : Activity() {
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_BUTTON_A,
         )
         const val EXTRA_DRIVE_FILE = "driveFile"
+        const val EXTRA_STICK_FILE = "stickFile"
+        const val EXTRA_MEDIA = "media"
+        private const val PLAY = "Jugar"
         private const val PASS = "Pasar al stick"
         private const val POLL_MS = 3000L
         private const val FICHA_BAR_DP = 320

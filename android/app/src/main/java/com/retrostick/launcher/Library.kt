@@ -58,6 +58,8 @@ class Game(val console: Console, val file: File) {
     /** Epoch millis of the last session: runtime log first, newest save file otherwise. 0 = never. */
     var lastPlayed: Long = 0
     var favorite = false
+    /** Marked as finished (Finished), or null. */
+    var finished: Finished.Entry? = null
 
     val hasProgress get() = saveFiles.isNotEmpty()
 }
@@ -91,6 +93,7 @@ class Library(private val context: Context) {
     /** Scans /ROMs. Runs on a background thread. */
     fun scan(): Map<String, List<Game>> {
         val favorites = prefs.getStringSet("favorites", emptySet())!!
+        val finished = Finished.load()
         val saves = listFiles(savesDir) + listFiles(statesDir)
         val logs = runtimeLogs.listFiles()?.filter { it.isDirectory }?.flatMap { listFiles(it) }.orEmpty()
 
@@ -102,6 +105,7 @@ class Library(private val context: Context) {
             val games = files.filter { it.name !in inPlaylists }.map { Game(console, it) }
             games.forEach { game ->
                 game.favorite = game.key in favorites
+                game.finished = finished[game.key]
                 // <name>.srm, <name>.state, <name>.state.auto, <name>.state1...
                 game.saveFiles = saves.filter {
                     it.name == "${game.baseName}.srm" || it.name.startsWith("${game.baseName}.state")
@@ -120,6 +124,7 @@ class Library(private val context: Context) {
      * /Partidas and RetroArch's logs after the ROM is taken off.
      */
     fun describe(game: Game) {
+        game.finished = Finished.load()[game.key]
         val saves = listFiles(savesDir) + listFiles(statesDir)
         game.saveFiles = saves.filter { it.name == "${game.baseName}.srm" || it.name.startsWith("${game.baseName}.state") }
         val logs = runtimeLogs.listFiles()?.filter { it.isDirectory }?.flatMap { listFiles(it) }.orEmpty()
