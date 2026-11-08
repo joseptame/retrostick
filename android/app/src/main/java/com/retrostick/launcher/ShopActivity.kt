@@ -364,6 +364,7 @@ class ShopActivity : Activity() {
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             clipChildren = false
+            clipToPadding = false
             setPadding(dp(56), dp(36), dp(48), dp(20))
             addView(top)
             addView(fichaShotsTitle, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(18) })
