@@ -38,6 +38,8 @@ class HomeList(private val ctx: Context, private val covers: CoverLoader) {
         val last: String, val time: String, val save: String, val saveOk: Boolean,
         val playLabel: String, val languages: List<String>, val finished: String?,
         val manual: Boolean, val manualGlyph: String, val inDrive: Boolean,
+        /** Confirm button: the PlayStation cross icon, or a letter ("A", "OK") for other controllers */
+        val playCross: Boolean = true, val playLetter: String = "",
     )
 
     private val main = Handler(Looper.getMainLooper())
@@ -176,8 +178,7 @@ class HomeList(private val ctx: Context, private val covers: CoverLoader) {
             langs.text = ""
             listOf(statLast, statTime, statSave).forEach { it.first.visibility = View.GONE }
             desc.text = "Abre la tienda para buscar y descargar juegos directamente al stick con el mando."
-            playBtn.text = "✕  Abrir la tienda"
-            styleButton(playBtn, true)
+            setPlay("Abrir la tienda", true, "", true)
             manualBtn.visibility = View.GONE
             cover.setImageBitmap(null)
             mediaTitle.visibility = View.GONE
@@ -192,12 +193,10 @@ class HomeList(private val ctx: Context, private val covers: CoverLoader) {
         statTime.second.text = sheet.time
         statSave.second.text = sheet.save
         statSave.second.setTextColor(ctx.getColor(if (sheet.saveOk) R.color.ok else R.color.text))
-        playBtn.text = "✕  ${sheet.playLabel}"
-        styleButton(playBtn, mediaFocus < 0)
+        setPlay(sheet.playLabel, sheet.playCross, sheet.playLetter, mediaFocus < 0)
         manualBtn.visibility = if (sheet.manual) View.VISIBLE else View.GONE
-        manualBtn.text = "Manual"
-        bookIcon(manualBtn)
         styleButton(manualBtn, false)
+        manualBtn.text = PillSpan.text(sheet.manualGlyph, "Manual", manualBtn.currentTextColor, ctx.resources.displayMetrics.density)
         langs.text = android.text.SpannableStringBuilder().apply {
             if (sheet.languages.isNotEmpty()) {
                 append("Idiomas   ")
@@ -396,11 +395,19 @@ class HomeList(private val ctx: Context, private val covers: CoverLoader) {
         (statSave.first.tag as TextView).text = "PARTIDA GUARDADA"
     }
 
-    /** Line book icon before the text, tinted like it (the emoji clashed with the rest). */
-    private fun bookIcon(b: TextView) {
-        val d = ctx.getDrawable(R.drawable.ic_shop_book)!!.mutate().apply { setTint(b.currentTextColor); setBounds(0, 0, dp(16), dp(16)) }
-        b.setCompoundDrawablesRelative(d, null, null, null)
-        b.compoundDrawablePadding = dp(7)
+    /** The play button with the same confirm glyph as the covers view: the ✕ in a disc (or a boxed letter). */
+    private fun setPlay(label: String, cross: Boolean, letter: String, primary: Boolean) {
+        styleButton(playBtn, primary)
+        if (cross) {
+            val d = ctx.getDrawable(R.drawable.ic_btn_play_cross)!!.mutate().apply { setBounds(0, 0, dp(18), dp(18)) }
+            if (!primary) d.alpha = 200
+            playBtn.setCompoundDrawablesRelative(d, null, null, null)
+            playBtn.compoundDrawablePadding = dp(8)
+            playBtn.text = label
+        } else {
+            playBtn.setCompoundDrawablesRelative(null, null, null, null)
+            playBtn.text = PillSpan.text(letter, label, playBtn.currentTextColor, ctx.resources.displayMetrics.density)
+        }
     }
 
     private fun button(primary: Boolean) = text(12.5f, if (primary) R.color.button_text else R.color.text).apply {

@@ -880,7 +880,7 @@ class MainActivity : Activity() {
         if (!settingsTab && padStyle != PadStyle.REMOTE) {
             // The button that opens the manual, drawn (the word "Create" read like "crear")
             if (manualPill.visibility == View.VISIBLE || (listMode && homeList.view.visibility == View.VISIBLE && currentManual() != null)) {
-                addHint(when (padStyle) { PadStyle.XBOX -> Glyph.Pill("View"); PadStyle.NINTENDO -> Glyph.Pill("−"); else -> Glyph.Icon(R.drawable.ic_hint_create) }, R.string.hint_manual)
+                addHint(Glyph.Pill(manualGlyph()), R.string.hint_manual)
             }
             addHint(Glyph.Pill(when (padStyle) { PadStyle.XBOX -> "LT"; PadStyle.NINTENDO -> "ZL"; else -> "L2" }), R.string.hint_search)
             addHint(Glyph.Pill(when (padStyle) { PadStyle.XBOX -> "Menu"; PadStyle.NINTENDO -> "+"; else -> "Options" }), R.string.hint_view)
@@ -1395,11 +1395,7 @@ class MainActivity : Activity() {
         val g = currentGame ?: currentDrive?.let { item -> driveInfo.getOrPut(item.key) { item.probe().also { library.describe(it) } } }
         val manual = g?.let { Manuals.find(this, it.console, it.baseName) }
         manualPill.visibility = if (manual != null && !active) View.VISIBLE else View.GONE
-        manualPill.text = "Manual"
-        if (manualPill.compoundDrawablesRelative[0] == null) {
-            manualPill.setCompoundDrawablesRelative(getDrawable(R.drawable.ic_shop_book)!!.mutate().apply { setTint(getColor(R.color.text)); setBounds(0, 0, dp(17), dp(17)) }, null, null, null)
-            manualPill.compoundDrawablePadding = dp(7)
-        }
+        manualPill.text = PillSpan.text(manualGlyph(), "Manual", getColor(R.color.text), resources.displayMetrics.density)
         if (!active) return
         gamePanel.visibility = View.GONE
         emptyText.visibility = View.GONE
@@ -1431,6 +1427,8 @@ class MainActivity : Activity() {
             languages = Languages.of(game.file.name),
             finished = game.finished?.let { "Terminado el ${date.format(it.at)} · ${formatDuration(it.seconds)}" },
             manual = Manuals.find(this, game.console, game.baseName) != null, manualGlyph = manualGlyph(), inDrive = inDrive,
+            playCross = padStyle == PadStyle.PLAYSTATION,
+            playLetter = when (padStyle) { PadStyle.XBOX, PadStyle.NINTENDO -> "A"; PadStyle.REMOTE -> "OK"; else -> "" },
         )
     }
 
@@ -1439,7 +1437,8 @@ class MainActivity : Activity() {
         PadStyle.XBOX -> "View"
         PadStyle.NINTENDO -> "−"
         PadStyle.REMOTE -> ""
-        else -> "Create"
+        // The DualSense's Create button, the old "Share" one: "Create" read like "crear"
+        else -> "Share"
     }
 
     private fun currentManual(): String? {
