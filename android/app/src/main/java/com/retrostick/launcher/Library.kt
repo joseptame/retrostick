@@ -11,7 +11,7 @@ import java.util.Locale
 const val SDCARD = "/storage/emulated/0"
 const val RETROARCH_PACKAGE = "com.retroarch.ra32"
 private const val RETROARCH_ACTIVITY = "com.retroarch.browser.retroactivity.RetroActivityFuture"
-private const val RETROARCH_CFG = "$SDCARD/Android/data/$RETROARCH_PACKAGE/files/retroarch.cfg"
+internal const val RETROARCH_CFG = "$SDCARD/Android/data/$RETROARCH_PACKAGE/files/retroarch.cfg"
 
 data class Console(
     val id: String,
@@ -170,6 +170,8 @@ fun launchInRetroArch(context: Context, game: Game): Boolean {
     } catch (e: Exception) {
         return false
     }
+    // RetroArch rewrites its config when it closes: the RetroAchievements account goes back in every time
+    RetroAchievements.apply(context)
     val intent = Intent(Intent.ACTION_MAIN)
         .setComponent(ComponentName(RETROARCH_PACKAGE, RETROARCH_ACTIVITY))
         .putExtra("ROM", game.file.absolutePath)

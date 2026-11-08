@@ -199,6 +199,8 @@ object DriveSync {
             listOf("saves", "states", ".stick").forEach { syncSaves(it) }
             // A new launcher published with android/publish-update.mjs (before the ROMs, which can take long).
             runCatching { Updater.check(context, drive, dir(Updater.FOLDER)) }.onFailure { Log.w("RetroStick", "Update check failed", it) }
+            // RetroAchievements account (Retro/Config/ra.json) into RetroArch
+            runCatching { RetroAchievements.sync(context, drive, dir("Retro/Config")) }.onFailure { Log.w("RetroStick", "RetroAchievements sync failed", it) }
             CONSOLES.forEach { syncRoms(it) }
         }
 
