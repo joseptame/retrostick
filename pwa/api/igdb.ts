@@ -79,22 +79,25 @@ export default async function handler(request: Request): Promise<Response> {
   try {
     const access = await accessToken(id, secret)
     const query = async (where: string) => {
-      const body = `search "${title.replace(/"/g, '')}"; fields name,summary,storyline,cover.image_id,genres.name,platforms.name,first_release_date,rating,videos.video_id,screenshots.image_id;${where} limit 8;`
+      const body = `search "${title.replace(/"/g, '')}"; fields name,summary,storyline,cover.image_id,genres.name,platforms.name,first_release_date,rating,videos.video_id,screenshots.image_id,version_parent,total_rating_count;${where} limit 15;`
       const res = await fetch(`${API}/games`, {
         method: 'POST',
         headers: { 'Client-ID': id, Authorization: `Bearer ${access}`, Accept: 'application/json' },
         body,
       })
       if (!res.ok) throw new Error(`igdb ${res.status}`)
-      return (await res.json()) as { name?: string }[]
+      return (await res.json()) as { name?: string; version_parent?: number; total_rating_count?: number }[]
     }
     let games = platforms ? await query(` where platforms = (${platforms.join(',')});`) : []
     if (!games.length) games = await query('')
     if (!games.length) return json({ found: false })
-    // Search order is by relevance; an exact title (ignoring case and punctuation) wins.
+    // Search order is by relevance. Among the exact titles (ignoring case and punctuation), the original game
+    // rather than one of its versions (Japan-only edition, re-releases…), then the one most people rated.
     const loose = (s: string) => s.toLowerCase().normalize('NFD').replace(/[^a-z0-9]/g, '')
-    const exact = games.find((g) => g.name && loose(g.name) === loose(title))
-    return json(mapGame(exact ?? games[0]))
+    const exact = games
+      .filter((g) => g.name && loose(g.name) === loose(title))
+      .sort((a, b) => Number(!!a.version_parent) - Number(!!b.version_parent) || (b.total_rating_count ?? 0) - (a.total_rating_count ?? 0))
+    return json(mapGame(exact[0] ?? games[0]))
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : String(e) }, 500)
   }
