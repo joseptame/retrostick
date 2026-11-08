@@ -431,7 +431,8 @@ class ShopActivity : Activity() {
             ellipsize = TextUtils.TruncateAt.END
             typeface = resources.getFont(R.font.inter_semibold)
         }
-        val meta = text(8.5f, R.color.text_3).apply { maxLines = 1 }
+        // Two lines: Spanish genres are longer ("Plataformas", "Estrategia por turnos")
+        val meta = text(8.5f, R.color.text_3).apply { maxLines = 2; ellipsize = TextUtils.TruncateAt.END }
         val frame = FrameLayout(this@ShopActivity).apply {
             addView(cover, FrameLayout.LayoutParams(-1, -1))
             addView(rating, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.END).apply { setMargins(0, dp(4), dp(4), 0) })
@@ -951,7 +952,13 @@ class ShopActivity : Activity() {
                 "${Formatter.formatShortFileSize(this, job.done)} de ${Formatter.formatShortFileSize(this, job.total)} · puedes seguir mirando la tienda"
             state == ShopDownloads.State.QUEUED -> "En cola…" to "Empezará cuando termine la descarga anterior."
             state == ShopDownloads.State.ERROR -> RETRY to "No se pudo descargar: ${job.error}"
-            else -> DOWNLOAD to "Se guarda en el stick y se copia a tu Drive."
+            else -> {
+                val cat = catalog
+                val have = if (cat != null) ShopDownloads.partialBytes(cat, g) else 0L
+                val total = ShopDownloads.totalBytes(g)
+                if (have > 0) DOWNLOAD to "Descarga a medias: seguirá donde se quedó (${Formatter.formatShortFileSize(this, have)} de ${Formatter.formatShortFileSize(this, total)})."
+                else DOWNLOAD to "Se guarda en el stick y se copia a tu Drive."
+            }
         }
         fichaStatus.text = status
         val running = if (item != null) passing?.state == DriveCollection.State.RUNNING
@@ -1044,7 +1051,68 @@ class ShopActivity : Activity() {
         val cat = catalog ?: return
         val state = ShopDownloads.jobFor(g)?.state
         if (isOwned(g) || state == ShopDownloads.State.RUNNING || state == ShopDownloads.State.QUEUED) return
+        // Room for it? What is already downloaded (discs, a .part) doesn't count again.
+        val need = ShopDownloads.totalBytes(g) - ShopDownloads.partialBytes(cat, g)
+        val free = StickStatus.freeBytes()
+        if (need + SPACE_MARGIN > free) return askForSpace(g, need, free)
         ShopDownloads.enqueue(this, cat, g)
+    }
+
+    /**
+     * Not enough space: the stick's games, biggest first, to take one off (it stays in the Drive collection and
+     * can come back from the home screen). Once it is gone the download starts, or this asks again if still short.
+     */
+    private fun askForSpace(g: ShopGame, need: Long, free: Long) {
+        Sounds.play(Sounds.Sound.ERROR)
+        io.execute {
+            val games = Library(this).scan().values.flatten()
+                .map { it to DriveSync.romFiles(it).sumOf { f -> f.length() } }
+                .sortedByDescending { it.second }
+            runOnUiThread {
+                if (isFinishing) return@runOnUiThread
+                val size = { n: Long -> Formatter.formatShortFileSize(this, n) }
+                val auth = DriveAuth(this)
+                val keep = auth.isConfigured && auth.isConnected
+                val header = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(dp(24), dp(20), dp(24), dp(8))
+                    addView(text(16f, R.color.text).apply {
+                        text = "No cabe ${g.title}"
+                        typeface = resources.getFont(R.font.inter_bold)
+                    })
+                    addView(text(11.5f, R.color.text_2).apply {
+                        text = "Necesita ${size(need)} y quedan ${size(free)} libres. " + if (keep)
+                            "Elige un juego para quitarlo del stick: sigue en tu colección de Drive y puedes volver a pasarlo cuando quieras."
+                        else "Elige un juego para borrarlo del stick."
+                        setPadding(0, dp(6), 0, 0)
+                        setLineSpacing(0f, 1.25f)
+                    })
+                }
+                if (games.isEmpty()) {
+                    android.widget.Toast.makeText(this, "No cabe ${g.title}: necesita ${size(need)} y quedan ${size(free)} libres.", android.widget.Toast.LENGTH_LONG).show()
+                    return@runOnUiThread
+                }
+                AlertDialog.Builder(this, R.style.Dialog_RetroStick)
+                    .setCustomTitle(header)
+                    .setItems(games.map { (game, bytes) -> "${game.title}   ·   ${game.console.name}   ·   ${size(bytes)}" }.toTypedArray()) { _, which ->
+                        val game = games[which].first
+                        android.widget.Toast.makeText(this, "Quitando ${game.title} del stick…", android.widget.Toast.LENGTH_SHORT).show()
+                        DriveSync.removeGame(this, game, alsoDrive = false) { error ->
+                            if (error != null) {
+                                Sounds.play(Sounds.Sound.ERROR)
+                                android.widget.Toast.makeText(this, "No se pudo quitar ${game.title}: $error", android.widget.Toast.LENGTH_LONG).show()
+                            } else {
+                                DriveCollection.refresh(this, force = true)
+                                refreshOwned()
+                                download(g)
+                                renderFicha()
+                            }
+                        }
+                    }
+                    .setNegativeButton("Cancelar", null)
+                    .showForPad()
+            }
+        }
     }
 
     /** YouTube app on the TV; the browser if it is missing. */
@@ -1163,6 +1231,8 @@ class ShopActivity : Activity() {
 
     companion object {
         const val EXTRA_CONSOLE = "console"
+        /** Kept free besides the download (RetroArch's saves, the system). */
+        private const val SPACE_MARGIN = 150L * 1024 * 1024
         private val CONFIRM_KEYS = setOf(
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_BUTTON_A,
         )

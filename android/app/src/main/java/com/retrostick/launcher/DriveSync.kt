@@ -136,7 +136,7 @@ object DriveSync {
     }
 
     /** The game's file plus the ones it points to: discs listed in a .m3u, tracks in a .cue (and theirs). */
-    private fun romFiles(game: Game): List<File> {
+    fun romFiles(game: Game): List<File> {
         val out = linkedSetOf<File>()
         fun add(f: File) {
             if (!f.isFile || !out.add(f)) return

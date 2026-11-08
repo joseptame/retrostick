@@ -213,6 +213,7 @@ object ShopDownloads {
     }
 
     private const val CHUNK = 8L * 1024 * 1024
+    private const val RETRIES = 5
     private val executor = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
     private val listeners = CopyOnWriteArrayList<() -> Unit>()
@@ -259,7 +260,10 @@ object ShopDownloads {
             job.total = game.discs.sumOf { it.second }
             var before = 0L
             for ((file, size) in game.discs) {
-                fetchTo(catalog, file, size, File(dir, file.substringAfterLast('/'))) { job.done = before + it; tick() }
+                val target = File(dir, file.substringAfterLast('/'))
+                if (!(target.isFile && target.length() == size)) {
+                    fetchTo(catalog, file, size, target) { job.done = before + it; tick() }
+                }
                 before += size
             }
             val names = game.discs.map { it.first.substringAfterLast('/') }
@@ -299,14 +303,40 @@ object ShopDownloads {
         }
     }
 
+    /**
+     * Downloads into ".<name>.part" and renames it when complete. A .part left by a cut connection or a restart
+     * is continued with a Range request; network errors retry by themselves (up to [RETRIES] times, waiting longer
+     * each time), each retry going on from where the last one stopped.
+     */
     private fun get(url: String, target: File, progress: (Long) -> Unit) {
         val tmp = File(target.parentFile, ".${target.name}.part")
-        val conn = ShopApi.open(url)
+        var attempt = 0
+        while (true) {
+            try {
+                getOnce(url, tmp, progress)
+                break
+            } catch (e: java.io.IOException) {
+                if (++attempt > RETRIES) throw IllegalStateException("Se cortó la conexión (${e.message}). Pulsa Reintentar: seguirá donde se quedó.")
+                Log.w("RetroStick", "Download interrupted, retry $attempt", e)
+                Thread.sleep(5000L * attempt)
+            }
+        }
+        finish(tmp, target)
+    }
+
+    private fun getOnce(url: String, tmp: File, progress: (Long) -> Unit) {
+        val have = if (tmp.isFile) tmp.length() else 0L
+        val conn = ShopApi.open(url, if (have > 0) "bytes=$have-" else null)
         try {
-            if (conn.responseCode != 200) throw IllegalStateException("archive.org respondió ${conn.responseCode}")
-            var n = 0L
+            val code = conn.responseCode
+            // 416: the .part is already complete
+            if (code == 416 && have > 0) return
+            val append = code == 206 && have > 0
+            if (code != 200 && code != 206) throw IllegalStateException("archive.org respondió $code")
+            var n = if (append) have else 0L
+            progress(n)
             conn.inputStream.use { input ->
-                tmp.outputStream().use { out ->
+                java.io.FileOutputStream(tmp, append).use { out ->
                     val buf = ByteArray(64 * 1024)
                     while (true) {
                         val r = input.read(buf)
@@ -320,16 +350,34 @@ object ShopDownloads {
         } finally {
             conn.disconnect()
         }
-        finish(tmp, target)
     }
+
+    /** Bytes of [game] already on the stick: whole discs and .part files left by an interrupted download. */
+    fun partialBytes(catalog: ShopCatalog, game: ShopGame): Long {
+        val dir = catalog.console.romDir
+        fun part(name: String) = File(dir, ".$name.part").let { if (it.isFile) it.length() else 0L }
+        if (game.discs.isNotEmpty()) return game.discs.sumOf { (file, size) ->
+            val name = file.substringAfterLast('/')
+            File(dir, name).let { if (it.isFile && it.length() == size) size else part(name) }
+        }
+        if (game.pack != null) {
+            return dir.listFiles()?.filter { it.name.startsWith(".${game.name}.") && it.name.endsWith(".part") }?.sumOf { it.length() } ?: 0L
+        }
+        val ext = game.file.substringAfterLast('.').lowercase()
+        return part(if (catalog.console.id == "psx") game.file.substringAfterLast('/') else "${game.name}.$ext")
+    }
+
+    /** Full size of the download (all discs). */
+    fun totalBytes(game: ShopGame) = if (game.discs.isNotEmpty()) game.discs.sumOf { it.second } else game.size
 
     /** Restricted items (PS1 set): 8 MiB pieces through api/download.ts, which adds the archive.org keys. */
     private fun viaWebapp(catalog: ShopCatalog, file: String, size: Long, target: File, progress: (Long) -> Unit) {
         val tmp = File(target.parentFile, ".${target.name}.part")
         val url = "${BuildConfig.WEBAPP_URL}/api/download?id=${enc(catalog.collection)}&file=${enc(file)}"
         RandomAccessFile(tmp, "rw").use { out ->
-            out.setLength(0)
-            var start = 0L
+            var start = (minOf(out.length(), size) / CHUNK) * CHUNK
+            out.setLength(start)
+            progress(start)
             while (start < size) {
                 val end = minOf(start + CHUNK, size) - 1
                 var attempt = 0
