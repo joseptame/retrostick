@@ -188,6 +188,8 @@ El launcher declara `android.intent.category.HOME`, así que el stick arranca en
 | Game Boy | Gambatte | `/ROMs/gb` |
 | Game Boy Color | Gambatte | `/ROMs/gbc` |
 | Game Boy Advance | mGBA (alternativa: gpSP si algún juego va lento) | `/ROMs/gba` |
+| Mega Drive | Genesis Plus GX (se instala desde el Actualizador en línea de RetroArch) | `/ROMs/md` |
+| Master System | Genesis Plus GX | `/ROMs/sms` |
 | PlayStation | PCSX ReARMed | `/ROMs/psx` |
 
 ### 6.2 `stick/retroarch/retroarch.overrides.cfg`
@@ -266,7 +268,7 @@ Marcos propios que imitan cada consola (diseño en `docs/maquetas/marcos.html`; 
 |---|---|---|
 | Game Boy / Color | 960×864 (×6, píxeles perfectos) | `config/Gambatte/gb.cfg`, `gbc.cfg` |
 | Game Boy Advance | 1440×960 (×6, píxeles perfectos) | `config/mGBA/gba.cfg` |
-| NES / Super Nintendo / PlayStation | 1440×1080 (toda la altura, 4:3) | `config/FCEUmm/nes.cfg`, `config/Snes9x 2010/snes.cfg`, `config/PCSX-ReARMed/psx.cfg` |
+| NES / Super Nintendo / Mega Drive / Master System / PlayStation | 1440×1080 (toda la altura, 4:3) | `config/FCEUmm/nes.cfg`, `config/Snes9x 2010/snes.cfg`, `config/Genesis Plus GX/{md,sms}.cfg`, `config/PCSX-ReARMed/psx.cfg` |
 
 - Son *overrides* de carpeta de contenido: RetroArch carga `config/<Núcleo>/<nombre de la carpeta>.cfg` después del
   del núcleo, así GB y GBC (los dos con Gambatte) llevan marcos distintos.

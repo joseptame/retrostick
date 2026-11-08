@@ -53,21 +53,21 @@ Sin root no se puede añadir un `.kl` al sistema (`/vendor` es de solo lectura),
 
 ## Botones en cada consola (DualSense)
 
-| | NES (FCEUmm) | Super Nintendo (Snes9x 2010) | Game Boy / Color (Gambatte) | Game Boy Advance (mGBA) | PlayStation (PCSX ReARMed) |
-|---|---|---|---|---|---|
-| ✕ | B | B | A | A | ✕ |
-| ○ | A | A | A | A | ○ |
-| □ | B | Y | B | B | □ |
-| △ | A | X | B | B | △ |
-| Options | Start | Start | Start | Start | Start |
-| Create | Select | Select | Select | Select | Select |
-| Cruceta y stick izquierdo | Moverse | Moverse | Moverse | Moverse | Cruceta / stick |
-| L1 | **Guardado rápido** | L | **Guardado rápido** | L | L1 |
-| R1 | **Avance rápido x2** (activar/desactivar) | R | **Avance rápido x2** (activar/desactivar) | R | R1 |
-| L2 | — | **Guardado rápido** | — | **Guardado rápido** | L2 |
-| R2 | — | **Avance rápido x2** (activar/desactivar) | — | **Avance rápido x2** (activar/desactivar) | R2 |
-| PS | Menú de RetroArch | Menú de RetroArch | Menú de RetroArch | Menú de RetroArch | Menú de RetroArch |
-| Panel táctil (clic) | **Quitar / poner el marco** | **Quitar / poner el marco** | **Quitar / poner el marco** | **Quitar / poner el marco** | **Quitar / poner el marco** |
+| | NES (FCEUmm) | Super Nintendo (Snes9x 2010) | Game Boy / Color (Gambatte) | Game Boy Advance (mGBA) | Mega Drive / Master System (Genesis Plus GX) | PlayStation (PCSX ReARMed) |
+|---|---|---|---|---|---|---|
+| ✕ | B | B | A | A | B / 1 | ✕ |
+| ○ | A | A | A | A | C / 2 | ○ |
+| □ | B | Y | B | B | A / — | □ |
+| △ | A | X | B | B | — | △ |
+| Options | Start | Start | Start | Start | Start / Pause | Start |
+| Create | Select | Select | Select | Select | Mode / — | Select |
+| Cruceta y stick izquierdo | Moverse | Moverse | Moverse | Moverse | Moverse | Cruceta / stick |
+| L1 | **Guardado rápido** | L | **Guardado rápido** | L | — | L1 |
+| R1 | **Avance rápido x2** (activar/desactivar) | R | **Avance rápido x2** (activar/desactivar) | R | — | R1 |
+| L2 | — | **Guardado rápido** | — | **Guardado rápido** | **Guardado rápido** | L2 |
+| R2 | — | **Avance rápido x2** (activar/desactivar) | — | **Avance rápido x2** (activar/desactivar) | **Avance rápido x2** (activar/desactivar) | R2 |
+| PS | Menú de RetroArch | Menú de RetroArch | Menú de RetroArch | Menú de RetroArch | Menú de RetroArch | Menú de RetroArch |
+| Panel táctil (clic) | **Quitar / poner el marco** | **Quitar / poner el marco** | **Quitar / poner el marco** | **Quitar / poner el marco** | **Quitar / poner el marco** | **Quitar / poner el marco** |
 
 También abre el menú **Create + Options** (`input_menu_toggle_gamepad_combo = 4`).
 
@@ -83,6 +83,8 @@ Archivos (los instala `install.ps1`):
 | `stick/retroarch/overrides/FCEUmm/FCEUmm.cfg` | `RetroArch/config/FCEUmm/` | L1 guardar, R1 avance rápido, x2 |
 | `stick/retroarch/remaps/Snes9x 2010/Snes9x 2010.rmp` | `RetroArch/config/remaps/Snes9x 2010/` | Botones como el mando de SNES, L2/R2 sin función, stick = cruceta |
 | `stick/retroarch/overrides/Snes9x 2010/Snes9x 2010.cfg` | `RetroArch/config/Snes9x 2010/` | L2 guardar, R2 avance rápido, x2 |
+| `stick/retroarch/remaps/Genesis Plus GX/Genesis Plus GX.rmp` | `RetroArch/config/remaps/Genesis Plus GX/` | Botones del núcleo (□✕○ = A B C), L2/R2 sin función, stick = cruceta |
+| `stick/retroarch/overrides/Genesis Plus GX/Genesis Plus GX.cfg` | `RetroArch/config/Genesis Plus GX/` | L2 guardar, R2 avance rápido, x2 |
 | `stick/retroarch/overrides/<Núcleo>/<consola>.cfg` | `RetroArch/config/<Núcleo>/` | Tamaño fijo del juego y marco de esa consola (ver README 6.4) |
 | `stick/retroarch/overlays/retrostick/` | `RetroArch/overlays/retrostick/` | Marcos (PNG 1920×1080) |
 
