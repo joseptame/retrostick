@@ -22,7 +22,8 @@ import { baseName, bestVariants, displayTitle, isDemo, looseKey } from '../src/l
 import { DEFAULT_COLLECTIONS } from '../src/lib/recents'
 import { loadDb } from '../src/lib/romdb'
 
-export const config = { runtime: 'edge' }
+// Node.js runtime: archive.org answers 400 to requests from Vercel's edge network; also more CPU for big sets.
+export const config = { runtime: 'nodejs', maxDuration: 60 }
 
 const CACHE_MS = 6 * 3600_000
 
@@ -88,7 +89,7 @@ async function build(id: ConsoleId, collection: string): Promise<string> {
   return JSON.stringify({ console: id, collection, title, restricted, archive, genres, games })
 }
 
-export default async function handler(request: Request): Promise<Response> {
+export async function GET(request: Request): Promise<Response> {
   const url = new URL(request.url)
   const id = url.searchParams.get('console') as ConsoleId | null
   if (!id || !CONSOLES.some((c) => c.id === id)) return new Response('Consola desconocida', { status: 400 })
@@ -114,3 +115,6 @@ export default async function handler(request: Request): Promise<Response> {
     return new Response(e instanceof Error ? e.message : String(e), { status: 502 })
   }
 }
+
+/** vercel-dev.ts calls the default export. */
+export default GET

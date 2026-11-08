@@ -68,6 +68,9 @@ import { consoleForFile, ROM_EXTENSION, type ConsoleId } from './consoles'
 
 const METADATA = 'https://archive.org/metadata'
 
+/** Readable reason from an archive.org error page. */
+const pageTitle = (html: string) => (/<title>([^<]*)/i.exec(html)?.[1] ?? html.slice(0, 120)).trim()
+
 /** Extra headers for archive.org: none in the browser; the server (api/shop.ts) identifies itself. */
 let archiveHeaders: Record<string, string> = {}
 export function configureArchive(headers: Record<string, string>) {
@@ -82,7 +85,7 @@ function encodePath(path: string): string {
 
 export async function fetchMetadata(identifier: string): Promise<ArchiveMetadata> {
   const res = await fetch(`${METADATA}/${encodeURIComponent(identifier)}`, { headers: archiveHeaders })
-  if (!res.ok) throw new Error(`archive.org ${res.status} (metadata): ${(await res.text()).slice(0, 160)}`)
+  if (!res.ok) throw new Error(`archive.org ${res.status} (metadata): ${pageTitle(await res.text())}`)
   const json = (await res.json()) as {
     metadata?: { title?: string; identifier?: string; 'access-restricted-item'?: string | boolean }
     files?: ArchiveFile[]
