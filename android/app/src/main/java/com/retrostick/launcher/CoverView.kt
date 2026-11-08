@@ -12,9 +12,9 @@ import android.util.AttributeSet
 import android.widget.ImageView
 
 /**
- * Box art in a square slot. Portrait or near-square boxes fill it (centre crop, as before). Wide boxes
- * (European SNES, N64…) would lose their sides that way, so they are shown whole, over a blurred, darkened
- * copy of themselves that fills the gaps above and below.
+ * Box art in a square slot. Near-square boxes fill it (centre crop). Wide boxes (European SNES, N64…) and
+ * portrait ones (NES, Game Boy…) would lose their sides or their top and bottom that way, so they are shown whole,
+ * over a blurred, darkened copy of themselves that fills the gaps.
  */
 class CoverView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) : ImageView(context, attrs) {
     private val paint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
@@ -28,11 +28,11 @@ class CoverView @JvmOverloads constructor(context: Context, attrs: AttributeSet?
 
     private val bitmap get() = (drawable as? BitmapDrawable)?.bitmap
 
-    /** Wider than tall by more than a fifth (or the other way round): cropping would cut the box. */
+    /** More than 8 % off the slot's shape either way: cropping would cut part of the box. */
     private fun needsFit(b: Bitmap): Boolean {
         val box = b.width.toFloat() / b.height
         val slot = width.toFloat() / height.coerceAtLeast(1)
-        return box / slot > 1.2f || slot / box > 1.45f
+        return box / slot > 1.08f || slot / box > 1.08f
     }
 
     override fun onDraw(canvas: Canvas) {
