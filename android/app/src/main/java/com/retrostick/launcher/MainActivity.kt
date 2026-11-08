@@ -878,6 +878,10 @@ class MainActivity : Activity() {
         }
         addHint(g.shoulders, if (padStyle == PadStyle.REMOTE) R.string.hint_consoles else R.string.hint_switch)
         if (!settingsTab && padStyle != PadStyle.REMOTE) {
+            // The button that opens the manual, drawn (the word "Create" read like "crear")
+            if (manualPill.visibility == View.VISIBLE || (listMode && homeList.view.visibility == View.VISIBLE && currentManual() != null)) {
+                addHint(when (padStyle) { PadStyle.XBOX -> Glyph.Pill("View"); PadStyle.NINTENDO -> Glyph.Pill("−"); else -> Glyph.Icon(R.drawable.ic_hint_create) }, R.string.hint_manual)
+            }
             addHint(Glyph.Pill(when (padStyle) { PadStyle.XBOX -> "LT"; PadStyle.NINTENDO -> "ZL"; else -> "L2" }), R.string.hint_search)
             addHint(Glyph.Pill(when (padStyle) { PadStyle.XBOX -> "Menu"; PadStyle.NINTENDO -> "+"; else -> "Options" }), R.string.hint_view)
         }
@@ -1391,7 +1395,11 @@ class MainActivity : Activity() {
         val g = currentGame ?: currentDrive?.let { item -> driveInfo.getOrPut(item.key) { item.probe().also { library.describe(it) } } }
         val manual = g?.let { Manuals.find(this, it.console, it.baseName) }
         manualPill.visibility = if (manual != null && !active) View.VISIBLE else View.GONE
-        manualPill.text = manualGlyph().let { if (it.isEmpty()) "📖  Manual" else "📖  Manual  ·  $it" }
+        manualPill.text = "Manual"
+        if (manualPill.compoundDrawablesRelative[0] == null) {
+            manualPill.setCompoundDrawablesRelative(getDrawable(R.drawable.ic_shop_book)!!.mutate().apply { setTint(getColor(R.color.text)); setBounds(0, 0, dp(17), dp(17)) }, null, null, null)
+            manualPill.compoundDrawablePadding = dp(7)
+        }
         if (!active) return
         gamePanel.visibility = View.GONE
         emptyText.visibility = View.GONE
@@ -1432,6 +1440,11 @@ class MainActivity : Activity() {
         PadStyle.NINTENDO -> "−"
         PadStyle.REMOTE -> ""
         else -> "Create"
+    }
+
+    private fun currentManual(): String? {
+        val game = currentGame ?: currentDrive?.probe() ?: return null
+        return Manuals.find(this, game.console, game.baseName)
     }
 
     private fun openManual() {

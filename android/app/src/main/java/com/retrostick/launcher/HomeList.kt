@@ -195,7 +195,8 @@ class HomeList(private val ctx: Context, private val covers: CoverLoader) {
         playBtn.text = "✕  ${sheet.playLabel}"
         styleButton(playBtn, mediaFocus < 0)
         manualBtn.visibility = if (sheet.manual) View.VISIBLE else View.GONE
-        manualBtn.text = if (sheet.manualGlyph.isEmpty()) "📖  Manual" else "📖  Manual  ·  ${sheet.manualGlyph}"
+        manualBtn.text = "Manual"
+        bookIcon(manualBtn)
         styleButton(manualBtn, false)
         langs.text = android.text.SpannableStringBuilder().apply {
             if (sheet.languages.isNotEmpty()) {
@@ -393,6 +394,13 @@ class HomeList(private val ctx: Context, private val covers: CoverLoader) {
         (statLast.first.tag as TextView).text = "ÚLTIMA PARTIDA"
         (statTime.first.tag as TextView).text = "TIEMPO JUGADO"
         (statSave.first.tag as TextView).text = "PARTIDA GUARDADA"
+    }
+
+    /** Line book icon before the text, tinted like it (the emoji clashed with the rest). */
+    private fun bookIcon(b: TextView) {
+        val d = ctx.getDrawable(R.drawable.ic_shop_book)!!.mutate().apply { setTint(b.currentTextColor); setBounds(0, 0, dp(16), dp(16)) }
+        b.setCompoundDrawablesRelative(d, null, null, null)
+        b.compoundDrawablePadding = dp(7)
     }
 
     private fun button(primary: Boolean) = text(12.5f, if (primary) R.color.button_text else R.color.text).apply {
