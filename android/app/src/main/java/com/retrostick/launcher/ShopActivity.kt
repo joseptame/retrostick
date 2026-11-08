@@ -306,7 +306,7 @@ class ShopActivity : Activity() {
                 intArrayOf(Color.parseColor("#F20D0B1F"), Color.parseColor("#D90D0B1F"), Color.parseColor("#990D0B1F")),
             )
         }
-        fichaCover = ImageView(this).apply {
+        fichaCover = CoverView(this).apply {
             scaleType = ImageView.ScaleType.CENTER_CROP
             clipToOutline = true
             setBackgroundResource(R.drawable.bg_cover)
@@ -396,7 +396,7 @@ class ShopActivity : Activity() {
     }
 
     private inner class Card {
-        val cover = ImageView(this@ShopActivity).apply {
+        val cover = CoverView(this@ShopActivity).apply {
             scaleType = ImageView.ScaleType.CENTER_CROP
             clipToOutline = true
             setBackgroundResource(R.drawable.bg_cover)

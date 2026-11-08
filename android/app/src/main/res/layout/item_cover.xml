@@ -23,7 +23,7 @@
             android:textColor="@color/text"
             android:textSize="9.5sp" />
 
-        <ImageView
+        <com.retrostick.launcher.CoverView
             android:id="@+id/coverImage"
             android:layout_width="match_parent"
             android:layout_height="match_parent"

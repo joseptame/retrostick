@@ -46,6 +46,20 @@ export function useCoverUrl(
   return { url, resolved, failed, setFailed: fail }
 }
 
+/**
+ * Wide box art (European SNES, N64…) loses its sides when cropped to a square slot. When the image is
+ * clearly wider than tall it is shown whole; with `fill`, its container also paints a blurred copy of it
+ * behind (CSS .art-fill), so there are no empty bands.
+ */
+export function fitWideArt(img: HTMLImageElement, fill = true) {
+  const wide = img.naturalHeight > 0 && img.naturalWidth / img.naturalHeight > 1.2
+  img.classList.toggle('art-wide', wide)
+  const box = img.parentElement
+  if (!fill || !box) return
+  box.classList.toggle('art-fill', wide)
+  if (wide) box.style.setProperty('--art', `url("${img.currentSrc || img.src}")`)
+}
+
 /** Gradient used when a game has no box art, stable per title. */
 export function coverGradient(title: string): string {
   const [from, to] = GRADIENTS[hash(title) % GRADIENTS.length]
@@ -63,7 +77,7 @@ export function Cover({ console, name, title, className }: { console: ConsoleId;
           <span className="cover-title">{title}</span>
         </>
       )}
-      {url && !failed && <img src={url} alt="" loading="lazy" onError={() => setFailed(true)} />}
+      {url && !failed && <img src={url} alt="" loading="lazy" onLoad={(e) => fitWideArt(e.currentTarget)} onError={() => setFailed(true)} />}
     </div>
   )
 }

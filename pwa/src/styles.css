@@ -863,3 +863,12 @@ button.gp-btn.ok { animation: none; }
 .pair-ico svg { width: 28px; height: 28px; }
 .pair-ico.ok { background: rgba(74, 222, 128, 0.16); color: var(--ok); }
 .pair-code { font-size: 30px; font-weight: 800; letter-spacing: 4px; font-variant-numeric: tabular-nums; }
+
+/* Wide box art (fitWideArt in ui.tsx): whole, over a blurred copy of itself */
+img.art-wide { object-fit: contain !important; z-index: 1; }
+.gp-art img.art-wide, .detail-cover img.art-wide { position: relative; }
+.gs-cover.art-wide { background: rgba(0, 0, 0, 0.35); }
+.art-fill::before {
+  content: ''; position: absolute; inset: -24px; z-index: 0;
+  background: var(--art) center / cover no-repeat; filter: blur(16px) brightness(0.7) saturate(1.3);
+}

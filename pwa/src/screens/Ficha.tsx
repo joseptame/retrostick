@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { AppState } from '../App'
 import { Icon } from '../components/icons'
 import { Revisions, saveToPhone } from '../components/Revisions'
-import { coverGradient, Switch, useCoverUrl } from '../components/ui'
+import { coverGradient, fitWideArt, Switch, useCoverUrl } from '../components/ui'
 import { consoleById } from '../lib/consoles'
 import type { DriveFile } from '../lib/drive'
 import { formatAgo, formatBytes, formatWhen } from '../lib/format'
@@ -87,7 +87,7 @@ export function Ficha({ game, state, onBack }: { game: Game; state: AppState; on
 
       <div className="detail-head">
         <div className="detail-cover" style={url ? undefined : { background: coverGradient(game.title) }}>
-          {url ? <img src={url} alt="" /> : <span>{game.title.replace(/^The /, '').charAt(0)}</span>}
+          {url ? <img src={url} alt="" onLoad={(e) => fitWideArt(e.currentTarget)} /> : <span>{game.title.replace(/^The /, '').charAt(0)}</span>}
         </div>
         <div className="detail-title">
           <h1>{game.title}</h1>

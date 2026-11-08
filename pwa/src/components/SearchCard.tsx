@@ -1,7 +1,7 @@
 import { useState, type CSSProperties, type ReactNode } from 'react'
 import type { ConsoleId } from '../lib/consoles'
 import { Icon } from './icons'
-import { coverGradient, useCoverUrl } from './ui'
+import { coverGradient, fitWideArt, useCoverUrl } from './ui'
 
 interface CoverCardProps {
   console: ConsoleId
@@ -52,7 +52,10 @@ export function CoverCard({ console, fileName, title, meta, metaTone, progress, 
             src={art}
             alt=""
             loading="lazy"
-            onLoad={() => setLoadedSrc(art)}
+            onLoad={(e) => {
+              setLoadedSrc(art)
+              fitWideArt(e.currentTarget, false)
+            }}
             onError={() => setFailed(true)}
           />
         ) : (
