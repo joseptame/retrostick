@@ -32,11 +32,33 @@ object Manuals {
     fun addListener(l: () -> Unit) { listeners += l }
     fun removeListener(l: () -> Unit) { listeners -= l }
 
+    /**
+     * Manuals outside the collections, by console and loose title: "identifier::file" on archive.org.
+     * Dragon Ball Final Bout: the US one is "Dragon Ball GT: Final Bout", not in the US-only collection; this is the
+     * Japanese manual translated into English.
+     */
+    private val EXTRA = mapOf(
+        "psx" to mapOf("dragonballfinalbout" to "dragon-ball-final-bout-manual-en::Dragon_Ball_Final_Bout_Manual_EN.pdf"),
+    )
+
+    /** Spanish Pokémon editions under their English names, as the (US) manuals are called. */
+    private val ALIASES = listOf(
+        "edicion rojo fuego" to "firered version", "edicion verde hoja" to "leafgreen version", "edicion rubi" to "ruby version",
+        "edicion zafiro" to "sapphire version", "edicion esmeralda" to "emerald version", "edicion roja" to "red version",
+        "edicion azul" to "blue version", "edicion amarilla" to "yellow version", "edicion oro" to "gold version",
+        "edicion plata" to "silver version", "edicion cristal" to "crystal version",
+    )
+
     /** Loose key of a title: "Legend of Zelda, The - Oracle of Ages (USA)" == "The Legend of Zelda - Oracle of Ages". */
-    private fun key(name: String) = looseKey(displayTitle(name.substringBeforeLast(".pdf")))
+    private fun key(name: String): String {
+        var t = displayTitle(name.substringBeforeLast(".pdf")).lowercase()
+        for ((es, en) in ALIASES) t = t.replace(es, en)
+        return looseKey(t)
+    }
 
     /** The manual's file name in its collection, or null (none, or the list isn't loaded yet). */
     fun find(context: Context, console: Console, baseName: String): String? {
+        EXTRA[console.id]?.get(key(baseName))?.let { return it }
         if (index.isEmpty()) load(context)
         return index[console.id]?.get(key(baseName))
     }
@@ -100,11 +122,13 @@ object Manuals {
     /** The manual on disk, downloaded the first time (blocking). */
     fun file(context: Context, console: Console, name: String): File {
         val dir = File(context.filesDir, "manuals/${console.id}").apply { mkdirs() }
-        val target = File(dir, name)
+        // "identifier::file" for the manuals outside the collections (EXTRA)
+        val id = if ("::" in name) name.substringBefore("::") else COLLECTIONS.getValue(console.id)
+        val file = name.substringAfter("::")
+        val target = File(dir, file)
         if (target.isFile && target.length() > 0) return target
-        val id = COLLECTIONS.getValue(console.id)
-        val conn = ShopApi.open("https://archive.org/download/$id/${URLEncoder.encode(name, "UTF-8").replace("+", "%20")}")
-        val tmp = File(dir, "$name.part")
+        val conn = ShopApi.open("https://archive.org/download/$id/${URLEncoder.encode(file, "UTF-8").replace("+", "%20")}")
+        val tmp = File(dir, "$file.part")
         try {
             if (conn.responseCode != 200) throw IllegalStateException("archive.org respondió ${conn.responseCode}")
             conn.inputStream.use { input -> tmp.outputStream().use { input.copyTo(it, 64 * 1024) } }
