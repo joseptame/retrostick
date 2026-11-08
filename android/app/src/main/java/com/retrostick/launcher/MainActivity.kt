@@ -68,8 +68,14 @@ class MainActivity : Activity() {
     private val main = Handler(Looper.getMainLooper())
 
     private var games: Map<String, List<Game>> = emptyMap()
-    /** 0..3 = consoles, 4 = Retro Ajustes. */
+    /** 0 until CONSOLES.size = consoles, then Retro Ajustes. */
     private var tab = 0
+        set(value) {
+            field = value
+            if (value < CONSOLES.size) lastConsoleTab = value
+        }
+    /** Last console tab visited: RetroShop opens on that console. */
+    private var lastConsoleTab = 0
     private val selected = IntArray(CONSOLES.size)
     private var settingIndex = 0
     private var zone = Zone.CONTENT
@@ -522,6 +528,11 @@ class MainActivity : Activity() {
             },
             Setting("☁️", getString(R.string.set_account), "") {
                 if (driveAuth.isConnected) confirmDisconnect() else startDriveLogin()
+            },
+            Setting("🛒", getString(R.string.set_shop), getString(R.string.set_shop_sub)) {
+                // Opens on the console of the tab you came from (the first one from Retro Ajustes).
+                val from = CONSOLES.getOrNull(lastConsoleTab)?.id
+                open(Intent(this, ShopActivity::class.java).putExtra(ShopActivity.EXTRA_CONSOLE, from))
             },
             Setting("⬆️", getString(R.string.set_update), "") {
                 val update = Updater.available

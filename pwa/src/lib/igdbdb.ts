@@ -3,6 +3,7 @@
  * public/db/igdb-<console>.json, so Buscar can filter and sort without API calls.
  */
 import type { ConsoleId } from './consoles'
+import { fetchData } from './data'
 import { looseKey } from './names'
 import { officialName } from './romdb'
 
@@ -85,10 +86,7 @@ const cache = new Map<ConsoleId, Promise<IgdbDb>>()
 export function loadIgdbDb(id: ConsoleId): Promise<IgdbDb> {
   let p = cache.get(id)
   if (!p) {
-    p = fetch(`/db/igdb-${id}.json`).then((r) => {
-      if (!r.ok) throw new Error(`igdb-${id}.json ${r.status}`)
-      return r.json() as Promise<IgdbDb>
-    })
+    p = fetchData<IgdbDb>(`db/igdb-${id}.json`)
     p.catch(() => cache.delete(id))
     cache.set(id, p)
   }

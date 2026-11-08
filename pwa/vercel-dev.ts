@@ -12,7 +12,7 @@ declare const process: { env: Record<string, string | undefined> }
 /** Same exclusions as `config.matcher` in middleware.ts. */
 const PUBLIC = /^\/(manifest\.webmanifest|icon-192\.png|icon-512\.png|apple-touch-icon\.png)$/
 const API = /^\/api\/([\w-]+)$/
-const HANDLERS = new Set(['igdb', 'download', 'transfer'])
+const HANDLERS = new Set(['igdb', 'download', 'transfer', 'shop'])
 
 /* Minimal shapes of Node's IncomingMessage / ServerResponse (no @types/node in this project). */
 interface Req extends AsyncIterable<Uint8Array> {

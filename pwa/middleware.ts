@@ -64,6 +64,10 @@ export default async function middleware(request: Request): Promise<Response> {
   }
 
   if (cookie(request, COOKIE) === token) return pass()
+  // The stick (RetroShop) has no login cookie: it sends its own key (STICK_KEY, baked into the launcher).
+  const stickKey = process.env.STICK_KEY
+  const sent = request.headers.get('x-stick-key')
+  if (stickKey && sent && (await same(sent, stickKey, secret))) return pass()
   return loginPage(false)
 }
 

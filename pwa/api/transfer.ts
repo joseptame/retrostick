@@ -16,7 +16,7 @@
  */
 export const config = { runtime: 'edge' }
 
-declare const process: { env: Record<string, string | undefined> }
+import { fetchArchiveRange } from './_archive'
 
 /** Biggest chunk accepted (the PWA asks for 8 MiB). */
 const MAX_CHUNK = 32 * 1024 * 1024
@@ -28,56 +28,6 @@ const ARCHIVE_TIMEOUT = 150_000
 
 function bad(message: string, status = 400): Response {
   return new Response(JSON.stringify({ error: message }), { status, headers: { 'content-type': 'application/json; charset=utf-8' } })
-}
-
-/** Follows archive.org's redirects by hand: the auth header must go with every hop (fetch drops it cross-origin). */
-async function get(url: string, headers: Record<string, string>, signal: AbortSignal): Promise<Response> {
-  for (let hop = 0; hop < 5; hop++) {
-    const res = await fetch(url, { headers, redirect: 'manual', signal })
-    const location = res.headers.get('location')
-    if (res.status >= 300 && res.status < 400 && location) {
-      url = new URL(location, url).toString()
-      continue
-    }
-    return res
-  }
-  throw new Error('archive.org: demasiadas redirecciones')
-}
-
-/** The item's two storage servers and folder ("ia601801.us.archive.org", "/21/items/foo"), cached per item. */
-const mirrors = new Map<string, Promise<string[]>>()
-function mirrorsOf(id: string): Promise<string[]> {
-  let p = mirrors.get(id)
-  if (!p) {
-    p = fetch(`https://archive.org/metadata/${encodeURIComponent(id)}`)
-      .then((r) => r.json())
-      .then((m: { d1?: string; d2?: string; dir?: string; workable_servers?: string[] }) =>
-        m.dir ? [...new Set([m.d1, m.d2, ...(m.workable_servers ?? [])])].filter(Boolean).map((h) => `https://${h}${m.dir}`) : [],
-      )
-      .catch(() => [])
-    mirrors.set(id, p)
-  }
-  return p
-}
-
-/**
- * A byte range of an item's file: through archive.org's download redirect, and if that data node fails
- * (5xx), straight from the item's storage servers.
- */
-async function fetchArchiveRange(id: string, file: string, start: number, end: number, signal: AbortSignal): Promise<Response> {
-  const headers: Record<string, string> = { Range: `bytes=${start}-${end - 1}` }
-  const access = process.env.IA_ACCESS_KEY
-  const secret = process.env.IA_SECRET_KEY
-  if (access && secret) headers.Authorization = `LOW ${access}:${secret}`
-  const path = file.split('/').map(encodeURIComponent).join('/')
-  let res = await get(`https://archive.org/download/${encodeURIComponent(id)}/${path}`, headers, signal)
-  if (res.status < 500) return res
-  for (const base of await mirrorsOf(id)) {
-    console.log(`[transfer] archive.org ${res.status}: probando ${new URL(base).host}`)
-    res = await get(`${base}/${path}`, headers, signal)
-    if (res.status < 500) return res
-  }
-  return res
 }
 
 export default async function handler(request: Request): Promise<Response> {

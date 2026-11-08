@@ -12,7 +12,7 @@ export function baseName(fileName: string): string {
 /** "Legend of Zelda, The - Oracle of Ages (Europe) (En,Fr)" -> "The Legend of Zelda - Oracle of Ages" */
 export function displayTitle(name: string): string {
   const title = fileOnly(name)
-    .replace(/\.(gbc?|gba|chd|cue|bin|m3u|pbp|iso|img|zip|7z)$/i, '')
+    .replace(/\.(gbc?|gba|nes|sfc|smc|chd|cue|bin|m3u|pbp|iso|img|zip|7z)$/i, '')
     .replace(/\s*[([].*$/, '')
     .trim()
   const m = /^(.+?), (The|A|An|El|La|Los|Las|Le|Les|Die|Der|Das)( - .*)?$/.exec(title)

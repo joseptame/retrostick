@@ -1,5 +1,6 @@
 /** Game identification against the No-Intro / Redump database built by scripts/build-db.ts. */
 import { consoleById, type ConsoleId } from './consoles'
+import { fetchData } from './data'
 import { crc32, sha1 } from './hash'
 import { baseName, bestBoxart, coverUrl, looseKey } from './names'
 
@@ -15,10 +16,7 @@ const cache = new Map<ConsoleId, Promise<Db>>()
 export function loadDb(id: ConsoleId): Promise<Db> {
   let db = cache.get(id)
   if (!db) {
-    db = fetch(`${import.meta.env.BASE_URL}db/${id}.json`).then((r) => {
-      if (!r.ok) throw new Error(`db ${id}: ${r.status}`)
-      return r.json()
-    })
+    db = fetchData<Db>(`db/${id}.json`)
     db.catch(() => cache.delete(id))
     cache.set(id, db)
   }

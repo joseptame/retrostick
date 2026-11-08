@@ -14,6 +14,8 @@ export interface ArchiveMetadata {
   identifier: string
   title: string
   files: ArchiveFile[]
+  /** "loggedin" items: downloads need the user's archive.org keys */
+  restricted: boolean
 }
 
 export interface ArchiveEntry {
@@ -75,11 +77,15 @@ function encodePath(path: string): string {
 export async function fetchMetadata(identifier: string): Promise<ArchiveMetadata> {
   const res = await fetch(`${METADATA}/${encodeURIComponent(identifier)}`)
   if (!res.ok) throw new Error(`archive.org ${res.status}`)
-  const json = (await res.json()) as { metadata?: { title?: string; identifier?: string }; files?: ArchiveFile[] }
+  const json = (await res.json()) as {
+    metadata?: { title?: string; identifier?: string; 'access-restricted-item'?: string | boolean }
+    files?: ArchiveFile[]
+  }
   return {
     identifier: json.metadata?.identifier ?? identifier,
     title: json.metadata?.title ?? identifier,
     files: json.files ?? [],
+    restricted: String(json.metadata?.['access-restricted-item'] ?? '') === 'true',
   }
 }
 
@@ -162,7 +168,7 @@ const MIN_PACKS = 5
 export async function listItemFiles(
   identifier: string,
   console?: ConsoleId,
-): Promise<{ entries: ArchiveEntry[]; archive: string | null; title: string }> {
+): Promise<{ entries: ArchiveEntry[]; archive: string | null; title: string; restricted: boolean }> {
   const meta = await fetchMetadata(identifier)
   const ext = console && ROM_EXTENSION[console]
   const packs = meta.files.filter((f) => /\.(zip|7z)$/i.test(f.name) && !NOT_ROMS.test(f.name) && !isJunk(f.name))
@@ -172,7 +178,7 @@ export async function listItemFiles(
       ...loose.map((f) => ({ name: f.name, size: Number(f.size ?? 0) })),
       ...packs.map((f) => ({ name: f.name.replace(/\.[^./]+$/, '.' + ext), size: Number(f.size ?? 0), pack: f.name })),
     ]
-    return { entries, archive: null, title: meta.title }
+    return { entries, archive: null, title: meta.title, restricted: meta.restricted }
   }
   // Loose ROMs win over an archive: a PS1 set keeps its .chd files at the top and may carry an unrelated
   // .zip (subchannel data…).
@@ -181,8 +187,8 @@ export async function listItemFiles(
   if (archive) {
     const res = await fetch(archiveListingUrl(identifier, archive.name))
     if (!res.ok) throw new Error(`archive.org ${res.status}`)
-    return { entries: parseArchiveListing(await res.text()), archive: archive.name, title: meta.title }
+    return { entries: parseArchiveListing(await res.text()), archive: archive.name, title: meta.title, restricted: meta.restricted }
   }
   const entries = meta.files.filter((f) => !isJunk(f.name)).map((f) => ({ name: f.name, size: Number(f.size ?? 0) }))
-  return { entries, archive: null, title: meta.title }
+  return { entries, archive: null, title: meta.title, restricted: meta.restricted }
 }

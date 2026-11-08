@@ -45,7 +45,7 @@ export function removeRecent(id: string): RecentCollection[] {
 }
 
 /** archive.org collection each console explores in Buscar, until the user picks another one. */
-const DEFAULT_COLLECTIONS: Partial<Record<ConsoleId, string>> = {
+export const DEFAULT_COLLECTIONS: Partial<Record<ConsoleId, string>> = {
   nes: 'No-Intro_NES',
   snes: 'bahamut-lagoon-japan-espanol',
   gb: 'gameboy_202401', gbc: 'gbc_20240311', gba: 'gba-pal', psx: 'chd_psx_eur' }

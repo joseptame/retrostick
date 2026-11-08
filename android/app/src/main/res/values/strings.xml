@@ -85,4 +85,6 @@
     <string name="update_allow">Activa «Permitir» para RetroStick y vuelve a pulsar Instalar</string>
     <string name="update_downloading">Descargando la actualización…</string>
     <string name="update_failed">No se pudo descargar: %1$s</string>
+    <string name="set_shop">RetroShop</string>
+    <string name="set_shop_sub">Descarga juegos con el mando</string>
 </resources>
