@@ -881,11 +881,11 @@ class MainActivity : Activity() {
             // The button that opens the manual, drawn (the word "Create" read like "crear")
             if (manualPill.visibility == View.VISIBLE || (listMode && homeList.view.visibility == View.VISIBLE && currentManual() != null)) {
                 addHint(Glyph.Pill(manualGlyph()), R.string.hint_manual)
-                // Share icon left of the "Share" box
-                if (manualGlyph() == "Share") (hints.getChildAt(hints.childCount - 1) as? LinearLayout)?.addView(
-                    ImageView(this).apply { setImageResource(R.drawable.ic_share); setColorFilter(getColor(R.color.chip_text)) },
-                    0, LinearLayout.LayoutParams(dp(15), dp(15)).apply { marginEnd = dp(5) },
-                )
+                // The Share button's symbol inside its box, left of the word
+                if (manualGlyph() == "Share") ((hints.getChildAt(hints.childCount - 1) as? LinearLayout)?.getChildAt(0) as? TextView)?.apply {
+                    setCompoundDrawablesRelative(getDrawable(R.drawable.ic_share)!!.mutate().apply { setTint(getColor(R.color.chip_text)); setBounds(0, 0, dp(10), dp(10)) }, null, null, null)
+                    compoundDrawablePadding = dp(2)
+                }
             }
             addHint(Glyph.Pill(when (padStyle) { PadStyle.XBOX -> "LT"; PadStyle.NINTENDO -> "ZL"; else -> "L2" }), R.string.hint_search)
             addHint(Glyph.Pill(when (padStyle) { PadStyle.XBOX -> "Menu"; PadStyle.NINTENDO -> "+"; else -> "Options" }), R.string.hint_view)
