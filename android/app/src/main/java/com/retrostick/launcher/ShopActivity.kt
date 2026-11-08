@@ -58,6 +58,21 @@ class ShopActivity : Activity() {
     private val tabViews = mutableListOf<View>()
     private val filterViews = mutableListOf<TextView>()
     private val cards = mutableListOf<Card>()
+    // Header download pill
+    private lateinit var statusPill: View
+    private lateinit var statusBar: View
+    // Ficha (game sheet)
+    private lateinit var fichaPanel: View
+    private lateinit var fichaCover: ImageView
+    private lateinit var fichaTitle: TextView
+    private lateinit var fichaMeta: TextView
+    private lateinit var fichaInfo: TextView
+    private lateinit var fichaStatus: TextView
+    private lateinit var fichaTrack: View
+    private lateinit var fichaBar: View
+    private val fichaButtons = mutableListOf<TextView>()
+    private var ficha: ShopGame? = null
+    private var fichaButton = 0
 
     // Pairing (first time): QR + code on screen, the phone leaves the pass in Drive (ShopPairing).
     private val main = Handler(Looper.getMainLooper())
@@ -162,8 +177,22 @@ class ShopActivity : Activity() {
         })
         subtitle = text(10f, R.color.text_3).apply { setPadding(dp(14), dp(3), 0, 0); maxLines = 1; ellipsize = TextUtils.TruncateAt.END }
         header.addView(subtitle, LinearLayout.LayoutParams(0, -2, 1f))
-        status = text(10.5f, R.color.text_2).apply { gravity = Gravity.END; maxLines = 1 }
-        header.addView(status, LinearLayout.LayoutParams(dp(330), -2))
+        // Download pill: what is downloading and how far it got (hidden when idle)
+        status = text(10f, R.color.text).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END }
+        statusBar = View(this).apply { background = round(getColor(R.color.ok), 2) }
+        val track = FrameLayout(this).apply {
+            background = round(Color.parseColor("#26FFFFFF"), 2)
+            addView(statusBar, FrameLayout.LayoutParams(0, -1))
+        }
+        statusPill = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(12), dp(6), dp(12), dp(7))
+            background = round(getColor(R.color.surface), 12).apply { setStroke(dp(1), getColor(R.color.surface_border)) }
+            addView(status)
+            addView(track, LinearLayout.LayoutParams(-1, dp(3)).apply { topMargin = dp(5) })
+            visibility = View.GONE
+        }
+        header.addView(statusPill, LinearLayout.LayoutParams(dp(300), -2))
         col.addView(header)
 
         tabs = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
@@ -238,6 +267,7 @@ class ShopActivity : Activity() {
             addView(qrView, LinearLayout.LayoutParams(dp(210), dp(210)).apply { marginEnd = dp(40) })
             addView(info)
         }
+        root.addView(buildFicha(), FrameLayout.LayoutParams(-1, -1))
         root.addView(pairPanel, FrameLayout.LayoutParams(-1, -1))
 
         col.addView(text(9.5f, R.color.text_3).apply {
@@ -245,6 +275,54 @@ class ShopActivity : Activity() {
             gravity = Gravity.END
         })
         return root
+    }
+
+    /** Ficha: big cover on the left; title, rating, size, download progress and buttons on the right. */
+    private fun buildFicha(): View {
+        fichaCover = ImageView(this).apply {
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            clipToOutline = true
+            setBackgroundResource(R.drawable.bg_cover)
+            elevation = dp(10).toFloat()
+        }
+        fichaTitle = text(24f, R.color.text).apply { typeface = resources.getFont(R.font.inter_extrabold); maxLines = 2 }
+        fichaMeta = text(12.5f, R.color.brand_accent).apply { typeface = resources.getFont(R.font.inter_semibold) }
+        fichaInfo = text(11f, R.color.text_3).apply { setLineSpacing(0f, 1.35f) }
+        fichaStatus = text(11f, R.color.text_2)
+        fichaBar = View(this).apply { background = round(getColor(R.color.ok), 3) }
+        fichaTrack = FrameLayout(this).apply {
+            background = round(Color.parseColor("#26FFFFFF"), 3)
+            addView(fichaBar, FrameLayout.LayoutParams(0, -1))
+        }
+        val buttons = LinearLayout(this)
+        repeat(2) {
+            val b = text(13f, R.color.text).apply {
+                typeface = resources.getFont(R.font.inter_bold)
+                gravity = Gravity.CENTER
+                setPadding(dp(22), 0, dp(22), 0)
+            }
+            buttons.addView(b, LinearLayout.LayoutParams(-2, dp(44)).apply { marginEnd = dp(12) })
+            fichaButtons += b
+        }
+        val info = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(fichaTitle)
+            addView(fichaMeta, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(8) })
+            addView(fichaInfo, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(14) })
+            addView(fichaStatus, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(22) })
+            addView(fichaTrack, LinearLayout.LayoutParams(dp(FICHA_BAR_DP), dp(6)).apply { topMargin = dp(8) })
+            addView(buttons, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(18) })
+        }
+        fichaPanel = LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(70), 0, dp(60), 0)
+            setBackgroundResource(R.drawable.bg_screen)
+            isClickable = true
+            visibility = View.GONE
+            addView(fichaCover, LinearLayout.LayoutParams(dp(250), dp(250)).apply { marginEnd = dp(40) })
+            addView(info, LinearLayout.LayoutParams(0, -2, 1f))
+        }
+        return fichaPanel
     }
 
     private inner class Card {
@@ -455,14 +533,20 @@ class ShopActivity : Activity() {
 
     private fun renderStatus() {
         val job = ShopDownloads.active
-        val queued = ShopDownloads.jobs.count { it.state == ShopDownloads.State.QUEUED }
+        val queued = ShopDownloads.jobs.count { it.state == ShopDownloads.State.QUEUED } - if (job?.state == ShopDownloads.State.QUEUED) 1 else 0
+        val last = ShopDownloads.jobs.lastOrNull()
         status.text = when {
-            job != null -> "⬇ ${job.game.title} · ${(job.progress * 100).toInt()} %" +
-                if (queued > (if (job.state == ShopDownloads.State.QUEUED) 1 else 0)) " · ${queued} en cola" else ""
-            ShopDownloads.jobs.lastOrNull()?.state == ShopDownloads.State.ERROR -> "No se pudo descargar ${ShopDownloads.jobs.last().game.title}"
-            ShopDownloads.jobs.isNotEmpty() -> "Descargas terminadas · se suben a Drive solas"
+            job != null -> "⬇  ${job.game.title}  ${(job.progress * 100).toInt()} %" + if (queued > 0) "  ·  $queued en cola" else ""
+            last?.state == ShopDownloads.State.ERROR -> "✕  No se pudo descargar ${last.game.title}"
+            last != null -> "✓  ${last.game.title} ya está en el stick"
             else -> ""
         }
+        statusPill.visibility = if (last == null) View.GONE else View.VISIBLE
+        statusBar.background = round(getColor(if (last?.state == ShopDownloads.State.ERROR) R.color.xbox_b else R.color.ok), 2)
+        statusBar.layoutParams = (statusBar.layoutParams as FrameLayout.LayoutParams).apply {
+            width = ((dp(300) - dp(24)) * (job?.progress ?: 1f)).toInt()
+        }
+        renderFicha()
     }
 
     // ---- Input ----
@@ -487,6 +571,16 @@ class ShopActivity : Activity() {
     private fun onKey(code: Int) {
         if (pairPanel.visibility == View.VISIBLE) {
             if (code == KeyEvent.KEYCODE_BACK || code == KeyEvent.KEYCODE_BUTTON_B) finish()
+            return
+        }
+        if (ficha != null) {
+            when (code) {
+                KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_BUTTON_B -> closeFicha()
+                KeyEvent.KEYCODE_DPAD_LEFT -> { fichaButton = 0; renderFicha() }
+                KeyEvent.KEYCODE_DPAD_RIGHT -> { fichaButton = 1; renderFicha() }
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER,
+                KeyEvent.KEYCODE_BUTTON_A -> fichaAction()
+            }
             return
         }
         when (code) {
@@ -546,7 +640,7 @@ class ShopActivity : Activity() {
                 genre = if (which == 0) null else counts[which - 1].key
                 applyFilters(resetSelection = true)
             }
-            .show()
+            .showForPad()
     }
 
     /** The TV's on-screen keyboard: type part of a title ("zelda", "mario kart"). */
@@ -577,30 +671,79 @@ class ShopActivity : Activity() {
             .setNegativeButton("Cancelar", null)
             .create()
         dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
+        dialog.padKeys()
         dialog.show()
         input.requestFocus()
     }
 
+    // ---- Ficha (game sheet): own overlay driven by onKey, not a dialog (see PadDialog.kt) ----
+
     private fun showGame(g: ShopGame) {
-        val cat = catalog ?: return
+        ficha = g
+        fichaButton = 0
+        fichaCover.setImageDrawable(null)
+        loadCover(g) { bmp -> if (ficha === g) fichaCover.setImageBitmap(bmp) }
+        fichaTitle.text = g.title
+        fichaMeta.text = listOfNotNull(
+            g.rating?.let { "★ " + String.format("%.1f", it).replace('.', ',') },
+            g.year?.toString(),
+            g.genres.joinToString(", ").takeIf { it.isNotEmpty() },
+        ).joinToString("   ·   ")
         val size = sizeOf(g)
-        val lines = listOfNotNull(
-            listOfNotNull(g.rating?.let { "★ " + String.format("%.1f", it).replace('.', ',') }, g.year?.toString(), g.genres.joinToString(", ").takeIf { it.isNotEmpty() })
-                .joinToString(" · ").takeIf { it.isNotEmpty() },
-            g.name,
+        fichaInfo.text = listOf(
             if (g.discs.size > 1) "${g.discs.size} discos · $size" else size,
-        )
+            console.name,
+            g.name,
+        ).joinToString("\n")
+        fichaPanel.visibility = View.VISIBLE
+        renderFicha()
+    }
+
+    private fun closeFicha() {
+        ficha = null
+        fichaPanel.visibility = View.GONE
+        renderGrid()
+    }
+
+    /** Buttons and progress of the open sheet; also called on every download update. */
+    private fun renderFicha() {
+        val g = ficha ?: return
         val job = ShopDownloads.jobFor(g)
-        val builder = AlertDialog.Builder(this, R.style.Dialog_RetroStick).setTitle(g.title)
-        when {
-            isOwned(g) -> builder.setMessage(lines.joinToString("\n") + "\n\nYa está en el stick.").setPositiveButton("Cerrar", null)
-            job?.state == ShopDownloads.State.RUNNING || job?.state == ShopDownloads.State.QUEUED ->
-                builder.setMessage(lines.joinToString("\n") + "\n\nSe está descargando.").setPositiveButton("Cerrar", null)
-            else -> builder.setMessage(lines.joinToString("\n") + "\n\nSe guarda en el stick y se copia a tu Drive.")
-                .setPositiveButton("Descargar") { _, _ -> ShopDownloads.enqueue(this, cat, g) }
-                .setNegativeButton("Cancelar", null)
+        val state = job?.state
+        val (first, status) = when {
+            isOwned(g) -> "✓  En el stick" to "Ya está en el stick: aparece en la pestaña ${console.name} del inicio."
+            state == ShopDownloads.State.RUNNING -> "Descargando  ${(job.progress * 100).toInt()} %" to
+                "${Formatter.formatShortFileSize(this, job.done)} de ${Formatter.formatShortFileSize(this, job.total)} · puedes seguir mirando la tienda"
+            state == ShopDownloads.State.QUEUED -> "En cola…" to "Empezará cuando termine la descarga anterior."
+            state == ShopDownloads.State.ERROR -> "↻  Reintentar" to "No se pudo descargar: ${job.error}"
+            else -> "⬇  Descargar" to "Se guarda en el stick y se copia a tu Drive."
         }
-        builder.show()
+        fichaStatus.text = status
+        val running = state == ShopDownloads.State.RUNNING || state == ShopDownloads.State.QUEUED
+        fichaTrack.visibility = if (running) View.VISIBLE else View.INVISIBLE
+        fichaBar.layoutParams = (fichaBar.layoutParams as FrameLayout.LayoutParams).apply {
+            width = (dp(FICHA_BAR_DP) * (job?.progress ?: 0f)).toInt()
+        }
+        val labels = listOf(first, "Volver")
+        fichaButtons.forEachIndexed { i, b ->
+            b.text = labels[i]
+            val focus = i == fichaButton
+            val primary = i == 0 && !isOwned(g) && !running
+            b.background = round(if (focus) Color.WHITE else getColor(R.color.surface), 22).apply {
+                setStroke(dp(1), if (focus) Color.WHITE else getColor(R.color.surface_border))
+            }
+            b.setTextColor(if (focus) getColor(R.color.button_text) else if (primary) Color.WHITE else getColor(R.color.text_2))
+        }
+    }
+
+    private fun fichaAction() {
+        val g = ficha ?: return
+        if (fichaButton == 1) return closeFicha()
+        val cat = catalog ?: return
+        val state = ShopDownloads.jobFor(g)?.state
+        if (isOwned(g) || state == ShopDownloads.State.RUNNING || state == ShopDownloads.State.QUEUED) return
+        ShopDownloads.enqueue(this, cat, g)
+        renderFicha()
     }
 
     // ---- Helpers ----
@@ -621,6 +764,7 @@ class ShopActivity : Activity() {
     companion object {
         const val EXTRA_CONSOLE = "console"
         private const val POLL_MS = 3000L
+        private const val FICHA_BAR_DP = 320
         private const val COLUMNS = 8
         private const val ROWS = 2
         private const val CARD_DP = 98

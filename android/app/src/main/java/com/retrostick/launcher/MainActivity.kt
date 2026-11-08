@@ -594,7 +594,7 @@ class MainActivity : Activity() {
             else -> getString(R.string.drive_last_sync, ago)
         }
         settings[8].subtitle = if (connected) driveAuth.email ?: getString(R.string.drive_connected) else getString(R.string.drive_not_connected)
-        settings[9].subtitle = Updater.available?.let { getString(R.string.update_available_sub, it.versionName) }
+        settings[10].subtitle = Updater.available?.let { getString(R.string.update_available_sub, it.versionName) }
             ?: getString(R.string.update_current, BuildConfig.VERSION_NAME)
         settings[2].subtitle = net?.let { "Conectado por $it" } ?: getString(R.string.offline)
         settings[5].subtitle = if (pads.isEmpty()) "Ninguno" else pads.joinToString(", ")
@@ -835,7 +835,7 @@ class MainActivity : Activity() {
             .setView(box)
             .setNegativeButton(R.string.cancel) { _, _ -> loginCancelled = true }
             .setOnCancelListener { loginCancelled = true }
-            .show()
+            .showForPad()
 
         Thread {
             try {
@@ -881,7 +881,7 @@ class MainActivity : Activity() {
             .setPositiveButton(R.string.update_install) { _, _ -> installUpdate(update) }
             .setNegativeButton(R.string.update_later) { _, _ -> Updater.dismissedVersion = update.versionCode }
             .setOnCancelListener { Updater.dismissedVersion = update.versionCode }
-            .show()
+            .showForPad()
     }
 
     private fun installUpdate(update: Updater.Update) {
@@ -914,7 +914,7 @@ class MainActivity : Activity() {
                 render()
             }
             .setNegativeButton(R.string.cancel, null)
-            .show()
+            .showForPad()
     }
 
     private fun formatAgo(millis: Long): String {
@@ -963,7 +963,7 @@ class MainActivity : Activity() {
             .setTitle(game.title)
             .setMessage(text.trim())
             .setPositiveButton("Cerrar", null)
-            .show()
+            .showForPad()
     }
 
     private fun render() {
