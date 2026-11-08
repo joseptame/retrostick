@@ -164,6 +164,8 @@ class ShopActivity : Activity() {
 
     override fun onPause() {
         super.onPause()
+        // The trailer would keep playing behind another app
+        closeTrailer()
         ShopDownloads.removeListener(downloadsListener)
         main.removeCallbacks(pollPairing)
     }
@@ -855,6 +857,7 @@ class ShopActivity : Activity() {
     }
 
     private fun closeFicha() {
+        closeTrailer()
         ficha = null
         fichaPanel.visibility = View.GONE
         renderGrid()
@@ -925,6 +928,10 @@ class ShopActivity : Activity() {
         listOfNotNull(first, fichaIgdb?.trailerId?.let { TRAILER }, BACK)
 
     private fun fichaKey(code: Int) {
+        if (trailer != null) {
+            if (code == KeyEvent.KEYCODE_BACK || code == KeyEvent.KEYCODE_BUTTON_B) closeTrailer()
+            return
+        }
         if (viewerIndex >= 0) return viewerKey(code)
         val g = ficha ?: return
         val labels = fichaLabels("")
@@ -957,8 +964,44 @@ class ShopActivity : Activity() {
     }
 
     /** YouTube app on the TV; the browser if it is missing. */
+    private var trailer: android.webkit.WebView? = null
+
+    /**
+     * Trailer inside the ficha, full screen: YouTube's embedded player in a WebView (as the webapp does).
+     * The page is given the webapp's address as origin, which the embed needs. ○ closes it.
+     */
     private fun playTrailer() {
         val id = fichaIgdb?.trailerId ?: return
+        val web = runCatching {
+            android.webkit.WebView(this).apply {
+                setBackgroundColor(Color.BLACK)
+                settings.javaScriptEnabled = true
+                settings.domStorageEnabled = true
+                settings.mediaPlaybackRequiresUserGesture = false
+                webChromeClient = android.webkit.WebChromeClient()
+                isFocusable = false
+            }
+        }.getOrNull() ?: return openTrailerApp(id)
+        val html = """<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
+            <style>html,body{margin:0;height:100%;background:#000;overflow:hidden}iframe{position:fixed;inset:0;width:100%;height:100%;border:0}</style></head>
+            <body><iframe src="https://www.youtube-nocookie.com/embed/$id?autoplay=1&rel=0&modestbranding=1&playsinline=1&iv_load_policy=3"
+            allow="autoplay; encrypted-media; fullscreen"></iframe></body></html>"""
+        web.loadDataWithBaseURL(BuildConfig.WEBAPP_URL, html, "text/html", "utf-8", null)
+        (fichaPanel as FrameLayout).addView(web, FrameLayout.LayoutParams(-1, -1))
+        trailer = web
+    }
+
+    private fun closeTrailer() {
+        trailer?.let {
+            (fichaPanel as FrameLayout).removeView(it)
+            it.loadUrl("about:blank")
+            it.destroy()
+        }
+        trailer = null
+    }
+
+    /** No WebView on this device: the YouTube app (or the browser). */
+    private fun openTrailerApp(id: String) {
         val app = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("vnd.youtube:$id"))
         val web = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://www.youtube.com/watch?v=$id"))
         runCatching { startActivity(app) }.recoverCatching { startActivity(web) }
