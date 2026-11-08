@@ -152,15 +152,20 @@ object ShopApi {
     }
 
     /** The webapp ficha data for a title (api/igdb.ts): description, trailer, screenshots; null if IGDB has none. */
-    fun igdb(title: String, console: String): IgdbInfo? {
+    fun igdb(title: String, console: String): IgdbInfo? = runCatching { igdbOrThrow(title, console) }.getOrNull()
+
+    /** Same, but a failed request (no internet, server error, not paired) throws; null only means IGDB has none. */
+    fun igdbOrThrow(title: String, console: String): IgdbInfo? {
         val conn = open("${BuildConfig.WEBAPP_URL}/api/igdb?title=${URLEncoder.encode(title, "UTF-8")}&console=$console")
         val json = try {
-            if (conn.responseCode != 200) return null
+            if (conn.responseCode != 200) throw IllegalStateException("La webapp respondió ${conn.responseCode}")
+            if (conn.contentType?.startsWith("application/json") != true) throw NotPairedException()
             JSONObject(conn.inputStream.bufferedReader().readText())
         } finally {
             conn.disconnect()
         }
-        if (json.optBoolean("found", true).not() || json.has("error")) return null
+        if (json.has("error")) throw IllegalStateException(json.optString("error"))
+        if (json.optBoolean("found", true).not()) return null
         val shots = json.optJSONArray("screenshots")
         return IgdbInfo(
             description = json.optString("description").takeIf { it.isNotEmpty() && it != "null" },

@@ -97,15 +97,15 @@
         android:id="@+id/gamePanel"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="161dp"
+        android:layout_marginTop="152dp"
         android:orientation="horizontal"
         android:paddingStart="40dp"
         android:paddingEnd="40dp">
 
         <FrameLayout
             android:id="@+id/hero"
-            android:layout_width="190dp"
-            android:layout_height="190dp"
+            android:layout_width="150dp"
+            android:layout_height="200dp"
             android:background="@drawable/bg_hero"
             android:elevation="10dp"
             android:foreground="@drawable/fg_hero_border">
@@ -129,10 +129,10 @@
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="32dp"
+            android:layout_marginStart="24dp"
             android:layout_weight="1"
             android:orientation="vertical"
-            android:paddingTop="3dp">
+            android:paddingTop="0dp">
 
             <TextView
                 android:id="@+id/gameTitle"
@@ -143,20 +143,37 @@
                 android:letterSpacing="-0.02"
                 android:maxLines="1"
                 android:textColor="@color/text"
-                android:textSize="32sp" />
+                android:textSize="28sp"
+                android:autoSizeTextType="uniform"
+                android:autoSizeMinTextSize="17sp"
+                android:autoSizeMaxTextSize="28sp" />
 
             <TextView
                 android:id="@+id/gameMeta"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
+                android:ellipsize="end"
+                android:fontFamily="@font/inter_semibold"
+                android:maxLines="1"
+                android:textColor="@color/brand_accent"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/gameDesc"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:ellipsize="end"
+                android:lineSpacingMultiplier="1.3"
+                android:maxLines="3"
                 android:textColor="@color/text_2"
-                android:textSize="12sp" />
+                android:textSize="10.5sp" />
 
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="19dp"
+                android:layout_marginTop="10dp"
                 android:orientation="horizontal">
 
                 <LinearLayout style="@style/InfoColumn">
@@ -178,7 +195,7 @@
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="22dp"
+                android:layout_marginTop="12dp"
                 android:background="@drawable/bg_play"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"

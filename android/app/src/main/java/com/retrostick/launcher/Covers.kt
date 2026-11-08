@@ -52,6 +52,9 @@ class CoverLoader(context: Context) {
         }
     }
 
+    /** Blocking: downloads an image by URL into the disk cache (nothing decoded), for the fichas' prefetch. */
+    fun prefetchUrl(url: String) { locked(url) { urlFile(url) } }
+
     private fun urlFile(url: String): File? {
         val byUrl = File(dir, "url").apply { mkdirs() }
         val name = java.security.MessageDigest.getInstance("SHA-1").digest(url.toByteArray())

@@ -934,7 +934,9 @@ class ShopActivity : Activity() {
         renderFicha()
         // Description, trailer and screenshots, like the webapp
         io.execute {
-            val info = runCatching { ShopApi.igdb(g.title, console.id) }.getOrNull()
+            // The ficha kept on the stick when there is one (games on the stick: Fichas), else from the webapp
+            val info = Fichas.cached(this, g.title, console.id)?.takeIf { !it.stale }?.info
+                ?: runCatching { ShopApi.igdb(g.title, console.id) }.getOrNull()
             runOnUiThread {
                 if (ficha !== g) return@runOnUiThread
                 fichaIgdb = info

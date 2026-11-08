@@ -43,8 +43,6 @@ class HomeList(private val ctx: Context, private val covers: CoverLoader) {
     )
 
     private val main = Handler(Looper.getMainLooper())
-    private val io = Executors.newSingleThreadExecutor()
-    private val info = HashMap<String, IgdbInfo?>()
     private var pending: String? = null
 
     val backdrop = ImageView(ctx).apply { scaleType = ImageView.ScaleType.CENTER_CROP; alpha = 0.5f; visibility = View.GONE }
@@ -219,9 +217,10 @@ class HomeList(private val ctx: Context, private val covers: CoverLoader) {
                 covers.load(g, dp(132)) { b -> if (cover.tag == g.key) cover.setImageBitmap(b ?: logoCover(ctx, g.console, dp(132))) }
             }
         }
-        val igdbKey = "${sheet.consoleId}|${sheet.title}"
-        val known = info.containsKey(igdbKey)
-        val i = info[igdbKey]
+        // The ficha kept on the stick (Fichas): at once; fetched (or refreshed) when missing or old
+        val entry = Fichas.cached(ctx, sheet.title, sheet.consoleId)
+        val known = entry != null || Fichas.failed(sheet.title, sheet.consoleId)
+        val i = entry?.info
         meta.text = listOfNotNull(
             i?.rating?.let { "★ " + String.format("%.1f", it).replace('.', ',') },
             i?.year?.toString(),
@@ -240,8 +239,8 @@ class HomeList(private val ctx: Context, private val covers: CoverLoader) {
         }
         media = i
         renderMedia()
-        if (!known) fetch(igdbKey, sheet)
-        else i?.screenshots?.firstOrNull()?.let { url ->
+        if (entry == null || entry.stale) fetch(sheet)
+        i?.screenshots?.firstOrNull()?.let { url ->
             if (backdrop.tag != url) {
                 backdrop.tag = url
                 covers.loadUrl(url, dp(480)) { b -> if (backdrop.tag == url && view.visibility == View.VISIBLE) { backdrop.setImageBitmap(b); backdrop.visibility = if (b != null) View.VISIBLE else View.GONE } }
@@ -249,29 +248,18 @@ class HomeList(private val ctx: Context, private val covers: CoverLoader) {
         }
     }
 
-    /** IGDB data through the webapp (same as the shop's ficha), a short moment after the selection settles. */
-    private fun fetch(key: String, sheet: Sheet) {
+    /** A ficha not on the stick yet: asked for a short moment after the selection settles (Fichas tells MainActivity). */
+    private fun fetch(sheet: Sheet) {
+        val key = "${sheet.consoleId}|${sheet.title}"
         pending = key
-        main.postDelayed({
-            if (pending != key) return@postDelayed
-            io.execute {
-                val r = runCatching { ShopApi.igdb(sheet.title, sheet.consoleId) }.getOrNull()
-                main.post {
-                    info[key] = r
-                    if (pending == key) onUpdate?.invoke()
-                }
-            }
-        }, 250)
+        main.postDelayed({ if (pending == key) Fichas.request(ctx, sheet.title, sheet.consoleId) }, 250)
     }
-
-    /** Called when IGDB data arrives (MainActivity re-renders). */
-    var onUpdate: (() -> Unit)? = null
 
     /** Trailer thumbnail first (with a play badge), then screenshots. */
     val mediaUrls: List<String>
         get() {
             val i = media ?: return emptyList()
-            return (listOfNotNull(i.trailerId?.let { "https://i.ytimg.com/vi/$it/mqdefault.jpg" }) + i.screenshots).take(MAX_MEDIA)
+            return Fichas.mediaUrls(i, MAX_MEDIA)
         }
 
     private fun renderMedia() {

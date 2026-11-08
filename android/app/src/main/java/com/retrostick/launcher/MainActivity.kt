@@ -75,6 +75,19 @@ class MainActivity : Activity() {
     private lateinit var homeList: HomeList
     private lateinit var homeSearch: HomeSearch
     private lateinit var manualPill: TextView
+    // Covers view: the selected game's screenshot behind everything, its description, trailer and screenshots
+    private lateinit var coversBackdrop: ImageView
+    private lateinit var coversShade: View
+    private lateinit var gameDesc: TextView
+    private lateinit var coverLoading: LoadingBars
+    private lateinit var mediaCol: LinearLayout
+    private lateinit var mediaBig: ImageView
+    private val mediaThumbs = mutableListOf<ImageView>()
+    /** Covers view: -1 = the shelf has the focus; otherwise the trailer / screenshot with the focus (▲ from the shelf) */
+    private var mediaFocus = -1
+    private var mediaUrls = listOf<String>()
+    private var mediaTrailer = false
+    private var fichaPending: String? = null
     private val homePrefs by lazy { getSharedPreferences("home", MODE_PRIVATE) }
     private var listMode: Boolean
         get() = homePrefs.getBoolean("list", false)
@@ -252,8 +265,42 @@ class MainActivity : Activity() {
             root.addView(hl.backdrop, 0, FrameLayout.LayoutParams(-1, -1))
             root.addView(hl.shade, 1, FrameLayout.LayoutParams(-1, -1))
             root.addView(hl.view, root.indexOfChild(splash), FrameLayout.LayoutParams(-1, -1).apply { topMargin = dp(150); bottomMargin = dp(40) })
-            hl.onUpdate = { render() }
         }
+        coversBackdrop = ImageView(this).apply { scaleType = ImageView.ScaleType.CENTER_CROP; alpha = 0.85f; visibility = View.GONE }
+        root.addView(coversBackdrop, 0, FrameLayout.LayoutParams(dp(750), -1, Gravity.END))
+        coversShade = FrameLayout(this).apply {
+            visibility = View.GONE
+            // Dark on the left (text), the screenshot showing on the right; dark at the top (tabs) and bottom (shelf)
+            addView(View(this@MainActivity).apply {
+                background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
+                    intArrayOf(0xFF0D0B1F.toInt(), 0xFF0D0B1F.toInt(), 0xE00D0B1F.toInt(), 0x990D0B1F.toInt(), 0x5C0D0B1F.toInt(), 0x2E0D0B1F))
+            }, FrameLayout.LayoutParams(-1, -1))
+            addView(View(this@MainActivity).apply {
+                background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                    intArrayOf(0xEB0D0B1F.toInt(), 0x800D0B1F.toInt(), 0x100D0B1F, 0x000D0B1F, 0x000D0B1F, 0x200D0B1F, 0x900D0B1F.toInt(), 0xD00D0B1F.toInt(), 0xF50D0B1F.toInt(), 0xFF0D0B1F.toInt()))
+            }, FrameLayout.LayoutParams(-1, -1))
+        }
+        root.addView(coversShade, 1, FrameLayout.LayoutParams(-1, -1))
+        gameDesc = findViewById(R.id.gameDesc)
+        coverLoading = LoadingBars(this, lines = 3)
+        (gameDesc.parent as LinearLayout).let { col -> col.addView(coverLoading, col.indexOfChild(gameDesc) + 1, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) }) }
+        mediaBig = mediaImage(10)
+        mediaCol = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            clipChildren = false
+            visibility = View.GONE
+            addView(TextView(this@MainActivity).apply {
+                text = "TRÁILER Y CAPTURAS"; letterSpacing = 0.15f
+                setTextColor(getColor(R.color.text_2)); setTextSize(TypedValue.COMPLEX_UNIT_SP, 8.5f)
+            })
+            addView(mediaBig, LinearLayout.LayoutParams(dp(240), dp(135)).apply { topMargin = dp(5) })
+            addView(LinearLayout(this@MainActivity).apply {
+                clipChildren = false
+                repeat(3) { i -> addView(mediaImage(7).also { mediaThumbs += it }, LinearLayout.LayoutParams(dp(76), dp(43)).apply { if (i < 2) marginEnd = dp(6) }) }
+            }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(6) })
+        }
+        (gamePanel as LinearLayout).apply { clipChildren = false }.addView(mediaCol, LinearLayout.LayoutParams(dp(240), -2).apply { marginStart = dp(20) })
+        Fichas.addListener(fichaListener)
         homeSearch = HomeSearch(this, covers).also { hs ->
             root.addView(hs.view, root.indexOfChild(splash), FrameLayout.LayoutParams(-1, -1))
             hs.candidates = { searchCandidates() }
@@ -443,6 +490,8 @@ class MainActivity : Activity() {
                 updateTabCounts()
                 buildShelf()
                 render()
+                // Every game's ficha (and its screenshots) on the stick, in the background
+                Fichas.prefetch(this, scanned.values.flatten(), covers)
                 libraryLoaded = true
                 maybeHideSplash()
             }
@@ -621,7 +670,7 @@ class MainActivity : Activity() {
         val drive = driveRow
         val sel = selected[tab]
         coverViews.forEachIndexed { i, v ->
-            v.background = if (!drive && i == sel && zone == Zone.CONTENT) getDrawable(R.drawable.bg_cover_sel) else null
+            v.background = if (!drive && i == sel && zone == Zone.CONTENT && mediaFocus < 0) getDrawable(R.drawable.bg_cover_sel) else null
         }
         driveViews.forEachIndexed { i, v ->
             v.background = if (drive && i == driveSel[tab] && zone == Zone.CONTENT) getDrawable(R.drawable.bg_cover_sel) else null
@@ -664,11 +713,30 @@ class MainActivity : Activity() {
             return
         }
         findViewById<TextView>(R.id.gameTitle).text = game.title
+        // The ficha kept on the stick (Fichas): rating, year, genres, players, description, trailer, screenshots
+        val entry = Fichas.cached(this, game.title, game.console.id)
+        val info = entry?.info
+        val known = entry != null || Fichas.failed(game.title, game.console.id)
+        if (entry == null || entry.stale) requestFicha(game.title, game.console.id)
         findViewById<TextView>(R.id.gameMeta).text =
             listOfNotNull(
-                console.name, game.region, if (drive != null) getString(R.string.in_drive_meta) else null,
+                info?.rating?.let { "★ " + String.format("%.1f", it).replace('.', ',') },
+                info?.year?.toString(),
+                info?.genres?.take(2)?.joinToString(", ")?.takeIf { it.isNotEmpty() },
+                info?.players?.takeIf { it >= 2 }?.let { "👥 Hasta $it" },
+                console.name.takeIf { info == null }, game.region,
+                if (drive != null) getString(R.string.in_drive_meta) else null,
                 game.finished?.let { "🏆 Terminado" },
-            ).joinToString(" · ")
+            ).joinToString("  ·  ")
+        gameDesc.text = when {
+            info?.description != null -> info.description
+            !known -> ""
+            ShopApi.token == null -> "Vincula RetroShop (Retro Ajustes) para ver la descripción, el tráiler y las capturas."
+            else -> ""
+        }
+        gameDesc.visibility = if (gameDesc.text.isNullOrEmpty()) View.GONE else View.VISIBLE
+        coverLoading.show(!known && !listMode)
+        bindCoverMedia(game.key, info)
         findViewById<TextView>(R.id.lastPlayed).text = formatWhen(game.lastPlayed)
         findViewById<TextView>(R.id.timePlayed).text = formatDuration(game.runtimeSeconds)
         findViewById<TextView>(R.id.saveState).apply {
@@ -693,8 +761,97 @@ class MainActivity : Activity() {
             heroFallback.text = game.title
             heroImage.setImageDrawable(null)
             heroImage.tag = game.key
-            covers.load(game, dp(190)) { bitmap -> if (heroImage.tag == game.key) heroImage.setImageBitmap(bitmap ?: logoCover(this, game.console, dp(190))) }
+            covers.load(game, dp(200)) { bitmap ->
+                if (heroImage.tag != game.key) return@load
+                val b = bitmap ?: logoCover(this, game.console, dp(200))
+                heroImage.setImageBitmap(b)
+                sizeHero(b.width, b.height)
+            }
         }
+    }
+
+    /** The big cover keeps the box's shape (landscape SNES / GBA boxes, portrait Mega Drive), within 150×200 dp. */
+    private fun sizeHero(w: Int, h: Int) {
+        if (w <= 0 || h <= 0) return
+        val aspect = w.toFloat() / h
+        var hw = dp(150)
+        var hh = (hw / aspect).toInt()
+        if (hh > dp(200)) { hh = dp(200); hw = (hh * aspect).toInt() }
+        val lp = hero.layoutParams
+        if (lp.width != hw || lp.height != hh) { lp.width = hw; lp.height = hh; hero.layoutParams = lp }
+    }
+
+    /** A ficha not kept yet: asked for a moment after the selection settles. */
+    private fun requestFicha(title: String, console: String) {
+        val k = "$console|$title"
+        if (fichaPending == k) return
+        fichaPending = k
+        main.postDelayed({
+            if (fichaPending == k) { fichaPending = null; Fichas.request(this, title, console) }
+        }, 250)
+    }
+
+    private val fichaListener: () -> Unit = { if (!isDestroyed) render() }
+
+    private fun mediaImage(radius: Int) = ImageView(this).apply {
+        scaleType = ImageView.ScaleType.CENTER_CROP
+        clipToOutline = true
+        background = GradientDrawable().apply { setColor(Color.parseColor("#14FFFFFF")); cornerRadius = dp(radius).toFloat() }
+    }
+
+    /** Trailer (big, with the play badge) and three screenshots on the right; the first screenshot as the backdrop. */
+    private fun bindCoverMedia(key: String, info: IgdbInfo?) {
+        val urls = info?.let { Fichas.mediaUrls(it, 4) }.orEmpty()
+        if (urls != mediaUrls) { mediaUrls = urls; mediaFocus = -1 }
+        mediaTrailer = info?.trailerId != null
+        mediaCol.visibility = if (urls.isEmpty()) View.GONE else View.VISIBLE
+        (listOf(mediaBig) + mediaThumbs).forEachIndexed { i, v ->
+            val url = urls.getOrNull(i)
+            v.visibility = if (url == null) View.INVISIBLE else View.VISIBLE
+            if (url != null && v.tag != url) {
+                v.tag = url
+                v.setImageDrawable(null)
+                covers.loadUrl(url, if (i == 0) dp(240) else dp(76)) { b -> if (v.tag == url) v.setImageBitmap(b) }
+            }
+            val focus = i == mediaFocus && zone == Zone.CONTENT
+            val play = if (i == 0 && mediaTrailer) getDrawable(R.drawable.ic_shop_play_badge) else null
+            val border = if (focus) getDrawable(R.drawable.fg_hero_border) else null
+            v.foreground = listOfNotNull(play, border).let { if (it.size > 1) android.graphics.drawable.LayerDrawable(it.toTypedArray()) else it.firstOrNull() }
+            v.scaleX = if (focus) 1.06f else 1f
+            v.scaleY = v.scaleX
+        }
+        val shot = info?.screenshots?.firstOrNull()
+        if (shot == null) { coversBackdrop.tag = null; coversBackdrop.setImageDrawable(null) }
+        else if (coversBackdrop.tag != shot) {
+            coversBackdrop.tag = shot
+            coversBackdrop.setImageDrawable(null)
+            covers.loadUrl(shot, dp(480)) { b -> if (coversBackdrop.tag == shot) { coversBackdrop.setImageBitmap(b); renderBackdrop() } }
+        }
+    }
+
+    /** The screenshot behind the covers view: only there, with a game selected. */
+    private fun renderBackdrop() {
+        val on = !listMode && !settingsTab && gamePanel.visibility == View.VISIBLE
+        coversShade.visibility = if (on) View.VISIBLE else View.GONE
+        coversBackdrop.visibility = if (on && coversBackdrop.drawable != null) View.VISIBLE else View.GONE
+    }
+
+    /** Covers view: ▲ from the shelf goes up to the trailer / screenshots; ◀ ▶ through them, ✕ opens, ▼ / ○ back. */
+    private fun handleCoverMediaKey(code: Int): Boolean {
+        val n = mediaUrls.size
+        if (mediaFocus >= 0) {
+            when (code) {
+                KeyEvent.KEYCODE_DPAD_LEFT -> mediaFocus = (mediaFocus - 1).coerceAtLeast(0)
+                KeyEvent.KEYCODE_DPAD_RIGHT -> mediaFocus = (mediaFocus + 1).coerceAtMost(n - 1)
+                KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_BUTTON_B -> mediaFocus = -1
+                KeyEvent.KEYCODE_DPAD_UP -> { mediaFocus = -1; zone = Zone.TABS }
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_BUTTON_A -> openMedia(mediaFocus)
+                else -> return false
+            }
+            return true
+        }
+        if (code == KeyEvent.KEYCODE_DPAD_UP && !driveRow && n > 0 && currentGame != null) { mediaFocus = 0; return true }
+        return false
     }
 
     // ---- Retro Ajustes ----
@@ -865,6 +1022,10 @@ class MainActivity : Activity() {
         val g = glyphs(padStyle)
         when {
             settingsTab -> addHint(g.confirm, R.string.hint_open)
+            !listMode && mediaFocus >= 0 -> {
+                addHint(g.confirm, R.string.hint_open)
+                g.back?.let { addHint(it, R.string.hint_back) }
+            }
             currentDrive != null -> {
                 addHint(g.confirm, R.string.hint_ficha)
                 g.back?.let { addHint(it, R.string.hint_back) }
@@ -985,7 +1146,7 @@ class MainActivity : Activity() {
     private var keySound: Sounds.Sound? = null
 
     private fun navState() =
-        "$tab/$zone/$settingIndex/${selected.joinToString()}/${inDrive.joinToString()}/${driveSel.joinToString()}/$listMode/${homeList.mediaFocus}"
+        "$tab/$zone/$settingIndex/${selected.joinToString()}/${inDrive.joinToString()}/${driveSel.joinToString()}/$listMode/${homeList.mediaFocus}/$mediaFocus"
 
     private fun onKey(code: Int) {
         if (homeSearch.isOpen) {
@@ -1017,6 +1178,7 @@ class MainActivity : Activity() {
             KeyEvent.KEYCODE_BUTTON_SELECT -> { openManual(); render(); return }
         }
         if (listMode && !settingsTab && zone == Zone.CONTENT && handleListKey(code)) { render(); return }
+        if (!listMode && !settingsTab && zone == Zone.CONTENT && handleCoverMediaKey(code)) { render(); return }
         val tabsZone = zone == Zone.TABS
         when (code) {
             KeyEvent.KEYCODE_BUTTON_L1 -> switchTab(-1)
@@ -1057,11 +1219,13 @@ class MainActivity : Activity() {
     }
 
     private fun switchTab(delta: Int) {
+        mediaFocus = -1
         tab = (tab + delta + tabCount) % tabCount
         buildShelf()
     }
 
     private fun moveGame(delta: Int) {
+        mediaFocus = -1
         if (driveRow) driveSel[tab] = (driveSel[tab] + delta).coerceIn(0, driveItems.size - 1)
         // Games, then the "Añade juegos desde RetroShop" card (index == number of games)
         else selected[tab] = (selected[tab] + delta).coerceIn(0, consoleGames.size)
@@ -1303,6 +1467,7 @@ class MainActivity : Activity() {
                 else -> "${game.title} quitado del stick. Sigue en tu colección de Drive."
             }
             Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
+            if (error == null) Fichas.forget(this, game)
             reload()
             // "Quitar solo del stick": it shows up in the Drive section
             DriveCollection.refresh(this, force = true)
@@ -1315,6 +1480,7 @@ class MainActivity : Activity() {
         renderShelf()
         renderSettings()
         renderList()
+        renderBackdrop()
         renderHints()
         renderPlayGlyph()
     }
@@ -1325,6 +1491,7 @@ class MainActivity : Activity() {
 
     private fun toggleView() {
         listMode = !listMode
+        mediaFocus = -1
         if (::homeList.isInitialized) homeList.leaveMedia()
         if (settings.size > VIEW_SETTING) settings[VIEW_SETTING].subtitle = viewLabel()
         keySound = Sounds.Sound.TAB
