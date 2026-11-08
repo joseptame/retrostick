@@ -881,6 +881,11 @@ class MainActivity : Activity() {
             // The button that opens the manual, drawn (the word "Create" read like "crear")
             if (manualPill.visibility == View.VISIBLE || (listMode && homeList.view.visibility == View.VISIBLE && currentManual() != null)) {
                 addHint(Glyph.Pill(manualGlyph()), R.string.hint_manual)
+                // Share icon left of the "Share" box
+                if (manualGlyph() == "Share") (hints.getChildAt(hints.childCount - 1) as? LinearLayout)?.addView(
+                    ImageView(this).apply { setImageResource(R.drawable.ic_share); setColorFilter(getColor(R.color.chip_text)) },
+                    0, LinearLayout.LayoutParams(dp(15), dp(15)).apply { marginEnd = dp(5) },
+                )
             }
             addHint(Glyph.Pill(when (padStyle) { PadStyle.XBOX -> "LT"; PadStyle.NINTENDO -> "ZL"; else -> "L2" }), R.string.hint_search)
             addHint(Glyph.Pill(when (padStyle) { PadStyle.XBOX -> "Menu"; PadStyle.NINTENDO -> "+"; else -> "Options" }), R.string.hint_view)
@@ -1395,7 +1400,8 @@ class MainActivity : Activity() {
         val g = currentGame ?: currentDrive?.let { item -> driveInfo.getOrPut(item.key) { item.probe().also { library.describe(it) } } }
         val manual = g?.let { Manuals.find(this, it.console, it.baseName) }
         manualPill.visibility = if (manual != null && !active) View.VISIBLE else View.GONE
-        manualPill.text = PillSpan.text(manualGlyph(), "Manual", getColor(R.color.text), resources.displayMetrics.density)
+        manualPill.text = PillSpan.text(manualGlyph(), "Manual", getColor(R.color.text), resources.displayMetrics.density,
+            if (manualGlyph() == "Share") getDrawable(R.drawable.ic_share) else null)
         if (!active) return
         gamePanel.visibility = View.GONE
         emptyText.visibility = View.GONE

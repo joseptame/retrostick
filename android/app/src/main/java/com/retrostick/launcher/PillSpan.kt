@@ -35,11 +35,20 @@ class PillSpan(private val color: Int, private val density: Float, private val s
     }
 
     companion object {
-        /** "[label]  rest" with the label boxed; just [rest] when there is no label (TV remote). */
-        fun text(label: String, rest: String, color: Int, density: Float): CharSequence {
+        /** "[label]  rest" with the label boxed, after [icon] if given; just [rest] when there is no label (TV remote). */
+        fun text(label: String, rest: String, color: Int, density: Float, icon: android.graphics.drawable.Drawable? = null): CharSequence {
             if (label.isEmpty()) return rest
-            return SpannableStringBuilder(label).apply {
-                setSpan(PillSpan(color, density), 0, label.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            return SpannableStringBuilder().apply {
+                if (icon != null) {
+                    val size = (16 * density).toInt()
+                    icon.mutate().apply { setTint(color); setBounds(0, 0, size, size) }
+                    append(" ")
+                    setSpan(android.text.style.ImageSpan(icon, android.text.style.DynamicDrawableSpan.ALIGN_BOTTOM), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                    append(" ")
+                }
+                val at = length
+                append(label)
+                setSpan(PillSpan(color, density), at, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                 append("  ").append(rest)
             }
         }

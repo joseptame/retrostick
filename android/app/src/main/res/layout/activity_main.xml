@@ -196,7 +196,8 @@
                         android:id="@+id/playIcon"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
-                        android:src="@drawable/ic_btn_play_cross" />
+                        android:src="@drawable/ic_btn_cross_outline"
+                        android:tint="@color/button_text" />
 
                     <TextView
                         android:id="@+id/playLetter"

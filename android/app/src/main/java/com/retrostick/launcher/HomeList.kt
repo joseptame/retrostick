@@ -196,7 +196,8 @@ class HomeList(private val ctx: Context, private val covers: CoverLoader) {
         setPlay(sheet.playLabel, sheet.playCross, sheet.playLetter, mediaFocus < 0)
         manualBtn.visibility = if (sheet.manual) View.VISIBLE else View.GONE
         styleButton(manualBtn, false)
-        manualBtn.text = PillSpan.text(sheet.manualGlyph, "Manual", manualBtn.currentTextColor, ctx.resources.displayMetrics.density)
+        manualBtn.text = PillSpan.text(sheet.manualGlyph, "Manual", manualBtn.currentTextColor, ctx.resources.displayMetrics.density,
+            if (sheet.manualGlyph == "Share") ctx.getDrawable(R.drawable.ic_share) else null)
         langs.text = android.text.SpannableStringBuilder().apply {
             if (sheet.languages.isNotEmpty()) {
                 append("Idiomas   ")
@@ -399,8 +400,8 @@ class HomeList(private val ctx: Context, private val covers: CoverLoader) {
     private fun setPlay(label: String, cross: Boolean, letter: String, primary: Boolean) {
         styleButton(playBtn, primary)
         if (cross) {
-            val d = ctx.getDrawable(R.drawable.ic_btn_play_cross)!!.mutate().apply { setBounds(0, 0, dp(18), dp(18)) }
-            if (!primary) d.alpha = 200
+            // Same glyph as the covers view's button: the ✕ in an outlined circle, in the button's text colour
+            val d = ctx.getDrawable(R.drawable.ic_btn_cross_outline)!!.mutate().apply { setTint(playBtn.currentTextColor); setBounds(0, 0, dp(18), dp(18)) }
             playBtn.setCompoundDrawablesRelative(d, null, null, null)
             playBtn.compoundDrawablePadding = dp(8)
             playBtn.text = label

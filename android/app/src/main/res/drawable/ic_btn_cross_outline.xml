@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Confirm glyph on buttons: the ✕ in an outlined circle, transparent inside; tinted to the button's text -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="20dp" android:height="20dp" android:viewportWidth="20" android:viewportHeight="20">
+    <path android:strokeColor="#FFFFFF" android:strokeWidth="1.6" android:pathData="M19,10a9,9 0,1 0,-18 0a9,9 0,1 0,18 0z" />
+    <path android:strokeColor="#FFFFFF" android:strokeWidth="1.9" android:strokeLineCap="round" android:pathData="M6.9,6.9L13.1,13.1M13.1,6.9L6.9,13.1" />
+</vector>

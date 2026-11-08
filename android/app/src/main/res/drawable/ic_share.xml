@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Share icon (three linked dots), next to the "Share" button label; tinted where used -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="20dp" android:height="20dp" android:viewportWidth="20" android:viewportHeight="20">
+    <path android:strokeColor="#FFFFFF" android:strokeWidth="1.6" android:pathData="M7.2,9.1L12.8,6M7.2,10.9L12.8,14" />
+    <path android:fillColor="#FFFFFF" android:pathData="M15,4.8m-2.6,0a2.6,2.6 0,1 1,5.2 0a2.6,2.6 0,1 1,-5.2 0M5,10m-2.6,0a2.6,2.6 0,1 1,5.2 0a2.6,2.6 0,1 1,-5.2 0M15,15.2m-2.6,0a2.6,2.6 0,1 1,5.2 0a2.6,2.6 0,1 1,-5.2 0" />
+</vector>
