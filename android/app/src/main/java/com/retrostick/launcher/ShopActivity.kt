@@ -341,7 +341,13 @@ class ShopActivity : Activity() {
             val selected = i == consoleIndex
             v.setBackgroundResource(if (selected) (if (zone == Zone.TABS) R.drawable.bg_tab_sel_focus else R.drawable.bg_tab_sel) else R.drawable.bg_tab)
             val logo = (v as LinearLayout).getChildAt(0) as ImageView
-            if (selected) logo.clearColorFilter() else logo.setColorFilter(Color.WHITE)
+            // Unselected logos in white, like the home screen (GBA has its own white version without the plate).
+            val c = CONSOLES[i]
+            when {
+                selected -> { logo.setImageResource(c.logo); logo.clearColorFilter() }
+                c.logoWhite != null -> { logo.setImageResource(c.logoWhite); logo.clearColorFilter() }
+                else -> { logo.setImageResource(c.logo); logo.setColorFilter(Color.WHITE) }
+            }
             v.alpha = if (selected) 1f else 0.75f
         }
         val labels = Sort.values().map { it.label } + "Género: ${genre ?: "Todos"}"

@@ -76,7 +76,7 @@ function encodePath(path: string): string {
 
 export async function fetchMetadata(identifier: string): Promise<ArchiveMetadata> {
   const res = await fetch(`${METADATA}/${encodeURIComponent(identifier)}`)
-  if (!res.ok) throw new Error(`archive.org ${res.status}`)
+  if (!res.ok) throw new Error(`archive.org ${res.status} (metadata): ${(await res.text()).slice(0, 160)}`)
   const json = (await res.json()) as {
     metadata?: { title?: string; identifier?: string; 'access-restricted-item'?: string | boolean }
     files?: ArchiveFile[]
@@ -128,7 +128,7 @@ export function isJunk(path: string): boolean {
 /** The ROM inside a per-game archive (`entry.pack`): read from its listing, the biggest ROM file. */
 export async function packedRom(identifier: string, pack: string): Promise<ArchiveEntry> {
   const res = await fetch(archiveListingUrl(identifier, pack))
-  if (!res.ok) throw new Error(`archive.org ${res.status}`)
+  if (!res.ok) throw new Error(`archive.org ${res.status} (zip): ${(await res.text()).slice(0, 160)}`)
   const rom = parseArchiveListing(await res.text())
     .filter((e) => consoleForFile(e.name))
     .sort((a, b) => b.size - a.size)[0]
@@ -186,7 +186,7 @@ export async function listItemFiles(
   const archive = looseRoms ? null : archiveFileOf(meta.files)
   if (archive) {
     const res = await fetch(archiveListingUrl(identifier, archive.name))
-    if (!res.ok) throw new Error(`archive.org ${res.status}`)
+    if (!res.ok) throw new Error(`archive.org ${res.status} (listado): ${(await res.text()).slice(0, 160)}`)
     return { entries: parseArchiveListing(await res.text()), archive: archive.name, title: meta.title, restricted: meta.restricted }
   }
   const entries = meta.files.filter((f) => !isJunk(f.name)).map((f) => ({ name: f.name, size: Number(f.size ?? 0) }))
