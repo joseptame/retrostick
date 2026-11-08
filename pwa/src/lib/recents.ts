@@ -1,4 +1,4 @@
-import type { ConsoleId } from './consoles'
+import type { ConsoleId } from './consoles.js'
 
 /** archive.org collections opened in Buscar, most recent first (per-device convenience, localStorage). */
 export interface RecentCollection {

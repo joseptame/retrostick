@@ -94,8 +94,9 @@ export function vercelDev(): Plugin {
 
           const api = API.exec(url.pathname)
           if (api && HANDLERS.has(api[1])) {
-            const mod = (await server.ssrLoadModule(`/api/${api[1]}.ts`)) as { default: Handler }
-            return await send(await mod.default(request), res)
+            const mod = (await server.ssrLoadModule(`/api/${api[1]}.ts`)) as { default?: Handler; GET?: Handler }
+            // Edge handlers export default; Node.js ones (api/shop.ts) export GET.
+            return await send(await (mod.default ?? mod.GET)!(request), res)
           }
           next()
         } catch (e) {

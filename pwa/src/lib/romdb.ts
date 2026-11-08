@@ -1,8 +1,8 @@
 /** Game identification against the No-Intro / Redump database built by scripts/build-db.ts. */
-import { consoleById, type ConsoleId } from './consoles'
-import { fetchData } from './data'
-import { crc32, sha1 } from './hash'
-import { baseName, bestBoxart, coverUrl, looseKey } from './names'
+import { consoleById, type ConsoleId } from './consoles.js'
+import { fetchData } from './data.js'
+import { crc32, sha1 } from './hash.js'
+import { baseName, bestBoxart, coverUrl, looseKey } from './names.js'
 
 interface Db {
   names: string[]

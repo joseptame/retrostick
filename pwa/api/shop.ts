@@ -14,15 +14,17 @@
  *
  * Only reachable with the stick's pass (x-stick-token, see api/pair.ts and middleware.ts). Cached per console for a few hours.
  */
-import { configureArchive, groupDiscs, listItemFiles, type ArchiveEntry } from '../src/lib/archive'
-import { consoleForFile, CONSOLES, isCartridge, type ConsoleId } from '../src/lib/consoles'
-import { configureData } from '../src/lib/data'
-import { loadLookup } from '../src/lib/igdbdb'
-import { baseName, bestVariants, displayTitle, isDemo, looseKey } from '../src/lib/names'
-import { DEFAULT_COLLECTIONS } from '../src/lib/recents'
-import { loadDb } from '../src/lib/romdb'
+import { configureArchive, groupDiscs, listItemFiles, type ArchiveEntry } from '../src/lib/archive.js'
+import { consoleForFile, CONSOLES, isCartridge, type ConsoleId } from '../src/lib/consoles.js'
+import { configureData } from '../src/lib/data.js'
+import { loadLookup } from '../src/lib/igdbdb.js'
+import { baseName, bestVariants, displayTitle, isDemo, looseKey } from '../src/lib/names.js'
+import { DEFAULT_COLLECTIONS } from '../src/lib/recents.js'
+import { loadDb } from '../src/lib/romdb.js'
 
-export const config = { runtime: 'edge' }
+// Node.js, not edge: Vercel's edge adds a "Forwarded" header to outgoing requests and archive.org answers
+// those with 400. (Imports carry .js: Node resolves ES modules by exact file name.)
+export const config = { runtime: 'nodejs', maxDuration: 60 }
 
 const CACHE_MS = 6 * 3600_000
 
@@ -88,23 +90,8 @@ async function build(id: ConsoleId, collection: string): Promise<string> {
   return JSON.stringify({ console: id, collection, title, restricted, archive, genres, games })
 }
 
-export default async function handler(request: Request): Promise<Response> {
+export async function GET(request: Request): Promise<Response> {
   const url = new URL(request.url)
-  if (url.searchParams.has('debug')) {
-    // TEMPORARY: why does archive.org answer 400 from here?
-    const out: Record<string, unknown> = {}
-    out.echo = await (await fetch('https://httpbin.org/headers')).json().catch((e) => String(e))
-    for (const [name, init] of [
-      ['plain', {}],
-      ['ua', { headers: { 'User-Agent': 'Mozilla/5.0 RetroStick' } }],
-    ] as const) {
-      const r = await fetch('https://archive.org/metadata/gba-pal', init as RequestInit)
-      out[name] = `${r.status} ${(await r.text()).slice(0, 80)}`
-    }
-    const r2 = await fetch('https://archive.org/metadata/gba-pal/metadata/title')
-    out.sub = `${r2.status} ${(await r2.text()).slice(0, 80)}`
-    return new Response(JSON.stringify(out, null, 2), { headers: { 'content-type': 'application/json' } })
-  }
   const id = url.searchParams.get('console') as ConsoleId | null
   if (!id || !CONSOLES.some((c) => c.id === id)) return new Response('Consola desconocida', { status: 400 })
   const collection = url.searchParams.get('collection') || DEFAULT_COLLECTIONS[id]
@@ -112,7 +99,7 @@ export default async function handler(request: Request): Promise<Response> {
 
   // The data files sit behind the login too: fetch them from this deployment with the stick's key.
   configureData(url.origin, { 'x-stick-token': request.headers.get('x-stick-token') ?? '' })
-  // archive.org answers 400 to anonymous requests from Vercel's edge: say who is asking.
+  // Say who is asking (archive.org asks API clients to identify themselves).
   configureArchive({ 'User-Agent': 'RetroStick/1.0 (+https://retrostick.vercel.app)', Accept: 'application/json, text/html' })
   const key = `${id}/${collection}`
   let hit = cache.get(key)

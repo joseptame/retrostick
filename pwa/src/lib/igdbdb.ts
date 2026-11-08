@@ -2,10 +2,10 @@
  * Genres, rating and year from IGDB, prebuilt per console by `npm run build-igdb` into
  * public/db/igdb-<console>.json, so Buscar can filter and sort without API calls.
  */
-import type { ConsoleId } from './consoles'
-import { fetchData } from './data'
-import { looseKey } from './names'
-import { officialName } from './romdb'
+import type { ConsoleId } from './consoles.js'
+import { fetchData } from './data.js'
+import { looseKey } from './names.js'
+import { officialName } from './romdb.js'
 
 export interface IgdbDb {
   generated: string

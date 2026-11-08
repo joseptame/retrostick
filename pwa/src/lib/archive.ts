@@ -64,7 +64,7 @@ export function m3uName(discName: string): string {
   return discName.replace(/^.*\//, '').replace(DISC, '').replace(/\.[^.]+$/, '') + '.m3u'
 }
 
-import { consoleForFile, ROM_EXTENSION, type ConsoleId } from './consoles'
+import { consoleForFile, ROM_EXTENSION, type ConsoleId } from './consoles.js'
 
 const METADATA = 'https://archive.org/metadata'
 
