@@ -38,6 +38,8 @@ class ShopActivity : Activity() {
     private var filterIndex = 0
     private var sort = Sort.RATING
     private var genre: String? = null
+    /** Text search (🔍 chip or the top face button): every word must appear in the title */
+    private var query: String? = null
     private var catalog: ShopCatalog? = null
     private var loading = false
     private var error: String? = null
@@ -182,7 +184,8 @@ class ShopActivity : Activity() {
 
         filters = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         col.addView(filters, LinearLayout.LayoutParams(-1, dp(30)).apply { topMargin = dp(12) })
-        repeat(Sort.values().size + 1) {
+        // 🔍 Buscar · the sorts · Género
+        repeat(Sort.values().size + 2) {
             val v = text(10f, R.color.chip_text).apply {
                 gravity = Gravity.CENTER
                 setPadding(dp(13), 0, dp(13), 0)
@@ -238,7 +241,7 @@ class ShopActivity : Activity() {
         root.addView(pairPanel, FrameLayout.LayoutParams(-1, -1))
 
         col.addView(text(9.5f, R.color.text_3).apply {
-            text = "OK  Ver juego     L1 / R1  Consola     ▲  Filtros     B  Volver"
+            text = "OK  Ver juego     △ / Y  Buscar     L1 / R1  Consola     B  Volver"
             gravity = Gravity.END
         })
         return root
@@ -320,6 +323,11 @@ class ShopActivity : Activity() {
     private fun applyFilters(resetSelection: Boolean) {
         val all = catalog?.games.orEmpty()
         var list = if (genre != null) all.filter { genre in it.genres } else all
+        val words = query?.split(Regex("""\s+"""))?.map(::looseKey)?.filter { it.isNotEmpty() }.orEmpty()
+        if (words.isNotEmpty()) list = list.filter { g ->
+            val hay = g.looseTitle + " " + looseKey(g.name)
+            words.all { it in hay }
+        }
         list = when (sort) {
             Sort.RATING -> list // already sorted by the webapp
             Sort.NAME -> list.sortedBy { it.title.lowercase() }
@@ -353,10 +361,14 @@ class ShopActivity : Activity() {
             }
             v.alpha = if (selected) 1f else 0.75f
         }
-        val labels = Sort.values().map { it.label } + "Género: ${genre ?: "Todos"}"
+        val labels = listOf(query?.let { "🔍  «$it»" } ?: "🔍  Buscar") + Sort.values().map { it.label } + "Género: ${genre ?: "Todos"}"
         filterViews.forEachIndexed { i, v ->
             v.text = labels[i]
-            val on = if (i < Sort.values().size) Sort.values()[i] == sort else genre != null
+            val on = when {
+                i == 0 -> query != null
+                i <= Sort.values().size -> Sort.values()[i - 1] == sort
+                else -> genre != null
+            }
             val focus = zone == Zone.FILTERS && i == filterIndex
             v.background = round(if (on) getColor(R.color.accent_start) else getColor(R.color.surface), 13).apply {
                 setStroke(dp(if (focus) 2 else 1), if (focus) Color.WHITE else getColor(R.color.surface_border))
@@ -368,6 +380,7 @@ class ShopActivity : Activity() {
             shown.isNotEmpty() -> ""
             loading -> "Cargando el catálogo de ${console.name}…"
             error != null -> "No se pudo cargar el catálogo:\n$error"
+            query != null -> "Ningún juego coincide con «$query»."
             genre != null -> "Ningún juego de ese género."
             else -> "No hay juegos para ${console.name}."
         }
@@ -477,6 +490,7 @@ class ShopActivity : Activity() {
             return
         }
         when (code) {
+            KeyEvent.KEYCODE_BUTTON_Y -> askSearch()
             KeyEvent.KEYCODE_BUTTON_L1 -> switchConsole(-1)
             KeyEvent.KEYCODE_BUTTON_R1 -> switchConsole(1)
             KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_BUTTON_B -> if (zone == Zone.GRID) finish() else { zone = Zone.GRID; render() }
@@ -517,8 +531,9 @@ class ShopActivity : Activity() {
     }
 
     private fun chooseFilter() {
-        if (filterIndex < Sort.values().size) {
-            sort = Sort.values()[filterIndex]
+        if (filterIndex == 0) return askSearch()
+        if (filterIndex <= Sort.values().size) {
+            sort = Sort.values()[filterIndex - 1]
             applyFilters(resetSelection = true)
             return
         }
@@ -532,6 +547,38 @@ class ShopActivity : Activity() {
                 applyFilters(resetSelection = true)
             }
             .show()
+    }
+
+    /** The TV's on-screen keyboard: type part of a title ("zelda", "mario kart"). */
+    private fun askSearch() {
+        val input = android.widget.EditText(this).apply {
+            setText(query.orEmpty())
+            setSelection(text.length)
+            hint = "Título del juego"
+            isSingleLine = true
+            imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH
+            setTextColor(getColor(R.color.text))
+            setHintTextColor(getColor(R.color.text_3))
+        }
+        val box = FrameLayout(this).apply { setPadding(dp(20), dp(8), dp(20), 0); addView(input) }
+        var dialog: AlertDialog? = null
+        val apply = { text: String? ->
+            query = text?.trim()?.takeIf { it.isNotEmpty() }
+            zone = Zone.GRID
+            applyFilters(resetSelection = true)
+            dialog?.dismiss()
+        }
+        input.setOnEditorActionListener { _, _, _ -> apply(input.text.toString()); true }
+        dialog = AlertDialog.Builder(this, R.style.Dialog_RetroStick)
+            .setTitle("Buscar en ${console.name}")
+            .setView(box)
+            .setPositiveButton("Buscar") { _, _ -> apply(input.text.toString()) }
+            .apply { if (query != null) setNeutralButton("Quitar búsqueda") { _, _ -> apply(null) } }
+            .setNegativeButton("Cancelar", null)
+            .create()
+        dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
+        dialog.show()
+        input.requestFocus()
     }
 
     private fun showGame(g: ShopGame) {
@@ -581,7 +628,7 @@ class ShopActivity : Activity() {
         private val KEYS = setOf(
             KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_BACK,
-            KeyEvent.KEYCODE_BUTTON_A, KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_BUTTON_L1, KeyEvent.KEYCODE_BUTTON_R1,
+            KeyEvent.KEYCODE_BUTTON_A, KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_BUTTON_Y, KeyEvent.KEYCODE_BUTTON_L1, KeyEvent.KEYCODE_BUTTON_R1,
         )
     }
 }
