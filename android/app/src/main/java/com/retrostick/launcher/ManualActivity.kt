@@ -31,6 +31,8 @@ class ManualActivity : Activity() {
     private var page = 0
     private var wide = false
     private var bitmap: Bitmap? = null
+    private var lastCode = 0
+    private var lastTime = 0L
     private val name get() = intent.getStringExtra(EXTRA_FILE) ?: ""
     private val prefs get() = getSharedPreferences("manuals", MODE_PRIVATE)
 
@@ -117,6 +119,16 @@ class ManualActivity : Activity() {
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         val code = StickStatus.standardKey(event.device, event.keyCode)
         if (event.action != KeyEvent.ACTION_DOWN) return super.dispatchKeyEvent(event)
+        // One press = one page: the DualSense's D-pad can report a press twice in a row (key + hat), and a held
+        // button repeats. Ignore repeats and the same key again within a quarter of a second.
+        val turn = code == KeyEvent.KEYCODE_DPAD_LEFT || code == KeyEvent.KEYCODE_DPAD_RIGHT ||
+            code == KeyEvent.KEYCODE_BUTTON_L1 || code == KeyEvent.KEYCODE_BUTTON_R1
+        if (turn) {
+            if (event.repeatCount > 0) return true
+            if (code == lastCode && event.eventTime - lastTime < 250) return true
+            lastCode = code
+            lastTime = event.eventTime
+        }
         when (code) {
             KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_BUTTON_B -> { Sounds.play(Sounds.Sound.BACK); finish() }
             KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_BUTTON_R1 -> if (renderer != null && page < renderer!!.pageCount - 1) { show(page + 1); Sounds.play(Sounds.Sound.MOVE) }
