@@ -512,6 +512,8 @@ const PLATFORM_LOOK: Record<ConsoleId, { from: string; to: string; glyph: string
   gb: { from: '#4d6b3c', to: '#1f2d1a', glyph: 'GB' },
   gbc: { from: '#7c3aed', to: '#2e1065', glyph: 'GBC' },
   gba: { from: '#4f46e5', to: '#1e1b4b', glyph: 'GBA' },
+  md: { from: '#1f2937', to: '#030712', glyph: 'MD' },
+  sms: { from: '#b91c1c', to: '#1f2937', glyph: 'SMS' },
   psx: { from: '#475569', to: '#0f172a', glyph: 'PS1' },
 }
 

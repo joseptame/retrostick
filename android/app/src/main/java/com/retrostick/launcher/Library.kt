@@ -40,6 +40,11 @@ val CONSOLES = listOf(
         "gambatte_libretro_android.so", "Nintendo_-_Game_Boy_Color"),
     Console("gba", "Game Boy Advance", R.drawable.logo_gba, setOf("gba"),
         "mgba_libretro_android.so", "Nintendo_-_Game_Boy_Advance", logoWhite = R.drawable.logo_gba_white),
+    // Sega: Genesis Plus GX runs both (and is light enough for this stick)
+    Console("md", "Mega Drive", R.drawable.logo_md, setOf("md", "gen", "smd"),
+        "genesis_plus_gx_libretro_android.so", "Sega_-_Mega_Drive_-_Genesis", whiteWhenSelected = true),
+    Console("sms", "Master System", R.drawable.logo_sms, setOf("sms"),
+        "genesis_plus_gx_libretro_android.so", "Sega_-_Master_System_-_Mark_III"),
     // .bin tracks are reached through their .cue; discs listed in a .m3u are hidden behind it.
     Console("psx", "PlayStation", R.drawable.logo_psx, setOf("m3u", "cue", "chd", "pbp"),
         "pcsx_rearmed_libretro_android.so", "Sony_-_PlayStation"),

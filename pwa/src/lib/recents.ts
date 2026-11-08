@@ -48,7 +48,7 @@ export function removeRecent(id: string): RecentCollection[] {
 export const DEFAULT_COLLECTIONS: Partial<Record<ConsoleId, string>> = {
   nes: 'No-Intro_NES',
   snes: 'bahamut-lagoon-japan-espanol',
-  gb: 'gameboy_202401', gbc: 'gbc_20240311', gba: 'gba-pal', psx: 'chd_psx_eur' }
+  gb: 'gameboy_202401', gbc: 'gbc_20240311', gba: 'gba-pal', md: 'nointro.md', sms: 'nointro.ms-mkiii', psx: 'chd_psx_eur' }
 const BY_CONSOLE = 'rs.collectionByConsole'
 
 function byConsole(): Partial<Record<ConsoleId, string>> {

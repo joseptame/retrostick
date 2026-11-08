@@ -1,0 +1,12 @@
+# Mega Drive / Master System (Genesis Plus GX), 2026-11-08: the core's own layout already fits the DualSense,
+# Square / Cross / Circle = A / B / C left to right as on the Mega Drive pad (Master System: Cross = 1, Circle = 2),
+# Options = Start (Pause on the Master System). Only the left stick is added, as the D-pad.
+#   L2 / R2 are hotkeys in config/Genesis Plus GX/Genesis Plus GX.cfg, so they do nothing in the game.
+input_player1_btn_l2 = "-1"
+input_player1_btn_r2 = "-1"
+# 1 = ANALOG_DPAD_LSTICK
+input_player1_analog_dpad_mode = "1"
+# Player 2 (a second DualSense): same layout
+input_player2_btn_l2 = "-1"
+input_player2_btn_r2 = "-1"
+input_player2_analog_dpad_mode = "1"

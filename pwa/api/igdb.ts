@@ -88,7 +88,7 @@ function json(body: unknown, status = 200, cacheDays = 0): Response {
 }
 
 const CONSOLE_NAMES: Record<string, string> = {
-  nes: 'NES', snes: 'Super Nintendo', gb: 'Game Boy', gbc: 'Game Boy Color', gba: 'Game Boy Advance', psx: 'PlayStation',
+  nes: 'NES', snes: 'Super Nintendo', gb: 'Game Boy', gbc: 'Game Boy Color', gba: 'Game Boy Advance', md: 'Mega Drive', sms: 'Master System', psx: 'PlayStation',
 }
 /** The article must be about this console's version ("PlayStation", not "PlayStation 2"). */
 const CONSOLE_TEXT: Record<string, RegExp> = {
@@ -97,6 +97,8 @@ const CONSOLE_TEXT: Record<string, RegExp> = {
   gb: /Game Boy(?! Advance| Color)/,
   gbc: /Game Boy Color/,
   gba: /Game Boy Advance/,
+  md: /Mega Drive|Genesis/,
+  sms: /Master System|Mark III/,
   psx: /PlayStation(?!\s?[2-5]|\s?Portable|\s?Vita)/,
 }
 const looseKey = (s: string) => s.toLowerCase().normalize('NFD').replace(/[^a-z0-9]/g, '')
@@ -176,7 +178,7 @@ async function spanishDescription(game: IgdbGame, consoleId: string | null): Pro
 }
 
 /** IGDB platform ids per console (as in scripts/build-igdb.ts); GBC sets also hold Game Boy games. */
-const PLATFORMS: Record<string, number[]> = { gb: [33], gbc: [22, 33], gba: [24], nes: [18, 99], snes: [19, 58], psx: [7] }
+const PLATFORMS: Record<string, number[]> = { gb: [33], gbc: [22, 33], gba: [24], nes: [18, 99], snes: [19, 58], md: [29], sms: [64], psx: [7] }
 
 export default async function handler(request: Request): Promise<Response> {
   const id = process.env.IGDB_CLIENT_ID

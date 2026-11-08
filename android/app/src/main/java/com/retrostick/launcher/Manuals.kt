@@ -19,6 +19,7 @@ object Manuals {
     private val COLLECTIONS = mapOf(
         "nes" to "NESManuals", "snes" to "SNESManuals", "gb" to "NintendoGameBoyManuals",
         "gbc" to "NintendoGameBoyColorManuals", "gba" to "NintendoGameBoyAdvanceManuals", "psx" to "SonyPlaystationManuals",
+        "md" to "SEGAGenesisMegaDriveManuals", "sms" to "SEGAMasterSystemManuals",
     )
     private const val WEEK = 7 * 24 * 3600_000L
 
@@ -114,7 +115,8 @@ object Manuals {
                 val cache = File(app.filesDir, "manuals-index.json")
                 var json = runCatching { JSONObject(cache.readText()) }.getOrNull()
                 if (json != null) publish(json)
-                if (json == null || System.currentTimeMillis() - json.optLong("at") > WEEK) {
+                // Stale, or a console added since (Mega Drive, Master System…)
+                if (json == null || System.currentTimeMillis() - json.optLong("at") > WEEK || COLLECTIONS.keys.any { !json.has(it) }) {
                     val fresh = JSONObject().put("at", System.currentTimeMillis())
                     for ((console, id) in COLLECTIONS) {
                         val names = runCatching { listPdfs(id) }.onFailure { Log.w("RetroStick", "Manuals $id", it) }.getOrNull()

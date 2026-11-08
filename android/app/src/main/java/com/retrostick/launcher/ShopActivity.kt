@@ -249,10 +249,10 @@ class ShopActivity : Activity() {
                 addView(ImageView(this@ShopActivity).apply {
                     setImageResource(c.logo)
                     adjustViewBounds = true
-                    maxWidth = dp(92)
+                    maxWidth = dp(80)
                 }, LinearLayout.LayoutParams(-2, dp(15)))
             }
-            tabs.addView(v, LinearLayout.LayoutParams(dp(118), dp(36)).apply { marginEnd = dp(9) })
+            tabs.addView(v, LinearLayout.LayoutParams(dp(100), dp(36)).apply { marginEnd = dp(7) })
             tabViews += v
         }
 
