@@ -244,12 +244,23 @@
         android:columnCount="4"
         android:visibility="gone" />
 
-    <!-- Shelf -->
+    <!-- Shelves: the stick's games, and below them the Drive collection (it slides up when focused).
+         The window shows the first row and the title of the second. -->
+    <ScrollView
+        android:id="@+id/shelfClip"
+        android:layout_width="match_parent"
+        android:layout_height="154dp"
+        android:layout_marginTop="363dp"
+        android:descendantFocusability="blocksDescendants"
+        android:focusable="false"
+        android:overScrollMode="never"
+        android:scrollbars="none">
+
     <LinearLayout
         android:id="@+id/shelf"
+        android:paddingBottom="40dp"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="363dp"
         android:clipChildren="false"
         android:orientation="vertical">
 
@@ -281,7 +292,40 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal" />
         </HorizontalScrollView>
+
+        <TextView
+            android:id="@+id/driveTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="40dp"
+            android:layout_marginTop="10dp"
+            android:layout_marginBottom="5dp"
+            android:fontFamily="@font/inter_semibold"
+            android:textColor="@color/text_2"
+            android:textSize="11sp"
+            android:visibility="gone" />
+
+        <HorizontalScrollView
+            android:id="@+id/driveScroll"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:clipToPadding="false"
+            android:descendantFocusability="blocksDescendants"
+            android:focusable="false"
+            android:overScrollMode="never"
+            android:paddingStart="36dp"
+            android:paddingEnd="36dp"
+            android:scrollbars="none"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/driveCovers"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal" />
+        </HorizontalScrollView>
     </LinearLayout>
+    </ScrollView>
 
     <!-- Startup animation, on top of everything; hidden once the library is loaded -->
     <FrameLayout

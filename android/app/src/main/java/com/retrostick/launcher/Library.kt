@@ -115,6 +115,18 @@ class Library(private val context: Context) {
         }
     }
 
+    /**
+     * Saves and play time of a game that isn't on the stick (one in the Drive collection): they stay in
+     * /Partidas and RetroArch's logs after the ROM is taken off.
+     */
+    fun describe(game: Game) {
+        val saves = listFiles(savesDir) + listFiles(statesDir)
+        game.saveFiles = saves.filter { it.name == "${game.baseName}.srm" || it.name.startsWith("${game.baseName}.state") }
+        val logs = runtimeLogs.listFiles()?.filter { it.isDirectory }?.flatMap { listFiles(it) }.orEmpty()
+        readRuntime(game, logs.filter { it.name == "${game.baseName}.lrtl" })
+        if (game.lastPlayed == 0L) game.lastPlayed = game.saveFiles.maxOfOrNull { it.lastModified() } ?: 0
+    }
+
     private fun readRuntime(game: Game, logFiles: List<File>) {
         // One .lrtl per core: {"runtime": "h:mm:ss", "last_played": "yyyy-MM-dd HH:mm:ss", "play_count": "n"}
         for (file in logFiles) {

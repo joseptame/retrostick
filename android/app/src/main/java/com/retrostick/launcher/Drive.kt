@@ -150,11 +150,24 @@ class DriveClient(private val auth: DriveAuth) {
         return request("POST", "$DRIVE_API/files?fields=id", meta).getString("id")
     }
 
-    fun download(id: String, target: File) {
+    /** [onProgress] gets the bytes written so far (a game passed from the Drive collection shows its progress). */
+    fun download(id: String, target: File, onProgress: ((Long) -> Unit)? = null) {
         val conn = open("GET", "$DRIVE_API/files/$id?alt=media")
         if (conn.responseCode != 200) throw DriveException("download ${target.name}: HTTP ${conn.responseCode}", conn.responseCode)
         val tmp = File(target.parentFile, ".${target.name}.part")
-        conn.inputStream.use { input -> tmp.outputStream().use { input.copyTo(it, 64 * 1024) } }
+        conn.inputStream.use { input ->
+            tmp.outputStream().use { out ->
+                val buf = ByteArray(64 * 1024)
+                var done = 0L
+                while (true) {
+                    val n = input.read(buf)
+                    if (n < 0) break
+                    out.write(buf, 0, n)
+                    done += n
+                    onProgress?.invoke(done)
+                }
+            }
+        }
         if (!tmp.renameTo(target)) {
             tmp.delete()
             throw DriveException("No se pudo escribir ${target.path}")

@@ -18,6 +18,7 @@ import android.os.Looper
 import android.provider.Settings
 import android.text.format.Formatter
 import android.util.TypedValue
+import android.view.Gravity
 import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.View
@@ -89,7 +90,30 @@ class MainActivity : Activity() {
     private val tabCount = CONSOLES.size + 1
     private val settingsTab get() = tab == CONSOLES.size
     private val consoleGames get() = if (settingsTab) emptyList() else games[CONSOLES[tab].id].orEmpty()
-    private val currentGame get() = consoleGames.getOrNull(selected.getOrElse(tab) { 0 })
+    /** Per console: selection in the Drive row (below the stick's) and whether that row has the focus. */
+    private val driveSel = IntArray(CONSOLES.size)
+    private val inDrive = BooleanArray(CONSOLES.size)
+    private val driveRow get() = !settingsTab && inDrive[tab] && driveItems.isNotEmpty()
+    private val currentGame get() = if (driveRow) null else consoleGames.getOrNull(selected.getOrElse(tab) { 0 })
+    /** Games of this tab's console in the Drive collection and not on the stick (row below the stick's). */
+    private var driveItems: List<DriveCollection.Item> = emptyList()
+    private val currentDrive get() = if (driveRow) driveItems.getOrNull(driveSel[tab]) else null
+    private val driveBadges = mutableMapOf<String, TextView>()
+    /** Saves and play time of the Drive games (read from /Partidas once per item). */
+    private val driveInfo = mutableMapOf<String, Game>()
+    private var driveDone = 0
+    private val driveListener: () -> Unit = {
+        val done = DriveCollection.jobsDone()
+        if (done != driveDone) {
+            // A game passed to the stick: it moves from the Drive section to the stick's
+            driveDone = done
+            reload()
+        } else {
+            val before = driveItems.map { it.key }
+            val now = if (settingsTab) emptyList() else DriveCollection.items(this, CONSOLES[tab]).map { it.key }
+            if (before != now) { buildDriveRow(); render() } else renderDriveBadges()
+        }
+    }
 
     private lateinit var tabs: LinearLayout
     private lateinit var gamePanel: View
@@ -101,6 +125,11 @@ class MainActivity : Activity() {
     private lateinit var shelfTitle: TextView
     private lateinit var shelfScroll: HorizontalScrollView
     private lateinit var coverRow: LinearLayout
+    private lateinit var driveTitle: TextView
+    private lateinit var shelfClip: android.widget.ScrollView
+    private lateinit var driveScroll: HorizontalScrollView
+    private lateinit var driveCovers: LinearLayout
+    private val driveViews = mutableListOf<View>()
     private lateinit var settingsGrid: GridLayout
     private lateinit var hints: LinearLayout
     private val tabViews = mutableListOf<View>()
@@ -142,6 +171,8 @@ class MainActivity : Activity() {
         if (DriveSync.phase != DriveSync.Phase.SYNCING) {
             reload()
             offerUpdate()
+            // The phone may have added or sent games to the collection
+            DriveCollection.refresh(this)
         }
     }
     /** RetroShop downloads: progress in the top bar; a finished game shows up in its tab right away. */
@@ -186,6 +217,12 @@ class MainActivity : Activity() {
         shelfTitle = findViewById(R.id.shelfTitle)
         shelfScroll = findViewById(R.id.shelfScroll)
         coverRow = findViewById(R.id.covers)
+        driveTitle = findViewById(R.id.driveTitle)
+        shelfClip = findViewById(R.id.shelfClip)
+        // The root lets children draw outside their bounds (selection glow); this window must clip its rows
+        shelfClip.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ -> v.clipBounds = android.graphics.Rect(0, 0, v.width, v.height) }
+        driveScroll = findViewById(R.id.driveScroll)
+        driveCovers = findViewById(R.id.driveCovers)
         settingsGrid = findViewById(R.id.settingsGrid)
         hints = findViewById(R.id.hints)
         hero.clipToOutline = true
@@ -269,6 +306,8 @@ class MainActivity : Activity() {
         getSystemService(ConnectivityManager::class.java).registerDefaultNetworkCallback(networkCallback)
         DriveSync.addListener(syncListener)
         ShopDownloads.addListener(shopListener)
+        DriveCollection.addListener(driveListener)
+        if (hasStorage) DriveCollection.refresh(this)
         main.post(statusTicker)
         main.post(statusJsonTicker)
         // Back from a game or from boot: sync if the last one is older than a minute, then every 15 min.
@@ -288,6 +327,7 @@ class MainActivity : Activity() {
         getSystemService(ConnectivityManager::class.java).unregisterNetworkCallback(networkCallback)
         DriveSync.removeListener(syncListener)
         ShopDownloads.removeListener(shopListener)
+        DriveCollection.removeListener(driveListener)
         main.removeCallbacks(statusTicker)
         main.removeCallbacks(statusJsonTicker)
         main.removeCallbacks(syncTicker)
@@ -327,12 +367,20 @@ class MainActivity : Activity() {
         io.execute {
             val scanned = library.scan()
             main.post {
+                // Keep the selection on the same game; one just passed from Drive gets selected on the stick's row
                 val keepKeys = CONSOLES.indices.map { i -> games[CONSOLES[i].id]?.getOrNull(selected[i])?.key }
+                val keepDrive = CONSOLES.indices.map { i -> DriveCollection.items(this, CONSOLES[i]).getOrNull(driveSel[i])?.baseName }
                 games = scanned
                 CONSOLES.forEachIndexed { i, c ->
                     val list = games[c.id].orEmpty()
-                    selected[i] = list.indexOfFirst { it.key == keepKeys[i] }.takeIf { it >= 0 }
+                    val drive = DriveCollection.items(this, c)
+                    val passed = if (inDrive[i]) list.indexOfFirst { it.baseName == keepDrive[i] } else -1
+                    if (passed >= 0) inDrive[i] = false
+                    selected[i] = passed.takeIf { it >= 0 } ?: list.indexOfFirst { it.key == keepKeys[i] }.takeIf { it >= 0 }
                         ?: selected[i].coerceIn(0, maxOf(0, list.size - 1))
+                    driveSel[i] = drive.indexOfFirst { it.baseName == keepDrive[i] }.takeIf { it >= 0 }
+                        ?: driveSel[i].coerceIn(0, maxOf(0, drive.size - 1))
+                    if (drive.isEmpty()) inDrive[i] = false
                 }
                 if (!initialTabChosen) chooseInitialTab()
                 updateTabCounts()
@@ -448,7 +496,7 @@ class MainActivity : Activity() {
             v.findViewById<View>(R.id.coverBadge).visibility = if (game == playing) View.VISIBLE else View.GONE
             val image = v.findViewById<ImageView>(R.id.coverImage)
             image.tag = game.key
-            covers.load(game, dp(98)) { bitmap -> if (image.tag == game.key) image.setImageBitmap(bitmap) }
+            covers.load(game, dp(98)) { bitmap -> if (image.tag == game.key) image.setImageBitmap(bitmap ?: logoCover(this, game.console, dp(98))) }
             coverRow.addView(v)
             coverViews += v
         }
@@ -462,15 +510,68 @@ class MainActivity : Activity() {
         coverRow.addView(add)
         // Selectable: last card of the shelf, opens RetroShop on this console
         coverViews += add
+        buildDriveRow()
+    }
+
+    /** Second row: games in the Drive collection that aren't on the stick (✕ opens their ficha). */
+    private fun buildDriveRow() {
+        driveCovers.removeAllViews()
+        driveViews.clear()
+        driveItems = if (settingsTab) emptyList() else DriveCollection.items(this, CONSOLES[tab])
+        driveInfo.clear()
+        driveBadges.clear()
+        val show = if (driveItems.isEmpty()) View.GONE else View.VISIBLE
+        driveTitle.visibility = show
+        driveScroll.visibility = show
+        if (!settingsTab) driveTitle.text = getString(R.string.shelf_title_drive, CONSOLES[tab].name)
+        driveItems.forEach { item ->
+            val v = layoutInflater.inflate(R.layout.item_cover, driveCovers, false)
+            val probe = item.probe()
+            val inner = v.findViewById<View>(R.id.coverInner)
+            inner.background = fallbackGradient(probe, 8)
+            inner.clipToOutline = true
+            v.findViewById<TextView>(R.id.coverTitle).text = item.title
+            val image = v.findViewById<ImageView>(R.id.coverImage)
+            image.tag = item.key
+            image.alpha = 0.6f
+            covers.load(probe, dp(98)) { bitmap -> if (image.tag == item.key) image.setImageBitmap(bitmap ?: logoCover(this, item.console, dp(98))) }
+            driveBadges[item.key] = v.findViewById<TextView>(R.id.coverBadge).apply { visibility = View.VISIBLE }
+            driveCovers.addView(v)
+            driveViews += v
+        }
+        renderDriveBadges()
+    }
+
+    /** "Drive" on each Drive card, or how far it got while passing to the stick. */
+    private fun renderDriveBadges() {
+        driveItems.forEach { item ->
+            val badge = driveBadges[item.key] ?: return@forEach
+            val job = DriveCollection.jobFor(item)
+            badge.text = when (job?.state) {
+                DriveCollection.State.RUNNING -> "${(job.progress * 100).toInt()} %"
+                DriveCollection.State.ERROR -> "Error"
+                else -> getString(R.string.drive_badge)
+            }
+        }
     }
 
     private fun renderShelf() {
         if (settingsTab) return
+        val drive = driveRow
         val sel = selected[tab]
         coverViews.forEachIndexed { i, v ->
-            v.background = if (i == sel && zone == Zone.CONTENT) getDrawable(R.drawable.bg_cover_sel) else null
+            v.background = if (!drive && i == sel && zone == Zone.CONTENT) getDrawable(R.drawable.bg_cover_sel) else null
         }
-        val v = coverViews.getOrNull(sel) ?: return
+        driveViews.forEachIndexed { i, v ->
+            v.background = if (drive && i == driveSel[tab] && zone == Zone.CONTENT) getDrawable(R.drawable.bg_cover_sel) else null
+        }
+        // The Drive row slides up into the window when it has the focus
+        shelfClip.post { shelfClip.smoothScrollTo(0, if (driveRow) driveTitle.top else 0) }
+        if (drive) driveViews.getOrNull(driveSel[tab])?.let { scrollInto(driveScroll, it) }
+        else coverViews.getOrNull(sel)?.let { scrollInto(shelfScroll, it) }
+    }
+
+    private fun scrollInto(shelfScroll: HorizontalScrollView, v: View) {
         shelfScroll.post {
             val visible = shelfScroll.width - shelfScroll.paddingStart - shelfScroll.paddingEnd
             when {
@@ -483,7 +584,8 @@ class MainActivity : Activity() {
     // ---- Selected game ----
 
     private fun renderContent() {
-        val game = currentGame
+        val drive = currentDrive
+        val game = currentGame ?: drive?.let { item -> driveInfo.getOrPut(item.key) { item.probe().also { library.describe(it) } } }
         gamePanel.visibility = if (!settingsTab && game != null) View.VISIBLE else View.GONE
         emptyText.visibility = if (!settingsTab && game == null) View.VISIBLE else View.GONE
         shelf.visibility = if (settingsTab) View.GONE else View.VISIBLE
@@ -501,7 +603,8 @@ class MainActivity : Activity() {
             return
         }
         findViewById<TextView>(R.id.gameTitle).text = game.title
-        findViewById<TextView>(R.id.gameMeta).text = listOfNotNull(console.name, game.region).joinToString(" · ")
+        findViewById<TextView>(R.id.gameMeta).text =
+            listOfNotNull(console.name, game.region, if (drive != null) getString(R.string.in_drive_meta) else null).joinToString(" · ")
         findViewById<TextView>(R.id.lastPlayed).text = formatWhen(game.lastPlayed)
         findViewById<TextView>(R.id.timePlayed).text = formatDuration(game.runtimeSeconds)
         findViewById<TextView>(R.id.saveState).apply {
@@ -514,7 +617,11 @@ class MainActivity : Activity() {
             })
             setTextColor(getColor(if (backedUp) R.color.ok else R.color.text))
         }
-        findViewById<TextView>(R.id.playText).setText(if (game.hasProgress) R.string.continue_game else R.string.play)
+        findViewById<TextView>(R.id.playText).setText(when {
+            drive != null -> R.string.see_ficha
+            game.hasProgress -> R.string.continue_game
+            else -> R.string.play
+        })
 
         if (heroKey != game.key) {
             heroKey = game.key
@@ -522,7 +629,7 @@ class MainActivity : Activity() {
             heroFallback.text = game.title
             heroImage.setImageDrawable(null)
             heroImage.tag = game.key
-            covers.load(game, dp(190)) { bitmap -> if (heroImage.tag == game.key) heroImage.setImageBitmap(bitmap) }
+            covers.load(game, dp(190)) { bitmap -> if (heroImage.tag == game.key) heroImage.setImageBitmap(bitmap ?: logoCover(this, game.console, dp(190))) }
         }
     }
 
@@ -685,6 +792,10 @@ class MainActivity : Activity() {
         val g = glyphs(padStyle)
         when {
             settingsTab -> addHint(g.confirm, R.string.hint_open)
+            currentDrive != null -> {
+                addHint(g.confirm, R.string.hint_ficha)
+                g.back?.let { addHint(it, R.string.hint_back) }
+            }
             currentGame == null -> addHint(g.confirm, R.string.hint_open)
             currentGame != null -> {
                 addHint(g.confirm, R.string.hint_play)
@@ -801,11 +912,13 @@ class MainActivity : Activity() {
             KeyEvent.KEYCODE_DPAD_UP -> when {
                 tabsZone -> Unit
                 settingsTab && settingIndex >= SETTINGS_COLUMNS -> settingIndex -= SETTINGS_COLUMNS
+                driveRow -> inDrive[tab] = false
                 else -> zone = Zone.TABS
             }
             KeyEvent.KEYCODE_DPAD_DOWN -> when {
                 tabsZone -> zone = Zone.CONTENT
                 settingsTab && settingIndex + SETTINGS_COLUMNS < settings.size -> settingIndex += SETTINGS_COLUMNS
+                !settingsTab && driveItems.isNotEmpty() -> inDrive[tab] = true
             }
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER,
             KeyEvent.KEYCODE_BUTTON_A -> when {
@@ -827,8 +940,9 @@ class MainActivity : Activity() {
     }
 
     private fun moveGame(delta: Int) {
+        if (driveRow) driveSel[tab] = (driveSel[tab] + delta).coerceIn(0, driveItems.size - 1)
         // Games, then the "Añade juegos desde RetroShop" card (index == number of games)
-        selected[tab] = (selected[tab] + delta).coerceIn(0, consoleGames.size)
+        else selected[tab] = (selected[tab] + delta).coerceIn(0, consoleGames.size)
     }
 
     // ---- Google Drive sign-in (code typed on the phone) ----
@@ -966,9 +1080,17 @@ class MainActivity : Activity() {
     }
 
     private fun play() {
+        currentDrive?.let { return openDriveGame(it) }
         val game = currentGame ?: return openShop()
         DriveSync.cancel()
         if (!launchInRetroArch(this, game)) toast(R.string.retroarch_missing)
+    }
+
+    /** The ficha of a game in the Drive collection, with "Pasar al stick" (ShopActivity in Drive mode). */
+    private fun openDriveGame(item: DriveCollection.Item) {
+        open(Intent(this, ShopActivity::class.java)
+            .putExtra(ShopActivity.EXTRA_CONSOLE, item.console.id)
+            .putExtra(ShopActivity.EXTRA_DRIVE_FILE, item.name))
     }
 
     /** RetroShop on the console of the current tab (the "Añade juegos" card). */
@@ -1035,6 +1157,8 @@ class MainActivity : Activity() {
             }
             Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
             reload()
+            // "Quitar solo del stick": it shows up in the Drive section
+            DriveCollection.refresh(this, force = true)
         }
     }
 

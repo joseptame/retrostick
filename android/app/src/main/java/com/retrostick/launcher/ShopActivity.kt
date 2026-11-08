@@ -88,6 +88,9 @@ class ShopActivity : Activity() {
     private var fichaShot = 0
     private var viewerIndex = -1
     private var fichaButton = 0
+    /** Drive mode (EXTRA_DRIVE_FILE): only the ficha of a game in the Drive collection, to pass it to the stick. */
+    private var driveItem: DriveCollection.Item? = null
+    private val driveListener: () -> Unit = { renderFicha() }
 
     // Pairing (first time): QR + code on screen, the phone leaves the pass in Drive (ShopPairing).
     private val main = Handler(Looper.getMainLooper())
@@ -127,6 +130,12 @@ class ShopActivity : Activity() {
         consoleIndex = CONSOLES.indexOfFirst { it.id == intent.getStringExtra(EXTRA_CONSOLE) }.coerceAtLeast(0)
         setContentView(build())
         ShopApi.token = ShopPairing.token(this)
+        intent.getStringExtra(EXTRA_DRIVE_FILE)?.let { name ->
+            val item = DriveCollection.find(this, console, name) ?: return finish()
+            driveItem = item
+            showGame(ShopGame(item.title, item.name, item.size, item.baseName, null, emptyList(), null, emptyList(), null, null))
+            return
+        }
         if (ShopApi.token == null) startPairing() else loadCatalog()
     }
 
@@ -159,6 +168,7 @@ class ShopActivity : Activity() {
         super.onResume()
         padStyle = StickStatus.firstPadStyle()
         ShopDownloads.addListener(downloadsListener)
+        DriveCollection.addListener(driveListener)
         downloadsListener()
         if (pairCode != null) main.postDelayed(pollPairing, POLL_MS)
     }
@@ -168,6 +178,7 @@ class ShopActivity : Activity() {
         // The trailer would keep playing behind another app
         closeTrailer()
         ShopDownloads.removeListener(downloadsListener)
+        DriveCollection.removeListener(driveListener)
         main.removeCallbacks(pollPairing)
     }
 
@@ -577,7 +588,7 @@ class ShopActivity : Activity() {
             if (card.bound !== g) {
                 card.bound = g
                 card.cover.setImageDrawable(null)
-                loadCover(g) { bmp -> if (card.bound === g) card.cover.setImageBitmap(bmp) }
+                loadCover(g) { bmp -> if (card.bound === g) card.cover.setImageBitmap(bmp ?: logoCover(this, console, dp(CARD_DP))) }
             }
         }
         // Next row ready before you get there
@@ -835,7 +846,7 @@ class ShopActivity : Activity() {
         viewer.visibility = View.GONE
         fichaHero.setImageDrawable(null)
         fichaCover.setImageDrawable(null)
-        loadCover(g) { bmp -> if (ficha === g) fichaCover.setImageBitmap(bmp) }
+        loadCover(g) { bmp -> if (ficha === g) fichaCover.setImageBitmap(bmp ?: logoCover(this, console, dp(200))) }
         fichaTitle.text = g.title
         fichaMeta.text = listOfNotNull(
             g.rating?.let { "★ " + String.format("%.1f", it).replace('.', ',') },
@@ -879,6 +890,7 @@ class ShopActivity : Activity() {
 
     private fun closeFicha() {
         closeTrailer()
+        if (driveItem != null) return finish()
         ficha = null
         fichaPanel.visibility = View.GONE
         renderGrid()
@@ -895,7 +907,16 @@ class ShopActivity : Activity() {
         val g = ficha ?: return
         val job = ShopDownloads.jobFor(g)
         val state = job?.state
+        val item = driveItem
+        val passing = item?.let { DriveCollection.jobFor(it) }
         val (first, status) = when {
+            item != null -> when (passing?.state) {
+                DriveCollection.State.RUNNING -> "Pasando al stick ${(passing.progress * 100).toInt()} %" to
+                    "${Formatter.formatShortFileSize(this, passing.done)} de ${Formatter.formatShortFileSize(this, passing.total)} · puedes volver al inicio y seguirá"
+                DriveCollection.State.DONE -> OWNED to "Ya está en el stick: aparece en la pestaña ${console.name} del inicio."
+                DriveCollection.State.ERROR -> RETRY to "No se pudo pasar al stick: ${passing.error}"
+                null -> PASS to "Está en tu colección de Drive. Se descarga al stick y queda sincronizado."
+            }
             isOwned(g) -> OWNED to "Ya está en el stick: aparece en la pestaña ${console.name} del inicio."
             state == ShopDownloads.State.RUNNING -> "Descargando ${(job.progress * 100).toInt()} %" to
                 "${Formatter.formatShortFileSize(this, job.done)} de ${Formatter.formatShortFileSize(this, job.total)} · puedes seguir mirando la tienda"
@@ -904,10 +925,11 @@ class ShopActivity : Activity() {
             else -> DOWNLOAD to "Se guarda en el stick y se copia a tu Drive."
         }
         fichaStatus.text = status
-        val running = state == ShopDownloads.State.RUNNING || state == ShopDownloads.State.QUEUED
+        val running = if (item != null) passing?.state == DriveCollection.State.RUNNING
+            else state == ShopDownloads.State.RUNNING || state == ShopDownloads.State.QUEUED
         fichaTrack.visibility = if (running) View.VISIBLE else View.GONE
         fichaBar.layoutParams = (fichaBar.layoutParams as FrameLayout.LayoutParams).apply {
-            width = (dp(FICHA_BAR_DP) * (job?.progress ?: 0f)).toInt()
+            width = (dp(FICHA_BAR_DP) * ((if (item != null) passing?.progress else job?.progress) ?: 0f)).toInt()
         }
         val labels = fichaLabels(first)
         fichaButton = fichaButton.coerceAtMost(labels.size - 1)
@@ -921,7 +943,7 @@ class ShopActivity : Activity() {
             }
             b.setTextColor(if (focus) getColor(R.color.button_text) else getColor(R.color.text))
             val icon = when (labels[i]) {
-                DOWNLOAD -> R.drawable.ic_shop_download
+                DOWNLOAD, PASS -> R.drawable.ic_shop_download
                 OWNED -> R.drawable.ic_shop_check
                 RETRY -> R.drawable.ic_shop_retry
                 else -> null
@@ -985,6 +1007,11 @@ class ShopActivity : Activity() {
     }
 
     private fun download(g: ShopGame) {
+        driveItem?.let { item ->
+            val s = DriveCollection.jobFor(item)?.state
+            if (s != DriveCollection.State.RUNNING && s != DriveCollection.State.DONE) DriveCollection.passToStick(this, item)
+            return renderFicha()
+        }
         val cat = catalog ?: return
         val state = ShopDownloads.jobFor(g)?.state
         if (isOwned(g) || state == ShopDownloads.State.RUNNING || state == ShopDownloads.State.QUEUED) return
@@ -1107,6 +1134,8 @@ class ShopActivity : Activity() {
 
     companion object {
         const val EXTRA_CONSOLE = "console"
+        const val EXTRA_DRIVE_FILE = "driveFile"
+        private const val PASS = "Pasar al stick"
         private const val POLL_MS = 3000L
         private const val FICHA_BAR_DP = 320
         private const val MAX_SHOTS = 6

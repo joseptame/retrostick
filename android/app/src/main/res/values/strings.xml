@@ -46,6 +46,11 @@
     <string name="add_games">+ Añade juegos desde RetroShop</string>
     <string name="shop_from_shelf">Descubre más juegos de %1$s en RetroShop: pulsa para abrir la tienda.</string>
     <string name="shelf_title">%1$s · en el stick</string>
+    <string name="shelf_title_drive">%1$s · en tu Drive (no están en el stick)</string>
+    <string name="drive_badge">Drive</string>
+    <string name="in_drive_meta">En tu Drive</string>
+    <string name="see_ficha">Ver ficha</string>
+    <string name="hint_ficha">Ver ficha</string>
     <string name="empty_console">Aún no hay juegos de %1$s en el stick: añádelos desde RetroShop.</string>
 
     <string name="hint_play">Jugar</string>

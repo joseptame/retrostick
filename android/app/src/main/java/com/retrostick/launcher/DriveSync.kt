@@ -151,8 +151,21 @@ object DriveSync {
         return out.toList()
     }
 
+    /** Runs [block] on the sync thread (after a sync in progress, which is asked to stop first). */
+    fun runExclusive(block: () -> Unit) {
+        cancel()
+        executor.execute(block)
+    }
+
+    /** A ROM put in /ROMs by RetroStick from JugandoAhora: the sync treats it as one it downloaded itself. */
+    fun markDownloaded(context: Context, consoleId: String, name: String) {
+        val manifest = prefs(context).getStringSet("roms", emptySet())!!.toMutableSet()
+        manifest += "$consoleId/$name"
+        prefs(context).edit().putStringSet("roms", manifest).apply()
+    }
+
     /** Drive folder id for a "Retro/..." path (same cache as the sync), created when missing. */
-    private fun folderId(context: Context, drive: DriveClient, path: String): String {
+    fun folderId(context: Context, drive: DriveClient, path: String): String {
         val folders = JSONObject(prefs(context).getString("folders", "{}")!!)
         folders.optString(path).takeIf { it.isNotEmpty() }?.let { return it }
         val parent = if ('/' in path) folderId(context, drive, path.substringBeforeLast('/')) else "root"

@@ -208,3 +208,27 @@ class CoverLoader(context: Context) {
         }
     }
 }
+
+private val logoCovers = LruCache<String, Bitmap>(16)
+
+/**
+ * Stand-in cover for a game without box art: the console's logo in white, a little above the middle
+ * (the card's title sits at the bottom), on a transparent square drawn over the card's own background.
+ */
+fun logoCover(context: Context, console: Console, sizePx: Int): Bitmap {
+    val key = "${console.id}@$sizePx"
+    logoCovers.get(key)?.let { return it }
+    val bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+    val logo = context.getDrawable(console.logoWhite ?: console.logo)!!.mutate()
+    if (console.logoWhite == null) logo.setColorFilter(android.graphics.Color.WHITE, android.graphics.PorterDuff.Mode.SRC_IN)
+    logo.alpha = 230
+    val aspect = logo.intrinsicWidth.toFloat() / logo.intrinsicHeight.coerceAtLeast(1)
+    val w = minOf(sizePx * 0.72f, sizePx * 0.24f * aspect)
+    val h = w / aspect
+    val left = (sizePx - w) / 2
+    val top = sizePx * 0.38f - h / 2
+    logo.setBounds(left.toInt(), top.toInt(), (left + w).toInt(), (top + h).toInt())
+    logo.draw(android.graphics.Canvas(bmp))
+    logoCovers.put(key, bmp)
+    return bmp
+}
