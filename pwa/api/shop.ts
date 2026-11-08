@@ -19,7 +19,7 @@ import { configureArchive, groupDiscs, listItemFiles, type ArchiveEntry } from '
 import { consoleForFile, CONSOLES, isCartridge, type ConsoleId } from '../src/lib/consoles.js'
 import { configureData } from '../src/lib/data.js'
 import { loadLookup } from '../src/lib/igdbdb.js'
-import { baseName, bestVariants, displayTitle, isDemo, looseKey } from '../src/lib/names.js'
+import { baseName, bestVariants, coverUrl, displayTitle, isDemo, looseKey, safeThumbName } from '../src/lib/names.js'
 import { DEFAULT_COLLECTIONS } from '../src/lib/recents.js'
 import { coverFor, loadDb } from '../src/lib/romdb.js'
 
@@ -90,8 +90,10 @@ async function build(id: ConsoleId, collection: string): Promise<string> {
   })
   // Box art picked here (same choice as the webapp), so the stick needn't look up libretro's index itself.
   const covers = await Promise.all(list.map((e) => coverFor(id, e.name).catch(() => null)))
+  // No box art (pirate, homebrew…): libretro often still has the title screen under the exact No-Intro name.
+  const thumbs = CONSOLES.find((c) => c.id === id)!.thumbs
   covers.forEach((c, i) => {
-    if (c) games[i].c = c
+    games[i].c = c ?? coverUrl(thumbs, safeThumbName(baseName(list[i].name)), 'Named_Titles')
   })
   games.sort((a, b) => (b.r ?? -1) - (a.r ?? -1) || a.t.localeCompare(b.t, 'es'))
   return JSON.stringify({ console: id, collection, title, restricted, archive, genres, games })

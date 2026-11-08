@@ -140,15 +140,18 @@ function boxartIndex(boxarts: string[]): BoxartIndex {
  * Box art at libretro's thumbnail server (it follows the repos' symlinks: "(Disc 1)" names are links), as a
  * full-size PNG (100–500 KB).
  */
-export function directCoverUrl(thumbsRepo: string, boxartName: string): string {
-  return `https://thumbnails.libretro.com/${encodeURIComponent(thumbsRepo.replace(/_/g, ' '))}/Named_Boxarts/${encodeURIComponent(boxartName)}.png`
+export function directCoverUrl(thumbsRepo: string, boxartName: string, kind: ThumbKind = 'Named_Boxarts'): string {
+  return `https://thumbnails.libretro.com/${encodeURIComponent(thumbsRepo.replace(/_/g, ' '))}/${kind}/${encodeURIComponent(boxartName)}.png`
 }
 
 /** Resizing CDN (wsrv.nl, free, no account): the same box art as a ~25 KB WebP, cached worldwide. */
 const PROXY = 'https://wsrv.nl/?url='
 
-export function coverUrl(thumbsRepo: string, boxartName: string): string {
-  return `${PROXY}${encodeURIComponent(directCoverUrl(thumbsRepo, boxartName))}&w=400&output=webp&q=80`
+/** Box art, or the title screen (Named_Titles) for games without one (pirate and homebrew releases). */
+export type ThumbKind = 'Named_Boxarts' | 'Named_Titles'
+
+export function coverUrl(thumbsRepo: string, boxartName: string, kind: ThumbKind = 'Named_Boxarts'): string {
+  return `${PROXY}${encodeURIComponent(directCoverUrl(thumbsRepo, boxartName, kind))}&w=400&output=webp&q=80`
 }
 
 /** The original image behind a resized cover URL (fallback when the CDN fails), or null. */
