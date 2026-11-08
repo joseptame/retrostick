@@ -305,8 +305,9 @@ function logoSpot(c) {
   const a = areaOf(c);
   // [panel left, panel right, centre y, white?, vertical?]
   switch (c.id) {
-    case 'gb': return [a.x, a.x + a.w, (a.y + a.h + 30 + H) / 2, false, false, 64];
-    case 'gbc': return [a.x, a.x + a.w, (a.y + a.h + 30 + H) / 2, false, false, 64];
+    // TVs crop the outer edge (overscan): logo smaller and higher, clear of the bottom 40 px
+    case 'gb': return [a.x, a.x + a.w, a.y + a.h + 60, false, false, 46];
+    case 'gbc': return [a.x, a.x + a.w, a.y + a.h + 50, false, false, 50];
     case 'gba': return [0, a.x - 26, H / 2 + 200, false, true];
     case 'nes': return [0, a.x - 30, H / 2 - 160, false, true];
     case 'snes': return [0, a.x - 30, H / 2 - 140, false, true];
