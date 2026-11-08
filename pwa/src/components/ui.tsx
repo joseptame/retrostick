@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 import { Icon } from './icons'
 import type { ConsoleId } from '../lib/consoles'
 import { coverFor } from '../lib/romdb'
+import { unproxiedCover } from '../lib/names'
 
 const GRADIENTS = [
   ['#0f9b6e', '#022c22'], ['#16a34a', '#14532d'], ['#f97316', '#7c2d12'], ['#eab308', '#713f12'],
@@ -35,8 +36,14 @@ export function useCoverUrl(
       alive = false
     }
   }, [console, name])
+  // The resizing CDN failed: try the original image before giving up.
+  const fail = (f: boolean) => {
+    const direct = f && url ? unproxiedCover(url) : null
+    if (direct) setUrl(direct)
+    else setFailed(f)
+  }
   /** `resolved`: the lookup finished (url found, none, or error). */
-  return { url, resolved, failed, setFailed }
+  return { url, resolved, failed, setFailed: fail }
 }
 
 /** Gradient used when a game has no box art, stable per title. */

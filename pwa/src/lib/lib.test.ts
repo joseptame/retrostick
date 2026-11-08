@@ -65,7 +65,9 @@ describe('covers', () => {
 
   it('builds the libretro-thumbnails URL (README 7.5)', () => {
     expect(coverUrl('Nintendo_-_Game_Boy_Color', 'A & B: C')).toBe(
-      'https://raw.githubusercontent.com/libretro-thumbnails/Nintendo_-_Game_Boy_Color/master/Named_Boxarts/A%20%26%20B%3A%20C.png',
+      'https://wsrv.nl/?url=' +
+        encodeURIComponent('https://thumbnails.libretro.com/Nintendo%20-%20Game%20Boy%20Color/Named_Boxarts/A%20%26%20B%3A%20C.png') +
+        '&w=400&output=webp&q=80',
     )
   })
 })

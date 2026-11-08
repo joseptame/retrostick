@@ -122,8 +122,24 @@ function looseKeysOf(boxarts: string[]): Map<string, string> {
   return m
 }
 
+/**
+ * Box art at libretro's thumbnail server (it follows the repos' symlinks: "(Disc 1)" names are links), as a
+ * full-size PNG (100–500 KB).
+ */
+export function directCoverUrl(thumbsRepo: string, boxartName: string): string {
+  return `https://thumbnails.libretro.com/${encodeURIComponent(thumbsRepo.replace(/_/g, ' '))}/Named_Boxarts/${encodeURIComponent(boxartName)}.png`
+}
+
+/** Resizing CDN (wsrv.nl, free, no account): the same box art as a ~25 KB WebP, cached worldwide. */
+const PROXY = 'https://wsrv.nl/?url='
+
 export function coverUrl(thumbsRepo: string, boxartName: string): string {
-  return `https://raw.githubusercontent.com/libretro-thumbnails/${thumbsRepo}/master/Named_Boxarts/${encodeURIComponent(boxartName)}.png`
+  return `${PROXY}${encodeURIComponent(directCoverUrl(thumbsRepo, boxartName))}&w=400&output=webp&q=80`
+}
+
+/** The original image behind a resized cover URL (fallback when the CDN fails), or null. */
+export function unproxiedCover(url: string): string | null {
+  return url.startsWith(PROXY) ? new URL(url).searchParams.get('url') : null
 }
 
 export type SaveKind = 'srm' | 'state' | 'auto'

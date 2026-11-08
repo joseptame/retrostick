@@ -34,12 +34,12 @@ export default defineConfig({
         navigateFallbackDenylist: [/^\/__/],
         runtimeCaching: [
           {
-            // Box art (README 7.5): CacheFirst, 30 days
-            urlPattern: /^https:\/\/raw\.githubusercontent\.com\/libretro-thumbnails\//,
+            // Box art (README 7.5), resized by wsrv.nl or straight from libretro: CacheFirst, 60 days
+            urlPattern: /^https:\/\/(wsrv\.nl\/|thumbnails\.libretro\.com\/|raw\.githubusercontent\.com\/libretro-thumbnails\/)/,
             handler: 'CacheFirst',
             options: {
               cacheName: 'covers',
-              expiration: { maxEntries: 1000, maxAgeSeconds: 30 * 24 * 3600 },
+              expiration: { maxEntries: 4000, maxAgeSeconds: 60 * 24 * 3600 },
               cacheableResponse: { statuses: [0, 200] },
             },
           },

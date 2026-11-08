@@ -409,12 +409,19 @@ class ShopActivity : Activity() {
             if (card.bound !== g) {
                 card.bound = g
                 card.cover.setImageDrawable(null)
-                // Multi-disc games: the box art is named without "(Disc 1)"
-                val coverName = g.name.replace(Regex("""\s*\(Disc \d+\)""", RegexOption.IGNORE_CASE), "")
-                val probe = Game(console, File(console.romDir, "$coverName.${g.file.substringAfterLast('.')}"))
-                covers.load(probe, dp(CARD_DP)) { bmp -> if (card.bound === g) card.cover.setImageBitmap(bmp) }
+                covers.load(coverProbe(g), dp(CARD_DP)) { bmp -> if (card.bound === g) card.cover.setImageBitmap(bmp) }
             }
         }
+        // Next row ready before you get there
+        for (i in (topRow + ROWS) * COLUMNS until (topRow + ROWS + 1) * COLUMNS) {
+            shown.getOrNull(i)?.let { covers.load(coverProbe(it), dp(CARD_DP)) {} }
+        }
+    }
+
+    /** A Game named like the download, for CoverLoader (multi-disc box art is named without "(Disc 1)"). */
+    private fun coverProbe(g: ShopGame): Game {
+        val name = g.name.replace(Regex("""\s*\(Disc \d+\)""", RegexOption.IGNORE_CASE), "")
+        return Game(console, File(console.romDir, "$name.${g.file.substringAfterLast('.')}"))
     }
 
     /** Download size (all discs of a multi-disc game). */

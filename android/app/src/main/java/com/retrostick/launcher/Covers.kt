@@ -19,8 +19,11 @@ class CoverLoader(context: Context) {
     private val memory = object : LruCache<String, Bitmap>((Runtime.getRuntime().maxMemory() / 8).toInt()) {
         override fun sizeOf(key: String, value: Bitmap) = value.byteCount
     }
-    // One thread: two loads of the same cover (shelf + hero) must not race on the same files.
-    private val executor = Executors.newSingleThreadExecutor()
+    // A few covers at once (RetroShop shows 16); loads of the same game or console index take turns
+    // on a lock so they never race on the same files.
+    private val executor = Executors.newFixedThreadPool(4)
+    private val locks = java.util.concurrent.ConcurrentHashMap<String, Any>()
+    private fun <T> locked(key: String, block: () -> T): T = synchronized(locks.getOrPut(key) { Any() }) { block() }
     private val main = Handler(Looper.getMainLooper())
 
     /** Calls [onLoaded] on the main thread with the cover, or null when there is none. */
@@ -28,7 +31,7 @@ class CoverLoader(context: Context) {
         val memKey = "${game.key}@$sizePx"
         memory.get(memKey)?.let { onLoaded(it); return }
         executor.execute {
-            val bitmap = coverFile(game)?.let { decode(it, sizePx) }
+            val bitmap = locked(game.key) { coverFile(game) }?.let { decode(it, sizePx) }
             if (bitmap != null) memory.put(memKey, bitmap)
             main.post { onLoaded(bitmap) }
         }
@@ -41,7 +44,7 @@ class CoverLoader(context: Context) {
         val missing = File(consoleDir, "${game.baseName}.none")
         if (missing.exists() && System.currentTimeMillis() - missing.lastModified() < RETRY_MISSING_MS) return null
 
-        val names = boxartIndex(game.console)?.let { listOfNotNull(bestBoxart(game.baseName, it)) }
+        val names = locked("index/${game.console.id}") { boxartIndex(game.console) }?.let { listOfNotNull(bestBoxart(game.baseName, it)) }
             ?: candidateNames(game.baseName)
         for (name in names) {
             when (download(game.console.thumbnailSystem, name, local)) {
@@ -90,14 +93,28 @@ class CoverLoader(context: Context) {
         null
     }
 
+    /**
+     * Box art from libretro's thumbnail server (it follows the repos' symlinks, used for "(Disc 1)" names),
+     * resized to a ~30 KB WebP by the wsrv.nl CDN; straight from libretro (full PNG) if the CDN fails.
+     */
     private fun download(system: String, name: String, target: File): Result {
-        val encoded = URLEncoder.encode(name, "UTF-8").replace("+", "%20")
-        val url = URL("https://raw.githubusercontent.com/libretro-thumbnails/$system/master/Named_Boxarts/$encoded.png")
+        val enc = { s: String -> URLEncoder.encode(s, "UTF-8").replace("+", "%20") }
+        val direct = "https://thumbnails.libretro.com/${enc(system.replace('_', ' '))}/Named_Boxarts/${enc(name)}.png"
+        val resized = "https://wsrv.nl/?url=${enc(direct)}&w=600&output=webp&q=82"
+        return when (val r = fetch(resized, target)) {
+            Result.ERROR -> fetch(direct, target)
+            else -> r
+        }
+    }
+
+    private fun fetch(address: String, target: File): Result {
+        val url = URL(address)
         val tmp = File.createTempFile("cover", ".part", target.parentFile)
         return try {
             val conn = url.openConnection() as HttpURLConnection
             conn.connectTimeout = 8000
             conn.readTimeout = 15000
+            conn.setRequestProperty("User-Agent", "RetroStick-Launcher")
             when (conn.responseCode) {
                 200 -> {
                     conn.inputStream.use { input -> tmp.outputStream().use { input.copyTo(it) } }
