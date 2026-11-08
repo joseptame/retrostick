@@ -65,6 +65,7 @@ Sin root no se puede añadir un `.kl` al sistema (`/vendor` es de solo lectura),
 | L2 | — | **Guardado rápido** | L2 |
 | R2 | — | **Avance rápido x2** (activar/desactivar) | R2 |
 | PS | Menú de RetroArch | Menú de RetroArch | Menú de RetroArch |
+| Panel táctil (clic) | **Quitar / poner el marco** | **Quitar / poner el marco** | **Quitar / poner el marco** |
 
 También abre el menú **Create + Options** (`input_menu_toggle_gamepad_combo = 4`).
 
@@ -76,6 +77,8 @@ Archivos (los instala `install.ps1`):
 | `stick/retroarch/overrides/Gambatte/Gambatte.cfg` | `RetroArch/config/Gambatte/` | L1 guardar, R1 avance rápido, x2 |
 | `stick/retroarch/remaps/mGBA/mGBA.rmp` | `RetroArch/config/remaps/mGBA/` | ✕○ → A, □△ → B, L2/R2 sin función, stick = cruceta |
 | `stick/retroarch/overrides/mGBA/mGBA.cfg` | `RetroArch/config/mGBA/` | L2 guardar, R2 avance rápido, x2 |
+| `stick/retroarch/overrides/<Núcleo>/<consola>.cfg` | `RetroArch/config/<Núcleo>/` | Tamaño fijo del juego y marco de esa consola (ver README 6.4) |
+| `stick/retroarch/overlays/retrostick/` | `RetroArch/overlays/retrostick/` | Marcos (PNG 1920×1080) |
 
 Los atajos de las configuraciones por núcleo usan los códigos del DualSense (100/101/102/103). Con otro mando habrá
 que añadir sus códigos cuando se empareje.

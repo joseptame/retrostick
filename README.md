@@ -259,8 +259,23 @@ config_save_on_exit = "false"             # para que la configuración del repo 
 - BIOS: usa la del usuario si existe en `system/`, si no la HLE. ⚠️ VERIFICAR qué nombres de archivo busca la versión instalada (habitualmente `scph1001.bin`, `scph5501.bin`, `scph7001.bin`, `scph101.bin`; comprobar si admite la PAL `scph5502.bin`). Documentar en `docs/bios-ps1.md` cómo extraerla de una PS1 propia (FreePSXBoot + volcador), **sin enlaces a descargas de BIOS**.
 
 ### 6.4 Overlays y marcos
-- GB/GBC/GBA: escalado entero + marco decorativo (overlays libres de `libretro/overlay-borders` u otro repo con licencia compatible). Comprobar el rendimiento.
-- PS1: sin marco, 4:3.
+Marcos propios que imitan cada consola (diseño en `docs/maquetas/marcos.html`; de ahí salen los PNG de
+`stick/retroarch/overlays/retrostick/`, 1920×1080 con un hueco transparente donde va el juego).
+
+| Consola | Juego en pantalla | Override por carpeta |
+|---|---|---|
+| Game Boy / Color | 960×864 (×6, píxeles perfectos) | `config/Gambatte/gb.cfg`, `gbc.cfg` |
+| Game Boy Advance | 1440×960 (×6, píxeles perfectos) | `config/mGBA/gba.cfg` |
+| NES / Super Nintendo / PlayStation | 1440×1080 (toda la altura, 4:3) | `config/FCEUmm/nes.cfg`, `config/Snes9x 2010/snes.cfg`, `config/PCSX-ReARMed/psx.cfg` |
+
+- Son *overrides* de carpeta de contenido: RetroArch carga `config/<Núcleo>/<nombre de la carpeta>.cfg` después del
+  del núcleo, así GB y GBC (los dos con Gambatte) llevan marcos distintos.
+- Tamaño fijo con `aspect_ratio_index = "23"` (personalizado). En RetroArch 1.22 `custom_viewport_x/y` son
+  desplazamientos **desde el centro**, por eso valen 0 (comprobado con capturas en el stick el 2026-11-08).
+- Cada marco tiene dos overlays (con marco / vacío). **Clic en el panel táctil** del DualSense
+  (`input_overlay_next_btn = "106"`) cambia entre ellos. No se usa Select + R1: con un botón de atajos todos los atajos
+  pedirían Select, y R1/L1 ya son avance rápido y guardado en GB/GBC.
+- Para cambiar un marco: editar `marcos.html`, exportar los PNG y copiarlos con `install.ps1`.
 
 ### 6.5 Mandos
 - Crear o validar `stick/retroarch/autoconfig/` para **DualSense** y **Switch Pro Controller** en Android 9: nombre del dispositivo y VID/PID tal como los ve RetroArch (*Ajustes → Entrada → Puerto 1*, o `adb shell getevent -il`).
@@ -477,7 +492,8 @@ Usa el cliente OAuth del stick (`local.properties`); la primera vez muestra un c
 - [x] Núcleos, información de núcleos y perfiles de mando descargados.
 - [x] GBC y GBA a velocidad completa; `.srm`/`.state.auto` en `/Partidas` (ver `docs/dispositivo.md`).
 - [ ] **Pendiente:** emparejar DualSense y Pro Controller, validar autoconfig y atajos (Select+Start, guardar/cargar estado, avance rápido).
-- [ ] **Pendiente:** PS1 (opciones de PCSX ReARMed y prueba) cuando haya un juego. Overlays/marcos.
+- [ ] **Pendiente:** PS1 (opciones de PCSX ReARMed y prueba) cuando haya un juego.
+- [x] Marcos por consola con tamaño fijo del juego (README 6.4), 2026-11-08.
 
 ### Fase 3 – Stick: Google Drive ✅ (cerrada el 2026-11-03)
 - [x] Proyecto de Google Cloud y cliente OAuth de TV (`docs/google-cloud.md`). Se usa un proyecto existente, en modo
