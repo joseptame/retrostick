@@ -863,7 +863,11 @@ class ShopActivity : Activity() {
         renderGrid()
     }
 
-    private val fichaShots get() = fichaIgdb?.screenshots.orEmpty().take(MAX_SHOTS)
+    private val hasTrailer get() = fichaIgdb?.trailerId != null
+    /** Screenshots shown (the trailer, when there is one, takes the first slot of the row). */
+    private val fichaShots get() = fichaIgdb?.screenshots.orEmpty().take(if (hasTrailer) MAX_SHOTS - 1 else MAX_SHOTS)
+    /** Items of the bottom row: trailer thumbnail first, then the screenshots. */
+    private val fichaMedia get() = listOfNotNull(fichaIgdb?.trailerId?.let { "https://i.ytimg.com/vi/$it/mqdefault.jpg" }) + fichaShots
 
     /** Buttons and download progress of the open sheet; also called on every download update. */
     private fun renderFicha() {
@@ -897,18 +901,17 @@ class ShopActivity : Activity() {
             b.setTextColor(if (focus) getColor(R.color.button_text) else getColor(R.color.text))
             val icon = when (labels[i]) {
                 DOWNLOAD -> R.drawable.ic_shop_download
-                TRAILER -> R.drawable.ic_shop_play
                 OWNED -> R.drawable.ic_shop_check
                 RETRY -> R.drawable.ic_shop_retry
                 else -> null
             }
             b.icon(icon, 15, b.currentTextColor)
         }
-        val shots = fichaShots
-        fichaShotsTitle.visibility = if (shots.isEmpty()) View.GONE else View.VISIBLE
-        fichaShotsTitle.text = "CAPTURAS  ${shots.size}"
+        val media = fichaMedia
+        fichaShotsTitle.visibility = if (media.isEmpty()) View.GONE else View.VISIBLE
+        fichaShotsTitle.text = (if (hasTrailer) "TRÁILER Y CAPTURAS" else "CAPTURAS") + "  ${fichaShots.size}"
         fichaShotViews.forEachIndexed { i, v ->
-            val url = shots.getOrNull(i)
+            val url = media.getOrNull(i)
             v.visibility = if (url == null) View.GONE else View.VISIBLE
             if (url == null) return@forEachIndexed
             if (v.tag != url) {
@@ -917,15 +920,18 @@ class ShopActivity : Activity() {
                 covers.loadUrl(url, dp(150)) { if (v.tag == url) v.setImageBitmap(it) }
             }
             val focus = fichaRow == 1 && i == fichaShot
-            v.foreground = if (focus) getDrawable(R.drawable.fg_hero_border) else null
+            val play = if (i == 0 && hasTrailer) getDrawable(R.drawable.ic_shop_play_badge) else null
+            val border = if (focus) getDrawable(R.drawable.fg_hero_border) else null
+            v.foreground = listOfNotNull(play, border).let {
+                if (it.size > 1) android.graphics.drawable.LayerDrawable(it.toTypedArray()) else it.firstOrNull()
+            }
             v.scaleX = if (focus) 1.08f else 1f
             v.scaleY = v.scaleX
         }
     }
 
-    /** [Descargar…, Tráiler (when IGDB has one), Volver] */
-    private fun fichaLabels(first: String) =
-        listOfNotNull(first, fichaIgdb?.trailerId?.let { TRAILER }, BACK)
+    /** [Descargar…, Volver] (the trailer plays from the bottom row) */
+    private fun fichaLabels(first: String) = listOf(first, BACK)
 
     private fun fichaKey(code: Int) {
         if (trailer != null) {
@@ -941,14 +947,15 @@ class ShopActivity : Activity() {
                 if (fichaRow == 0) fichaButton = (fichaButton - 1).coerceAtLeast(0) else fichaShot = (fichaShot - 1).coerceAtLeast(0)
             KeyEvent.KEYCODE_DPAD_RIGHT ->
                 if (fichaRow == 0) fichaButton = (fichaButton + 1).coerceAtMost(labels.size - 1)
-                else fichaShot = (fichaShot + 1).coerceAtMost(fichaShots.size - 1)
-            KeyEvent.KEYCODE_DPAD_DOWN -> if (fichaShots.isNotEmpty()) fichaRow = 1
+                else fichaShot = (fichaShot + 1).coerceAtMost(fichaMedia.size - 1)
+            KeyEvent.KEYCODE_DPAD_DOWN -> if (fichaMedia.isNotEmpty()) fichaRow = 1
             KeyEvent.KEYCODE_DPAD_UP -> fichaRow = 0
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_BUTTON_A -> {
-                if (fichaRow == 1) return openViewer(fichaShot)
+                if (fichaRow == 1) {
+                    return if (hasTrailer && fichaShot == 0) playTrailer() else openViewer(fichaShot - if (hasTrailer) 1 else 0)
+                }
                 when (labels.getOrNull(fichaButton)) {
                     BACK -> return closeFicha()
-                    TRAILER -> return playTrailer()
                     else -> download(g)
                 }
             }
@@ -1082,7 +1089,6 @@ class ShopActivity : Activity() {
         private const val POLL_MS = 3000L
         private const val FICHA_BAR_DP = 320
         private const val MAX_SHOTS = 6
-        private const val TRAILER = "Tráiler"
         private const val DOWNLOAD = "Descargar"
         private const val OWNED = "En el stick"
         private const val RETRY = "Reintentar"
