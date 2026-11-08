@@ -61,17 +61,31 @@ class ShopActivity : Activity() {
     // Header download pill
     private lateinit var statusPill: View
     private lateinit var statusBar: View
-    // Ficha (game sheet)
+    // Ficha (game sheet): same content as the webapp's (IGDB through /api/igdb), own overlay driven by onKey
     private lateinit var fichaPanel: View
+    private lateinit var fichaHero: ImageView
     private lateinit var fichaCover: ImageView
     private lateinit var fichaTitle: TextView
     private lateinit var fichaMeta: TextView
     private lateinit var fichaInfo: TextView
+    private lateinit var fichaDesc: TextView
     private lateinit var fichaStatus: TextView
     private lateinit var fichaTrack: View
     private lateinit var fichaBar: View
+    private lateinit var fichaButtonsRow: LinearLayout
+    private lateinit var fichaShotsTitle: TextView
+    private lateinit var fichaShotsRow: LinearLayout
+    private lateinit var viewer: FrameLayout
+    private lateinit var viewerImage: ImageView
+    private lateinit var viewerCount: TextView
     private val fichaButtons = mutableListOf<TextView>()
+    private val fichaShotViews = mutableListOf<ImageView>()
     private var ficha: ShopGame? = null
+    private var fichaIgdb: IgdbInfo? = null
+    /** 0 = buttons row, 1 = screenshots row */
+    private var fichaRow = 0
+    private var fichaShot = 0
+    private var viewerIndex = -1
     private var fichaButton = 0
 
     // Pairing (first time): QR + code on screen, the phone leaves the pass in Drive (ShopPairing).
@@ -278,50 +292,102 @@ class ShopActivity : Activity() {
         return root
     }
 
-    /** Ficha: big cover on the left; title, rating, size, download progress and buttons on the right. */
+    /**
+     * Ficha like the webapp's: a screenshot as backdrop, cover, title, rating, genres, size, description,
+     * buttons (download, trailer, back), download progress and the screenshot gallery.
+     */
     private fun buildFicha(): View {
+        fichaHero = ImageView(this).apply { scaleType = ImageView.ScaleType.CENTER_CROP; alpha = 0.35f }
+        val shade = View(this).apply {
+            background = GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                intArrayOf(Color.parseColor("#F20D0B1F"), Color.parseColor("#D90D0B1F"), Color.parseColor("#990D0B1F")),
+            )
+        }
         fichaCover = ImageView(this).apply {
             scaleType = ImageView.ScaleType.CENTER_CROP
             clipToOutline = true
             setBackgroundResource(R.drawable.bg_cover)
             elevation = dp(10).toFloat()
         }
-        fichaTitle = text(24f, R.color.text).apply { typeface = resources.getFont(R.font.inter_extrabold); maxLines = 2 }
-        fichaMeta = text(12.5f, R.color.brand_accent).apply { typeface = resources.getFont(R.font.inter_semibold) }
-        fichaInfo = text(11f, R.color.text_3).apply { setLineSpacing(0f, 1.35f) }
-        fichaStatus = text(11f, R.color.text_2)
+        fichaTitle = text(23f, R.color.text).apply { typeface = resources.getFont(R.font.inter_extrabold); maxLines = 2 }
+        fichaMeta = text(12f, R.color.brand_accent).apply { typeface = resources.getFont(R.font.inter_semibold) }
+        fichaInfo = text(10.5f, R.color.text_3)
+        fichaDesc = text(11.5f, R.color.text_2).apply {
+            setLineSpacing(0f, 1.3f)
+            maxLines = 5
+            ellipsize = TextUtils.TruncateAt.END
+        }
+        fichaStatus = text(10.5f, R.color.text_2)
         fichaBar = View(this).apply { background = round(getColor(R.color.ok), 3) }
         fichaTrack = FrameLayout(this).apply {
             background = round(Color.parseColor("#26FFFFFF"), 3)
             addView(fichaBar, FrameLayout.LayoutParams(0, -1))
         }
-        val buttons = LinearLayout(this)
-        repeat(2) {
-            val b = text(13f, R.color.text).apply {
+        fichaButtonsRow = LinearLayout(this)
+        repeat(3) {
+            val b = text(12.5f, R.color.text).apply {
                 typeface = resources.getFont(R.font.inter_bold)
                 gravity = Gravity.CENTER
-                setPadding(dp(22), 0, dp(22), 0)
+                setPadding(dp(20), 0, dp(20), 0)
             }
-            buttons.addView(b, LinearLayout.LayoutParams(-2, dp(44)).apply { marginEnd = dp(12) })
+            fichaButtonsRow.addView(b, LinearLayout.LayoutParams(-2, dp(40)).apply { marginEnd = dp(10) })
             fichaButtons += b
         }
         val info = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             addView(fichaTitle)
-            addView(fichaMeta, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(8) })
-            addView(fichaInfo, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(14) })
-            addView(fichaStatus, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(22) })
-            addView(fichaTrack, LinearLayout.LayoutParams(dp(FICHA_BAR_DP), dp(6)).apply { topMargin = dp(8) })
-            addView(buttons, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(18) })
+            addView(fichaMeta, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(6) })
+            addView(fichaInfo, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(6) })
+            addView(fichaDesc, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) })
+            addView(fichaButtonsRow, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(16) })
+            addView(fichaStatus, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(10) })
+            addView(fichaTrack, LinearLayout.LayoutParams(dp(FICHA_BAR_DP), dp(5)).apply { topMargin = dp(6) })
         }
-        fichaPanel = LinearLayout(this).apply {
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(70), 0, dp(60), 0)
+        val top = LinearLayout(this).apply {
+            addView(fichaCover, LinearLayout.LayoutParams(dp(200), dp(200)).apply { marginEnd = dp(32) })
+            addView(info, LinearLayout.LayoutParams(0, -2, 1f))
+        }
+        fichaShotsTitle = text(9f, R.color.text_3).apply { letterSpacing = 0.15f }
+        fichaShotsRow = LinearLayout(this).apply { clipChildren = false; clipToPadding = false }
+        repeat(MAX_SHOTS) {
+            val v = ImageView(this).apply {
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                clipToOutline = true
+                background = round(getColor(R.color.surface), 8)
+            }
+            fichaShotsRow.addView(v, LinearLayout.LayoutParams(dp(150), dp(84)).apply { marginEnd = dp(10) })
+            fichaShotViews += v
+        }
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            clipChildren = false
+            setPadding(dp(56), dp(36), dp(48), dp(20))
+            addView(top)
+            addView(fichaShotsTitle, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(18) })
+            addView(fichaShotsRow, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
+        }
+        // Full-screen screenshot
+        viewerImage = ImageView(this).apply { scaleType = ImageView.ScaleType.FIT_CENTER }
+        viewerCount = text(11f, R.color.text_2).apply {
+            setPadding(dp(14), dp(6), dp(14), dp(6))
+            background = round(Color.parseColor("#B30D0B1F"), 12)
+        }
+        viewer = FrameLayout(this).apply {
+            setBackgroundColor(Color.BLACK)
+            visibility = View.GONE
+            addView(viewerImage, FrameLayout.LayoutParams(-1, -1))
+            addView(viewerCount, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = dp(20) })
+        }
+        fichaPanel = FrameLayout(this).apply {
             setBackgroundResource(R.drawable.bg_screen)
             isClickable = true
+            clipChildren = false
             visibility = View.GONE
-            addView(fichaCover, LinearLayout.LayoutParams(dp(250), dp(250)).apply { marginEnd = dp(40) })
-            addView(info, LinearLayout.LayoutParams(0, -2, 1f))
+            addView(fichaHero, FrameLayout.LayoutParams(-1, -1))
+            addView(shade, FrameLayout.LayoutParams(-1, -1))
+            addView(content, FrameLayout.LayoutParams(-1, -1))
+            addView(viewer, FrameLayout.LayoutParams(-1, -1))
         }
         return fichaPanel
     }
@@ -575,16 +641,7 @@ class ShopActivity : Activity() {
             return
         }
         if (kbOpen) return keyboardKey(code)
-        if (ficha != null) {
-            when (code) {
-                KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_BUTTON_B -> closeFicha()
-                KeyEvent.KEYCODE_DPAD_LEFT -> { fichaButton = 0; renderFicha() }
-                KeyEvent.KEYCODE_DPAD_RIGHT -> { fichaButton = 1; renderFicha() }
-                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER,
-                KeyEvent.KEYCODE_BUTTON_A -> fichaAction()
-            }
-            return
-        }
+        if (ficha != null) return fichaKey(code)
         when (code) {
             KeyEvent.KEYCODE_BUTTON_Y -> askSearch()
             KeyEvent.KEYCODE_BUTTON_L1 -> switchConsole(-1)
@@ -745,11 +802,17 @@ class ShopActivity : Activity() {
         }
     }
 
-    // ---- Ficha (game sheet): own overlay driven by onKey, not a dialog (see PadDialog.kt) ----
+    // ---- Ficha (game sheet) ----
 
     private fun showGame(g: ShopGame) {
         ficha = g
+        fichaIgdb = null
+        fichaRow = 0
         fichaButton = 0
+        fichaShot = 0
+        viewerIndex = -1
+        viewer.visibility = View.GONE
+        fichaHero.setImageDrawable(null)
         fichaCover.setImageDrawable(null)
         loadCover(g) { bmp -> if (ficha === g) fichaCover.setImageBitmap(bmp) }
         fichaTitle.text = g.title
@@ -759,13 +822,24 @@ class ShopActivity : Activity() {
             g.genres.joinToString(", ").takeIf { it.isNotEmpty() },
         ).joinToString("   ·   ")
         val size = sizeOf(g)
-        fichaInfo.text = listOf(
-            if (g.discs.size > 1) "${g.discs.size} discos · $size" else size,
-            console.name,
-            g.name,
-        ).joinToString("\n")
+        fichaInfo.text = listOf(if (g.discs.size > 1) "${g.discs.size} discos · $size" else size, console.name, g.name).joinToString("   ·   ")
+        fichaDesc.text = "Cargando la ficha…"
         fichaPanel.visibility = View.VISIBLE
         renderFicha()
+        // Description, trailer and screenshots, like the webapp
+        io.execute {
+            val info = runCatching { ShopApi.igdb(g.title) }.getOrNull()
+            runOnUiThread {
+                if (ficha !== g) return@runOnUiThread
+                fichaIgdb = info
+                fichaDesc.text = info?.description ?: "Sin descripción en IGDB."
+                if (g.rating == null && info?.rating != null) {
+                    fichaMeta.text = "★ " + String.format("%.1f", info.rating).replace('.', ',') + "   ·   " + fichaMeta.text
+                }
+                info?.screenshots?.firstOrNull()?.let { url -> covers.loadUrl(url, dp(480)) { if (ficha === g) fichaHero.setImageBitmap(it) } }
+                renderFicha()
+            }
+        }
     }
 
     private fun closeFicha() {
@@ -774,7 +848,9 @@ class ShopActivity : Activity() {
         renderGrid()
     }
 
-    /** Buttons and progress of the open sheet; also called on every download update. */
+    private val fichaShots get() = fichaIgdb?.screenshots.orEmpty().take(MAX_SHOTS)
+
+    /** Buttons and download progress of the open sheet; also called on every download update. */
     private fun renderFicha() {
         val g = ficha ?: return
         val job = ShopDownloads.jobFor(g)
@@ -789,30 +865,107 @@ class ShopActivity : Activity() {
         }
         fichaStatus.text = status
         val running = state == ShopDownloads.State.RUNNING || state == ShopDownloads.State.QUEUED
-        fichaTrack.visibility = if (running) View.VISIBLE else View.INVISIBLE
+        fichaTrack.visibility = if (running) View.VISIBLE else View.GONE
         fichaBar.layoutParams = (fichaBar.layoutParams as FrameLayout.LayoutParams).apply {
             width = (dp(FICHA_BAR_DP) * (job?.progress ?: 0f)).toInt()
         }
-        val labels = listOf(first, "Volver")
+        val labels = fichaLabels(first)
+        fichaButton = fichaButton.coerceAtMost(labels.size - 1)
         fichaButtons.forEachIndexed { i, b ->
+            b.visibility = if (i < labels.size) View.VISIBLE else View.GONE
+            if (i >= labels.size) return@forEachIndexed
             b.text = labels[i]
-            val focus = i == fichaButton
-            val primary = i == 0 && !isOwned(g) && !running
-            b.background = round(if (focus) Color.WHITE else getColor(R.color.surface), 22).apply {
+            val focus = fichaRow == 0 && i == fichaButton
+            b.background = round(if (focus) Color.WHITE else getColor(R.color.surface), 20).apply {
                 setStroke(dp(1), if (focus) Color.WHITE else getColor(R.color.surface_border))
             }
-            b.setTextColor(if (focus) getColor(R.color.button_text) else if (primary) Color.WHITE else getColor(R.color.text_2))
+            b.setTextColor(if (focus) getColor(R.color.button_text) else getColor(R.color.text))
+        }
+        val shots = fichaShots
+        fichaShotsTitle.visibility = if (shots.isEmpty()) View.GONE else View.VISIBLE
+        fichaShotsTitle.text = "CAPTURAS  ${shots.size}"
+        fichaShotViews.forEachIndexed { i, v ->
+            val url = shots.getOrNull(i)
+            v.visibility = if (url == null) View.GONE else View.VISIBLE
+            if (url == null) return@forEachIndexed
+            if (v.tag != url) {
+                v.tag = url
+                v.setImageDrawable(null)
+                covers.loadUrl(url, dp(150)) { if (v.tag == url) v.setImageBitmap(it) }
+            }
+            val focus = fichaRow == 1 && i == fichaShot
+            v.foreground = if (focus) getDrawable(R.drawable.fg_hero_border) else null
+            v.scaleX = if (focus) 1.08f else 1f
+            v.scaleY = v.scaleX
         }
     }
 
-    private fun fichaAction() {
+    /** [Descargar…, Tráiler (when IGDB has one), Volver] */
+    private fun fichaLabels(first: String) =
+        listOfNotNull(first, fichaIgdb?.trailerId?.let { TRAILER }, BACK)
+
+    private fun fichaKey(code: Int) {
+        if (viewerIndex >= 0) return viewerKey(code)
         val g = ficha ?: return
-        if (fichaButton == 1) return closeFicha()
+        val labels = fichaLabels("")
+        when (code) {
+            KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_BUTTON_B -> return closeFicha()
+            KeyEvent.KEYCODE_DPAD_LEFT ->
+                if (fichaRow == 0) fichaButton = (fichaButton - 1).coerceAtLeast(0) else fichaShot = (fichaShot - 1).coerceAtLeast(0)
+            KeyEvent.KEYCODE_DPAD_RIGHT ->
+                if (fichaRow == 0) fichaButton = (fichaButton + 1).coerceAtMost(labels.size - 1)
+                else fichaShot = (fichaShot + 1).coerceAtMost(fichaShots.size - 1)
+            KeyEvent.KEYCODE_DPAD_DOWN -> if (fichaShots.isNotEmpty()) fichaRow = 1
+            KeyEvent.KEYCODE_DPAD_UP -> fichaRow = 0
+            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_BUTTON_A -> {
+                if (fichaRow == 1) return openViewer(fichaShot)
+                when (labels.getOrNull(fichaButton)) {
+                    BACK -> return closeFicha()
+                    TRAILER -> return playTrailer()
+                    else -> download(g)
+                }
+            }
+        }
+        renderFicha()
+    }
+
+    private fun download(g: ShopGame) {
         val cat = catalog ?: return
         val state = ShopDownloads.jobFor(g)?.state
         if (isOwned(g) || state == ShopDownloads.State.RUNNING || state == ShopDownloads.State.QUEUED) return
         ShopDownloads.enqueue(this, cat, g)
-        renderFicha()
+    }
+
+    /** YouTube app on the TV; the browser if it is missing. */
+    private fun playTrailer() {
+        val id = fichaIgdb?.trailerId ?: return
+        val app = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("vnd.youtube:$id"))
+        val web = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://www.youtube.com/watch?v=$id"))
+        runCatching { startActivity(app) }.recoverCatching { startActivity(web) }
+            .onFailure { android.widget.Toast.makeText(this, "No hay ninguna app para ver el tráiler", android.widget.Toast.LENGTH_SHORT).show() }
+    }
+
+    private fun openViewer(index: Int) {
+        val shots = fichaShots
+        if (shots.isEmpty()) return
+        viewerIndex = index.coerceIn(0, shots.size - 1)
+        viewer.visibility = View.VISIBLE
+        val url = shots[viewerIndex]
+        viewerImage.setImageDrawable(null)
+        viewerImage.tag = url
+        covers.loadUrl(url, dp(900)) { if (viewerImage.tag == url) viewerImage.setImageBitmap(it) }
+        viewerCount.text = "${viewerIndex + 1} / ${shots.size}      ◀ ▶  Cambiar      ○  Cerrar"
+    }
+
+    private fun viewerKey(code: Int) {
+        when (code) {
+            KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_BUTTON_A -> {
+                viewerIndex = -1
+                viewer.visibility = View.GONE
+            }
+            KeyEvent.KEYCODE_DPAD_LEFT -> openViewer((viewerIndex - 1 + fichaShots.size) % fichaShots.size)
+            KeyEvent.KEYCODE_DPAD_RIGHT -> openViewer((viewerIndex + 1) % fichaShots.size)
+        }
     }
 
     // ---- Helpers ----
@@ -834,6 +987,9 @@ class ShopActivity : Activity() {
         const val EXTRA_CONSOLE = "console"
         private const val POLL_MS = 3000L
         private const val FICHA_BAR_DP = 320
+        private const val MAX_SHOTS = 6
+        private const val TRAILER = "▶  Tráiler"
+        private const val BACK = "Volver"
         private const val KB_DELETE = "⌫"
         private const val KB_SPACE = "espacio"
         private const val KB_DONE = "buscar"

@@ -47,6 +47,9 @@ class ShopCatalog(
     val games: List<ShopGame>,
 )
 
+/** IGDB data shown in the ficha (same as the webapp). */
+class IgdbInfo(val description: String?, val trailerId: String?, val screenshots: List<String>, val rating: Double?)
+
 /** Same idea as the webapp's looseKey: lower case, no accents, letters and digits only. */
 fun looseKey(s: String): String =
     Normalizer.normalize(s.lowercase(), Normalizer.Form.NFD).replace(Regex("[^a-z0-9]"), "")
@@ -139,6 +142,25 @@ object ShopApi {
         val catalog = parse(console, text)
         cacheFile(context, console).writeText(text)
         return catalog
+    }
+
+    /** The webapp ficha data for a title (api/igdb.ts): description, trailer, screenshots; null if IGDB has none. */
+    fun igdb(title: String): IgdbInfo? {
+        val conn = open("${BuildConfig.WEBAPP_URL}/api/igdb?title=${URLEncoder.encode(title, "UTF-8")}")
+        val json = try {
+            if (conn.responseCode != 200) return null
+            JSONObject(conn.inputStream.bufferedReader().readText())
+        } finally {
+            conn.disconnect()
+        }
+        if (json.optBoolean("found", true).not() || json.has("error")) return null
+        val shots = json.optJSONArray("screenshots")
+        return IgdbInfo(
+            description = json.optString("description").takeIf { it.isNotEmpty() && it != "null" },
+            trailerId = json.optString("trailerId").takeIf { it.isNotEmpty() && it != "null" },
+            screenshots = if (shots == null) emptyList() else List(shots.length()) { shots.getString(it) },
+            rating = if (json.isNull("rating")) null else json.optDouble("rating").takeIf { !it.isNaN() },
+        )
     }
 
     fun open(url: String, range: String? = null): HttpURLConnection =
