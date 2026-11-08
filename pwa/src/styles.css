@@ -843,3 +843,23 @@ button.gp-btn.ok { animation: none; }
 .picker-logo { display: block; height: 26px; width: auto; max-width: 100%; object-fit: contain; object-position: left; filter: brightness(0) invert(1); opacity: 0.95; margin-bottom: auto; }
 .picker-glyph { top: auto; bottom: 8px; right: 10px; font-size: 38px; color: rgba(255, 255, 255, 0.09); }
 .picker-name { margin-top: 18px; }
+
+/* ---- RetroShop pairing (PairSheet) ---- */
+.pair-cam { position: relative; margin-top: 16px; aspect-ratio: 1; border-radius: 22px; overflow: hidden; background: #000; }
+.pair-cam video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pair-frame { position: absolute; inset: 18%; border-radius: 18px; box-shadow: 0 0 0 999px rgba(5, 4, 15, 0.45); border: 2px solid rgba(255, 255, 255, 0.85); }
+.pair-cam.on .pair-frame { animation: pair-pulse 1.6s ease-in-out infinite; }
+@keyframes pair-pulse { 50% { border-color: var(--accent-text); } }
+.pair-cam-msg { position: absolute; inset: auto 16px 16px; text-align: center; font-size: 13px; color: var(--muted); }
+.pair-manual { display: flex; gap: 10px; margin-top: 14px; }
+.pair-manual input { flex: 1; min-width: 0; padding: 13px 14px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 16px; letter-spacing: 2px; text-transform: uppercase; }
+.pair-manual .cta { flex: none; }
+.pair-error { margin-top: 12px; font-size: 13px; color: #fecaca; }
+.pair-confirm { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; padding: 22px 4px 6px; }
+.pair-confirm p { font-size: 15px; }
+.pair-confirm small { font-size: 12.5px; color: var(--muted); max-width: 300px; }
+.pair-confirm .cta { margin-top: 8px; align-self: stretch; }
+.pair-ico { width: 58px; height: 58px; border-radius: 18px; display: grid; place-items: center; background: var(--surface-2); color: var(--accent-text); }
+.pair-ico svg { width: 28px; height: 28px; }
+.pair-ico.ok { background: rgba(74, 222, 128, 0.16); color: var(--ok); }
+.pair-code { font-size: 30px; font-weight: 800; letter-spacing: 4px; font-variant-numeric: tabular-nums; }

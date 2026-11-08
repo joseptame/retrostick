@@ -232,3 +232,14 @@ async function uploadOnce(
     xhr.send(blob)
   })
 }
+
+/**
+ * RetroShop pairing: leaves the stick's pass in Retro/Config/stick/pair-<code>.json, where the stick showing
+ * that code (ShopActivity) picks it up and deletes it.
+ */
+export async function savePairing(folders: Folders, code: string, token: string): Promise<void> {
+  const config = await childFolder(folders.root, 'Config')
+  const dir = await childFolder(config, 'stick')
+  const body = new Blob([JSON.stringify({ token, at: new Date().toISOString() })], { type: 'application/json' })
+  await uploadResumable(body, `pair-${code}.json`, dir, () => {})
+}

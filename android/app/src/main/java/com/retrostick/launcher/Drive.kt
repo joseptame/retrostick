@@ -161,6 +161,14 @@ class DriveClient(private val auth: DriveAuth) {
         }
     }
 
+    /** Deletes a file RetroStick can see (drive.file): the RetroShop pairing file once read. */
+    fun delete(id: String) {
+        val conn = open("DELETE", "$DRIVE_API/files/$id")
+        val code = conn.responseCode
+        conn.disconnect()
+        if (code != 204 && code != 404) throw DriveException("delete: HTTP $code", code)
+    }
+
     /** Resumable upload; updates [existingId] in place (keeps Drive's revision history) or creates a new file. */
     fun upload(local: File, parentId: String, existingId: String?): RemoteFile {
         val meta = JSONObject().put("modifiedTime", rfc3339(local.lastModified()))

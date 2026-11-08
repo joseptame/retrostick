@@ -2,13 +2,17 @@
  * Vercel Routing Middleware: the whole app is behind a login checked on the server.
  * Credentials live in Vercel environment variables (AUTH_USER, AUTH_PASSWORD, AUTH_SECRET), never in the repo.
  * A successful login sets a signed, HttpOnly cookie for one year; /__logout removes it.
+ * The stick (RetroShop) has no cookie: it sends a pass issued by api/pair.ts once paired with a QR
+ * (x-stick-token: "rs1.<id>.<HMAC of the id>", signed with AUTH_SECRET, so nothing is stored).
  */
 export const config = {
-  // The install metadata stays public: phones fetch the manifest and icons without cookies.
-  matcher: '/((?!manifest\\.webmanifest|icon-192\\.png|icon-512\\.png|apple-touch-icon\\.png).*)',
+  // The install metadata stays public: phones fetch the manifest and icons without cookies. So does the
+  // pairing QR the stick shows (api/qr.ts only encodes this site's own pairing link).
+  matcher: '/((?!manifest\\.webmanifest|icon-192\\.png|icon-512\\.png|apple-touch-icon\\.png|api/qr$).*)',
 }
 
 const COOKIE = 'rs_auth'
+const STICK_TOKEN = /^rs1\.([0-9a-f]{32})\.([0-9a-f]{64})$/
 const YEAR = 365 * 24 * 3600
 
 declare const process: { env: Record<string, string | undefined> }
@@ -55,23 +59,30 @@ export default async function middleware(request: Request): Promise<Response> {
     const okUser = await same(String(form.get('user') ?? ''), user, secret)
     const okPassword = await same(String(form.get('password') ?? ''), password, secret)
     if (okUser && okPassword) {
+      // Back to the page that asked for the login (a pairing link keeps its ?vincular=…).
+      const next = String(form.get('next') ?? '/')
       return new Response(null, {
         status: 303,
-        headers: { location: '/', 'set-cookie': `${COOKIE}=${token}; Path=/; Max-Age=${YEAR}; HttpOnly; Secure; SameSite=Lax` },
+        headers: { location: next.startsWith('/') && !next.startsWith('//') ? next : '/', 'set-cookie': `${COOKIE}=${token}; Path=/; Max-Age=${YEAR}; HttpOnly; Secure; SameSite=Lax` },
       })
     }
-    return loginPage(true)
+    return loginPage(true, String(form.get('next') ?? '/'))
   }
 
   if (cookie(request, COOKIE) === token) return pass()
-  // The stick (RetroShop) has no login cookie: it sends its own key (STICK_KEY, baked into the launcher).
-  const stickKey = process.env.STICK_KEY
-  const sent = request.headers.get('x-stick-key')
-  if (stickKey && sent && (await same(sent, stickKey, secret))) return pass()
-  return loginPage(false)
+  if (await validStickToken(request.headers.get('x-stick-token'), secret)) return pass()
+  return loginPage(false, url.pathname + url.search)
 }
 
-function loginPage(failed: boolean): Response {
+/** Pass issued by api/pair.ts: "rs1.<id>.<sig>", sig = HMAC(AUTH_SECRET, "stick:" + id). */
+async function validStickToken(value: string | null, secret: string): Promise<boolean> {
+  const m = STICK_TOKEN.exec(value ?? '')
+  return !!m && (await same(m[2], await sign(`stick:${m[1]}`, secret), secret))
+}
+
+const escapeAttr = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')
+
+function loginPage(failed: boolean, next = '/'): Response {
   const html = `<!doctype html>
 <html lang="es">
 <head>
@@ -99,6 +110,7 @@ button{width:100%;margin-top:22px;padding:15px;border:0;border-radius:16px;backg
 </head>
 <body>
 <form method="post" action="/__login">
+<input type="hidden" name="next" value="${escapeAttr(next)}">
 <div class="brand">Retro<span>Stick</span></div>
 <p>Acceso privado</p>
 ${failed ? '<div class="error">Usuario o contraseña incorrectos.</div>' : ''}

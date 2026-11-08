@@ -25,9 +25,8 @@ android {
         versionCode = 3
         versionName = "1.2.0"
         buildConfigField("String", "OAUTH_CLIENT_ID", "\"${oauthValue("retrostick.clientId", "RETROSTICK_CLIENT_ID")}\"")
-        // RetroShop: the webapp's catalog API and the key that gets the stick past its login (STICK_KEY in Vercel).
+        // RetroShop: the webapp whose catalog it shows (paired by QR, see api/pair.ts).
         buildConfigField("String", "WEBAPP_URL", "\"https://retrostick.vercel.app\"")
-        buildConfigField("String", "STICK_KEY", "\"${oauthValue("retrostick.stickKey", "RETROSTICK_STICK_KEY")}\"")
         buildConfigField("String", "OAUTH_CLIENT_SECRET", "\"${oauthValue("retrostick.clientSecret", "RETROSTICK_CLIENT_SECRET")}\"")
     }
 

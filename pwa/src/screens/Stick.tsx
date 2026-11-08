@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import type { AppState } from '../App'
+import { PairSheet } from '../components/PairSheet'
 import { Icon, type IconName } from '../components/icons'
 import { accountEmail } from '../lib/auth'
 import { formatAgo, formatBytes, formatWhen } from '../lib/format'
@@ -9,6 +11,7 @@ export function Stick({ state, onSignOut }: { state: AppState; onSignOut: () => 
   const stale = status && Date.now() - new Date(status.updatedAt).getTime() > 24 * 3600 * 1000
   const total = status ? status.romsBytes + status.freeBytes : 0
   const pct = status && total ? (status.romsBytes / total) * 100 : 0
+  const [pairing, setPairing] = useState(false)
 
   return (
     <main className="screen">
@@ -55,6 +58,20 @@ export function Stick({ state, onSignOut }: { state: AppState; onSignOut: () => 
           </div>
         </>
       )}
+
+      <h3 className="sec2">RetroShop</h3>
+      <div className="rows">
+        <button className="row-card row-btn" onClick={() => setPairing(true)}>
+          <span className="row-ico">
+            <Icon name="tv" />
+          </span>
+          <div className="grow">
+            <b>Escanear QR de la tele</b>
+            <small>Vincula la tienda del stick a tu cuenta (Retro Ajustes → RetroShop)</small>
+          </div>
+        </button>
+      </div>
+      {pairing && <PairSheet state={state} onClose={() => setPairing(false)} />}
 
       <h3 className="sec2">Cuenta</h3>
       <div className="rows">

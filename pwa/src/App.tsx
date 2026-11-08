@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { PairSheet, pairingCode } from './components/PairSheet'
 import { BottomNav, Banner, type Tab } from './components/ui'
 import { PullToRefreshIndicator, usePullToRefresh } from './components/PullToRefresh'
 import { accountEmail, isConfigured, isSignedIn, setAccountEmail, signOut, SignedOutError } from './lib/auth'
@@ -68,6 +69,8 @@ function Main({ onSignOut }: { onSignOut: () => void }) {
   const [loading, setLoading] = useState(false)
   const [selected, setSelected] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
+  // Opened from the TV's QR with the phone camera: …/?vincular=CODE (RetroShop pairing).
+  const [pairCode, setPairCode] = useState(() => pairingCode(location.href))
   const [uploads, setUploads] = useState<UploadItem[]>([])
   const uploadsApi = useMemo<UploadsApi>(
     () => ({
@@ -211,6 +214,16 @@ function Main({ onSignOut }: { onSignOut: () => void }) {
         </>
       )}
 
+      {pairCode && (
+        <PairSheet
+          state={state}
+          initialCode={pairCode}
+          onClose={() => {
+            setPairCode(null)
+            history.replaceState(null, '', '/')
+          }}
+        />
+      )}
       {toast && <div className="toast">{toast}</div>}
       <BottomNav
         tab={tab}

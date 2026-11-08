@@ -6,6 +6,8 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.text.TextUtils
 import android.text.format.Formatter
 import android.util.TypedValue
@@ -55,6 +57,33 @@ class ShopActivity : Activity() {
     private val filterViews = mutableListOf<TextView>()
     private val cards = mutableListOf<Card>()
 
+    // Pairing (first time): QR + code on screen, the phone leaves the pass in Drive (ShopPairing).
+    private val main = Handler(Looper.getMainLooper())
+    private lateinit var pairPanel: View
+    private lateinit var qrView: ImageView
+    private lateinit var pairCodeView: TextView
+    private lateinit var pairNote: TextView
+    private var pairCode: String? = null
+    private val pollPairing = object : Runnable {
+        override fun run() {
+            val code = pairCode ?: return
+            io.execute {
+                val paired = runCatching { ShopPairing.poll(this@ShopActivity, code) }.getOrDefault(false)
+                runOnUiThread {
+                    if (pairCode != code) return@runOnUiThread
+                    if (paired) {
+                        pairCode = null
+                        ShopApi.token = ShopPairing.token(this@ShopActivity)
+                        pairPanel.visibility = View.GONE
+                        loadCatalog()
+                    } else {
+                        main.postDelayed(this, POLL_MS)
+                    }
+                }
+            }
+        }
+    }
+
     private val downloadsListener: () -> Unit = {
         refreshOwned()
         renderStatus()
@@ -65,7 +94,33 @@ class ShopActivity : Activity() {
         super.onCreate(savedInstanceState)
         consoleIndex = CONSOLES.indexOfFirst { it.id == intent.getStringExtra(EXTRA_CONSOLE) }.coerceAtLeast(0)
         setContentView(build())
-        loadCatalog()
+        ShopApi.token = ShopPairing.token(this)
+        if (ShopApi.token == null) startPairing() else loadCatalog()
+    }
+
+    private fun startPairing() {
+        pairPanel.visibility = View.VISIBLE
+        message.visibility = View.GONE
+        if (!DriveAuth(this).isConnected) {
+            pairCode = null
+            qrView.setImageDrawable(null)
+            pairCodeView.text = ""
+            pairNote.text = "Primero conecta Google Drive en Retro Ajustes → Cuenta de Drive: el móvil deja ahí la vinculación."
+            return
+        }
+        val code = ShopPairing.newCode()
+        pairCode = code
+        pairCodeView.text = code.substring(0, 4) + " " + code.substring(4)
+        pairNote.text = "En el móvil: app RetroStick → Stick → Escanear QR de la tele.\nO abre la cámara y escanéalo."
+        io.execute {
+            val bmp = runCatching { ShopPairing.qrBitmap(code, dp(210)) }
+            runOnUiThread {
+                bmp.onSuccess { qrView.setImageBitmap(it) }
+                    .onFailure { pairNote.text = "No se pudo generar el QR (${it.message}). Escribe el código en la app." }
+            }
+        }
+        main.removeCallbacks(pollPairing)
+        main.postDelayed(pollPairing, POLL_MS)
     }
 
     override fun onResume() {
@@ -73,11 +128,13 @@ class ShopActivity : Activity() {
         padStyle = StickStatus.firstPadStyle()
         ShopDownloads.addListener(downloadsListener)
         downloadsListener()
+        if (pairCode != null) main.postDelayed(pollPairing, POLL_MS)
     }
 
     override fun onPause() {
         super.onPause()
         ShopDownloads.removeListener(downloadsListener)
+        main.removeCallbacks(pollPairing)
     }
 
     // ---- Layout (built in code: one screen, 960×540 dp) ----
@@ -146,6 +203,37 @@ class ShopActivity : Activity() {
         message = text(13f, R.color.text_2).apply { gravity = Gravity.CENTER; visibility = View.GONE }
         root.addView(message, FrameLayout.LayoutParams(-1, -1))
 
+        // Pairing panel over everything until the stick has a pass
+        qrView = ImageView(this).apply { setBackgroundColor(Color.WHITE) }
+        pairCodeView = text(26f, R.color.text).apply {
+            typeface = resources.getFont(R.font.inter_extrabold)
+            letterSpacing = 0.12f
+        }
+        pairNote = text(11.5f, R.color.text_2).apply { setLineSpacing(0f, 1.3f) }
+        val info = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(text(20f, R.color.text).apply {
+                text = "Vincula RetroShop"
+                typeface = resources.getFont(R.font.inter_extrabold)
+            })
+            addView(text(12f, R.color.text_3).apply {
+                text = "Una sola vez: así la tienda usa tu cuenta de la webapp."
+                setPadding(0, dp(6), 0, dp(18))
+            })
+            addView(text(9f, R.color.text_3).apply { text = "CÓDIGO"; letterSpacing = 0.15f })
+            addView(pairCodeView)
+            addView(pairNote, LinearLayout.LayoutParams(dp(330), -2).apply { topMargin = dp(16) })
+        }
+        pairPanel = LinearLayout(this).apply {
+            gravity = Gravity.CENTER
+            setBackgroundResource(R.drawable.bg_screen)
+            isClickable = true
+            visibility = View.GONE
+            addView(qrView, LinearLayout.LayoutParams(dp(210), dp(210)).apply { marginEnd = dp(40) })
+            addView(info)
+        }
+        root.addView(pairPanel, FrameLayout.LayoutParams(-1, -1))
+
         col.addView(text(9.5f, R.color.text_3).apply {
             text = "OK  Ver juego     L1 / R1  Consola     ▲  Filtros     B  Volver"
             gravity = Gravity.END
@@ -206,6 +294,14 @@ class ShopActivity : Activity() {
                 if (c != console) return@runOnUiThread
                 loading = false
                 result.onSuccess { catalog = it }.onFailure { error = it.message }
+                if (result.exceptionOrNull() is NotPairedException) {
+                    // Pass missing or revoked (AUTH_SECRET changed): pair again.
+                    ShopPairing.forget(this)
+                    ShopApi.token = null
+                    catalog = null
+                    startPairing()
+                    return@runOnUiThread
+                }
                 applyFilters(resetSelection = catalog == null || result.isFailure)
             }
         }
@@ -348,6 +444,10 @@ class ShopActivity : Activity() {
     }
 
     private fun onKey(code: Int) {
+        if (pairPanel.visibility == View.VISIBLE) {
+            if (code == KeyEvent.KEYCODE_BACK || code == KeyEvent.KEYCODE_BUTTON_B) finish()
+            return
+        }
         when (code) {
             KeyEvent.KEYCODE_BUTTON_L1 -> switchConsole(-1)
             KeyEvent.KEYCODE_BUTTON_R1 -> switchConsole(1)
@@ -445,6 +545,7 @@ class ShopActivity : Activity() {
 
     companion object {
         const val EXTRA_CONSOLE = "console"
+        private const val POLL_MS = 3000L
         private const val COLUMNS = 8
         private const val ROWS = 2
         private const val CARD_DP = 98

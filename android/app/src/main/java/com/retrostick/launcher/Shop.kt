@@ -49,7 +49,74 @@ class ShopCatalog(
 fun looseKey(s: String): String =
     Normalizer.normalize(s.lowercase(), Normalizer.Form.NFD).replace(Regex("[^a-z0-9]"), "")
 
+/** Thrown when the webapp answers with its login page: the stick is not paired (or its pass was revoked). */
+class NotPairedException : Exception("RetroShop no está vinculado")
+
+/**
+ * Pairing with the webapp account: the TV shows a QR with a code, the phone app leaves a pass in
+ * Drive (Retro/Config/stick/pair-<code>.json, see api/pair.ts) and the stick keeps it.
+ */
+object ShopPairing {
+    private const val ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+    private fun prefs(context: Context) = context.getSharedPreferences("shop", Context.MODE_PRIVATE)
+
+    fun token(context: Context): String? = prefs(context).getString("token", null)
+    fun forget(context: Context) = prefs(context).edit().remove("token").apply()
+
+    fun newCode(): String {
+        val random = java.security.SecureRandom()
+        return String(CharArray(8) { ALPHABET[random.nextInt(ALPHABET.length)] })
+    }
+
+    /** QR of the pairing link, drawn from the module matrix of api/qr.ts (white quiet zone included). */
+    fun qrBitmap(code: String, sizePx: Int): android.graphics.Bitmap {
+        val conn = ShopApi.open("${BuildConfig.WEBAPP_URL}/api/qr?code=$code")
+        val json = try {
+            if (conn.responseCode != 200) throw IllegalStateException("La webapp respondió ${conn.responseCode}")
+            JSONObject(conn.inputStream.bufferedReader().readText())
+        } finally {
+            conn.disconnect()
+        }
+        val rows = json.getJSONArray("rows")
+        val n = json.getInt("size")
+        val quiet = 2
+        val cell = maxOf(1, sizePx / (n + quiet * 2))
+        val side = cell * (n + quiet * 2)
+        val bmp = android.graphics.Bitmap.createBitmap(side, side, android.graphics.Bitmap.Config.ARGB_8888)
+        bmp.eraseColor(android.graphics.Color.WHITE)
+        val canvas = android.graphics.Canvas(bmp)
+        val paint = android.graphics.Paint().apply { color = android.graphics.Color.BLACK }
+        for (r in 0 until n) {
+            val row = rows.getString(r)
+            for (c in 0 until n) if (row[c] == '1') {
+                val x = ((c + quiet) * cell).toFloat()
+                val y = ((r + quiet) * cell).toFloat()
+                canvas.drawRect(x, y, x + cell, y + cell, paint)
+            }
+        }
+        return bmp
+    }
+
+    /** Blocking: looks for the pass the phone left for [code]; keeps it and deletes the file. */
+    fun poll(context: Context, code: String): Boolean {
+        val drive = DriveClient(DriveAuth(context))
+        var dir = "root"
+        for (name in listOf("Retro", "Config", "stick")) dir = drive.folder(dir, name)
+        val file = drive.list(dir).firstOrNull { it.name == "pair-$code.json" } ?: return false
+        val tmp = File(context.cacheDir, "pair.json")
+        drive.download(file.id, tmp)
+        val token = JSONObject(tmp.readText()).getString("token")
+        tmp.delete()
+        prefs(context).edit().putString("token", token).apply()
+        runCatching { drive.delete(file.id) }
+        return true
+    }
+}
+
 object ShopApi {
+    /** Pass sent with every request to the webapp (set once paired). */
+    @Volatile var token: String? = null
+
     private fun cacheFile(context: Context, console: Console) = File(context.cacheDir, "shop-${console.id}.json")
 
     /** Last catalog downloaded for the console, shown at once while a fresh one loads. */
@@ -61,7 +128,8 @@ object ShopApi {
         val conn = open("${BuildConfig.WEBAPP_URL}/api/shop?console=${console.id}")
         val text = try {
             if (conn.responseCode != 200) throw IllegalStateException("La webapp respondió ${conn.responseCode}")
-            if (conn.contentType?.startsWith("application/json") != true) throw IllegalStateException("La clave del stick no es válida")
+            // The login page instead of JSON: the pass is missing or no longer valid.
+            if (conn.contentType?.startsWith("application/json") != true) throw NotPairedException()
             conn.inputStream.bufferedReader().readText()
         } finally {
             conn.disconnect()
@@ -75,7 +143,7 @@ object ShopApi {
         (URL(url).openConnection() as HttpURLConnection).apply {
             connectTimeout = 20_000
             readTimeout = 120_000
-            if (url.startsWith(BuildConfig.WEBAPP_URL)) setRequestProperty("x-stick-key", BuildConfig.STICK_KEY)
+            if (url.startsWith(BuildConfig.WEBAPP_URL)) token?.let { setRequestProperty("x-stick-token", it) }
             range?.let { setRequestProperty("Range", it) }
         }
 

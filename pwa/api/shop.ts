@@ -12,7 +12,7 @@
  *             d?: [{ f, s }] discs, r?: rating 0..10, g?: genre indexes, y?: year }]
  * }
  *
- * Only reachable with the stick's key (middleware.ts). Cached per console for a few hours.
+ * Only reachable with the stick's pass (x-stick-token, see api/pair.ts and middleware.ts). Cached per console for a few hours.
  */
 import { groupDiscs, listItemFiles, type ArchiveEntry } from '../src/lib/archive'
 import { consoleForFile, CONSOLES, isCartridge, type ConsoleId } from '../src/lib/consoles'
@@ -23,8 +23,6 @@ import { DEFAULT_COLLECTIONS } from '../src/lib/recents'
 import { loadDb } from '../src/lib/romdb'
 
 export const config = { runtime: 'edge' }
-
-declare const process: { env: Record<string, string | undefined> }
 
 const CACHE_MS = 6 * 3600_000
 
@@ -98,7 +96,7 @@ export default async function handler(request: Request): Promise<Response> {
   if (!collection || collection.length > 200) return new Response('Sin colección', { status: 404 })
 
   // The data files sit behind the login too: fetch them from this deployment with the stick's key.
-  configureData(url.origin, { 'x-stick-key': process.env.STICK_KEY ?? '' })
+  configureData(url.origin, { 'x-stick-token': request.headers.get('x-stick-token') ?? '' })
   const key = `${id}/${collection}`
   let hit = cache.get(key)
   if (!hit || Date.now() - hit.at > CACHE_MS) {
