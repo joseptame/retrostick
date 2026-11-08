@@ -16,8 +16,8 @@ interface IgdbResponse extends Partial<IgdbGame> {
 }
 
 /** Returns the IGDB entry for a game title, or null when IGDB has no match. */
-export async function fetchIgdb(title: string): Promise<IgdbGame | null> {
-  const res = await fetch(`/api/igdb?title=${encodeURIComponent(title)}`)
+export async function fetchIgdb(title: string, console?: string): Promise<IgdbGame | null> {
+  const res = await fetch(`/api/igdb?title=${encodeURIComponent(title)}${console ? `&console=${console}` : ''}`)
   if (!res.ok) throw new Error(`igdb ${res.status}`)
   const json = (await res.json()) as IgdbResponse
   if (json.error) throw new Error(json.error)

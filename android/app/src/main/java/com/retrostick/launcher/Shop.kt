@@ -145,8 +145,8 @@ object ShopApi {
     }
 
     /** The webapp ficha data for a title (api/igdb.ts): description, trailer, screenshots; null if IGDB has none. */
-    fun igdb(title: String): IgdbInfo? {
-        val conn = open("${BuildConfig.WEBAPP_URL}/api/igdb?title=${URLEncoder.encode(title, "UTF-8")}")
+    fun igdb(title: String, console: String): IgdbInfo? {
+        val conn = open("${BuildConfig.WEBAPP_URL}/api/igdb?title=${URLEncoder.encode(title, "UTF-8")}&console=$console")
         val json = try {
             if (conn.responseCode != 200) return null
             JSONObject(conn.inputStream.bufferedReader().readText())

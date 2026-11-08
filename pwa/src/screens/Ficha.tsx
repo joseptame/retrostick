@@ -27,7 +27,7 @@ export function Ficha({ game, state, onBack }: { game: Game; state: AppState; on
     let alive = true
     setInfo(null)
     setPress(null)
-    if (state.online) fetchIgdb(game.title).then((d) => alive && setInfo(d)).catch(() => {})
+    if (state.online) fetchIgdb(game.title, game.console).then((d) => alive && setInfo(d)).catch(() => {})
     loadLookup(game.console)
       .then((look) => alive && setPress(look(game.name)?.rating ?? null))
       .catch(() => {})

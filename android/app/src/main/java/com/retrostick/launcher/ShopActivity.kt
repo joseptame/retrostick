@@ -506,7 +506,10 @@ class ShopActivity : Activity() {
             // Unselected logos in white, like the home screen (GBA has its own white version without the plate).
             val c = CONSOLES[i]
             when {
-                selected -> { logo.setImageResource(c.logo); logo.clearColorFilter() }
+                selected -> {
+                    logo.setImageResource(c.logo)
+                    if (c.whiteWhenSelected) logo.setColorFilter(Color.WHITE) else logo.clearColorFilter()
+                }
                 c.logoWhite != null -> { logo.setImageResource(c.logoWhite); logo.clearColorFilter() }
                 else -> { logo.setImageResource(c.logo); logo.setColorFilter(Color.WHITE) }
             }
@@ -860,7 +863,7 @@ class ShopActivity : Activity() {
         renderFicha()
         // Description, trailer and screenshots, like the webapp
         io.execute {
-            val info = runCatching { ShopApi.igdb(g.title) }.getOrNull()
+            val info = runCatching { ShopApi.igdb(g.title, console.id) }.getOrNull()
             runOnUiThread {
                 if (ficha !== g) return@runOnUiThread
                 fichaIgdb = info

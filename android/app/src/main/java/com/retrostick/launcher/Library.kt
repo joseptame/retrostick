@@ -23,6 +23,8 @@ data class Console(
     val thumbnailSystem: String,
     /** White variant for unselected tabs when tinting the logo white would hide it (GBA's blue plate). */
     val logoWhite: Int? = null,
+    /** Dark logo that disappears on the selected (purple) tab: drawn white there too (Game Boy's navy). */
+    val whiteWhenSelected: Boolean = false,
 ) {
     val romDir get() = File("$SDCARD/ROMs/$id")
 }
@@ -33,7 +35,7 @@ val CONSOLES = listOf(
     Console("snes", "Super Nintendo", R.drawable.logo_snes, setOf("sfc", "smc"),
         "snes9x2010_libretro_android.so", "Nintendo_-_Super_Nintendo_Entertainment_System"),
     Console("gb", "Game Boy", R.drawable.logo_gb, setOf("gb"),
-        "gambatte_libretro_android.so", "Nintendo_-_Game_Boy"),
+        "gambatte_libretro_android.so", "Nintendo_-_Game_Boy", whiteWhenSelected = true),
     Console("gbc", "Game Boy Color", R.drawable.logo_gbc, setOf("gbc"),
         "gambatte_libretro_android.so", "Nintendo_-_Game_Boy_Color"),
     Console("gba", "Game Boy Advance", R.drawable.logo_gba, setOf("gba"),

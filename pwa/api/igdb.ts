@@ -62,26 +62,39 @@ function json(body: unknown, status = 200): Response {
   })
 }
 
+/** IGDB platform ids per console (as in scripts/build-igdb.ts); GBC sets also hold Game Boy games. */
+const PLATFORMS: Record<string, number[]> = { gb: [33], gbc: [22, 33], gba: [24], nes: [18, 99], snes: [19, 58], psx: [7] }
+
 export default async function handler(request: Request): Promise<Response> {
   const id = process.env.IGDB_CLIENT_ID
   const secret = process.env.IGDB_CLIENT_SECRET
   if (!id || !secret) return json({ error: 'IGDB no está configurado (faltan IGDB_CLIENT_ID / IGDB_CLIENT_SECRET).' }, 503)
 
-  const title = new URL(request.url).searchParams.get('title')
+  const params = new URL(request.url).searchParams
+  const title = params.get('title')
   if (!title) return json({ error: 'Falta el parámetro title.' }, 400)
+  // The game of that console ("Super Mario World" on SNES, not its GBA remake); any platform if none matches.
+  const platforms = PLATFORMS[params.get('console') ?? '']
 
   try {
     const access = await accessToken(id, secret)
-    const body = `search "${title.replace(/"/g, '')}"; fields name,summary,storyline,cover.image_id,genres.name,platforms.name,first_release_date,rating,videos.video_id,screenshots.image_id; limit 1;`
-    const res = await fetch(`${API}/games`, {
-      method: 'POST',
-      headers: { 'Client-ID': id, Authorization: `Bearer ${access}`, Accept: 'application/json' },
-      body,
-    })
-    if (!res.ok) return json({ error: `igdb ${res.status}` }, 502)
-    const games = (await res.json()) as unknown[]
+    const query = async (where: string) => {
+      const body = `search "${title.replace(/"/g, '')}"; fields name,summary,storyline,cover.image_id,genres.name,platforms.name,first_release_date,rating,videos.video_id,screenshots.image_id;${where} limit 8;`
+      const res = await fetch(`${API}/games`, {
+        method: 'POST',
+        headers: { 'Client-ID': id, Authorization: `Bearer ${access}`, Accept: 'application/json' },
+        body,
+      })
+      if (!res.ok) throw new Error(`igdb ${res.status}`)
+      return (await res.json()) as { name?: string }[]
+    }
+    let games = platforms ? await query(` where platforms = (${platforms.join(',')});`) : []
+    if (!games.length) games = await query('')
     if (!games.length) return json({ found: false })
-    return json(mapGame(games[0]))
+    // Search order is by relevance; an exact title (ignoring case and punctuation) wins.
+    const loose = (s: string) => s.toLowerCase().normalize('NFD').replace(/[^a-z0-9]/g, '')
+    const exact = games.find((g) => g.name && loose(g.name) === loose(title))
+    return json(mapGame(exact ?? games[0]))
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : String(e) }, 500)
   }

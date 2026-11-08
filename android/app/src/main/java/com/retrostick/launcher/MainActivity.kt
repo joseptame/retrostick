@@ -402,7 +402,7 @@ class MainActivity : Activity() {
             when {
                 console == null || sel -> {
                     console?.let { logo.setImageResource(it.logo) }
-                    logo.clearColorFilter()
+                    if (console?.whiteWhenSelected == true) logo.setColorFilter(Color.WHITE) else logo.clearColorFilter()
                 }
                 console.logoWhite != null -> {
                     logo.setImageResource(console.logoWhite)

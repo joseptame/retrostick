@@ -257,7 +257,7 @@ export function Buscar({ state }: { state: AppState }) {
   async function openFicha(entry: ArchiveEntry) {
     setFicha({ entry, data: null, loading: true, error: null })
     try {
-      const data = await fetchIgdb(displayTitle(entry.name))
+      const data = await fetchIgdb(displayTitle(entry.name), consoleForFile(entry.name) ?? consoleId)
       setFicha((f) => (f && f.entry.name === entry.name ? { ...f, data, loading: false } : f))
     } catch (e) {
       setFicha((f) =>
