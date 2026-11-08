@@ -267,6 +267,7 @@ class ShopActivity : Activity() {
             addView(qrView, LinearLayout.LayoutParams(dp(210), dp(210)).apply { marginEnd = dp(40) })
             addView(info)
         }
+        root.addView(buildKeyboard(), FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
         root.addView(buildFicha(), FrameLayout.LayoutParams(-1, -1))
         root.addView(pairPanel, FrameLayout.LayoutParams(-1, -1))
 
@@ -573,6 +574,7 @@ class ShopActivity : Activity() {
             if (code == KeyEvent.KEYCODE_BACK || code == KeyEvent.KEYCODE_BUTTON_B) finish()
             return
         }
+        if (kbOpen) return keyboardKey(code)
         if (ficha != null) {
             when (code) {
                 KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_BUTTON_B -> closeFicha()
@@ -643,37 +645,104 @@ class ShopActivity : Activity() {
             .showForPad()
     }
 
-    /** The TV's on-screen keyboard: type part of a title ("zelda", "mario kart"). */
+    // ---- Search keyboard: our own, driven by onKey (the system keyboard gets the DualSense's raw buttons) ----
+
+    private val kbRows = listOf(
+        "1234567890".map { it.toString() },
+        "qwertyuiop".map { it.toString() },
+        "asdfghjkl".map { it.toString() } + KB_DELETE,
+        "zxcvbnm".map { it.toString() } + KB_SPACE + KB_DONE,
+    )
+    private lateinit var kbPanel: View
+    private lateinit var kbText: TextView
+    private val kbKeys = mutableListOf<List<TextView>>()
+    private var kbRow = 1
+    private var kbCol = 0
+    private val kbOpen get() = kbPanel.visibility == View.VISIBLE
+
+    private fun buildKeyboard(): View {
+        kbText = text(18f, R.color.text).apply { typeface = resources.getFont(R.font.inter_bold) }
+        val rows = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL }
+        kbRows.forEach { labels ->
+            val row = LinearLayout(this).apply { gravity = Gravity.CENTER }
+            val views = labels.map { label ->
+                text(14f, R.color.text).apply {
+                    text = label.uppercase()
+                    gravity = Gravity.CENTER
+                    typeface = resources.getFont(R.font.inter_semibold)
+                }.also { row.addView(it, LinearLayout.LayoutParams(dp(if (label.length > 1) 92 else 42), dp(38)).apply { setMargins(dp(3), dp(3), dp(3), dp(3)) }) }
+            }
+            kbKeys += views
+            rows.addView(row)
+        }
+        kbPanel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(dp(40), dp(14), dp(40), dp(16))
+            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(Color.parseColor("#EE0D0B1F"), Color.parseColor("#FF0D0B1F")))
+            isClickable = true
+            visibility = View.GONE
+            addView(kbText)
+            addView(text(9.5f, R.color.text_3).apply {
+                text = "✕  Escribir     □  Borrar     L1 / R1  Consola     ○  Cerrar"
+                setPadding(0, dp(4), 0, dp(8))
+            })
+            addView(rows)
+        }
+        return kbPanel
+    }
+
+    /** Opens the keyboard over the grid; results filter as you type. */
     private fun askSearch() {
-        val input = android.widget.EditText(this).apply {
-            setText(query.orEmpty())
-            setSelection(text.length)
-            hint = "Título del juego"
-            isSingleLine = true
-            imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH
-            setTextColor(getColor(R.color.text))
-            setHintTextColor(getColor(R.color.text_3))
+        kbPanel.visibility = View.VISIBLE
+        renderKeyboard()
+    }
+
+    private fun closeKeyboard() {
+        kbPanel.visibility = View.GONE
+        zone = Zone.GRID
+        render()
+    }
+
+    private fun renderKeyboard() {
+        kbText.text = "🔍  " + (query ?: "") + "▌" + if (query != null) "     ${shown.size} juegos" else ""
+        kbKeys.forEachIndexed { r, row ->
+            row.forEachIndexed { c, v ->
+                val focus = r == kbRow && c == kbCol
+                v.background = round(if (focus) Color.WHITE else getColor(R.color.surface), 9).apply {
+                    setStroke(dp(1), if (focus) Color.WHITE else getColor(R.color.surface_border))
+                }
+                v.setTextColor(if (focus) getColor(R.color.button_text) else getColor(R.color.text))
+            }
         }
-        val box = FrameLayout(this).apply { setPadding(dp(20), dp(8), dp(20), 0); addView(input) }
-        var dialog: AlertDialog? = null
-        val apply = { text: String? ->
-            query = text?.trim()?.takeIf { it.isNotEmpty() }
-            zone = Zone.GRID
-            applyFilters(resetSelection = true)
-            dialog?.dismiss()
+    }
+
+    private fun typeKey(label: String) {
+        when (label) {
+            KB_DONE -> return closeKeyboard()
+            KB_DELETE -> query = query?.dropLast(1)
+            KB_SPACE -> query = (query ?: "") + " "
+            else -> query = (query ?: "") + label
         }
-        input.setOnEditorActionListener { _, _, _ -> apply(input.text.toString()); true }
-        dialog = AlertDialog.Builder(this, R.style.Dialog_RetroStick)
-            .setTitle("Buscar en ${console.name}")
-            .setView(box)
-            .setPositiveButton("Buscar") { _, _ -> apply(input.text.toString()) }
-            .apply { if (query != null) setNeutralButton("Quitar búsqueda") { _, _ -> apply(null) } }
-            .setNegativeButton("Cancelar", null)
-            .create()
-        dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
-        dialog.padKeys()
-        dialog.show()
-        input.requestFocus()
+        if (query.isNullOrBlank()) query = null
+        applyFilters(resetSelection = true)
+        renderKeyboard()
+    }
+
+    private fun keyboardKey(code: Int) {
+        when (code) {
+            KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_BUTTON_Y -> closeKeyboard()
+            KeyEvent.KEYCODE_BUTTON_X -> typeKey(KB_DELETE)
+            // Same search on another console
+            KeyEvent.KEYCODE_BUTTON_L1 -> { switchConsole(-1); renderKeyboard() }
+            KeyEvent.KEYCODE_BUTTON_R1 -> { switchConsole(1); renderKeyboard() }
+            KeyEvent.KEYCODE_DPAD_LEFT -> { kbCol = (kbCol - 1).coerceAtLeast(0); renderKeyboard() }
+            KeyEvent.KEYCODE_DPAD_RIGHT -> { kbCol = (kbCol + 1).coerceAtMost(kbRows[kbRow].size - 1); renderKeyboard() }
+            KeyEvent.KEYCODE_DPAD_UP -> { kbRow = (kbRow - 1).coerceAtLeast(0); kbCol = kbCol.coerceAtMost(kbRows[kbRow].size - 1); renderKeyboard() }
+            KeyEvent.KEYCODE_DPAD_DOWN -> { kbRow = (kbRow + 1).coerceAtMost(kbRows.size - 1); kbCol = kbCol.coerceAtMost(kbRows[kbRow].size - 1); renderKeyboard() }
+            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER,
+            KeyEvent.KEYCODE_BUTTON_A -> typeKey(kbRows[kbRow][kbCol])
+        }
     }
 
     // ---- Ficha (game sheet): own overlay driven by onKey, not a dialog (see PadDialog.kt) ----
@@ -765,6 +834,9 @@ class ShopActivity : Activity() {
         const val EXTRA_CONSOLE = "console"
         private const val POLL_MS = 3000L
         private const val FICHA_BAR_DP = 320
+        private const val KB_DELETE = "⌫"
+        private const val KB_SPACE = "espacio"
+        private const val KB_DONE = "buscar"
         private const val COLUMNS = 8
         private const val ROWS = 2
         private const val CARD_DP = 98
@@ -772,7 +844,7 @@ class ShopActivity : Activity() {
         private val KEYS = setOf(
             KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_BACK,
-            KeyEvent.KEYCODE_BUTTON_A, KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_BUTTON_Y, KeyEvent.KEYCODE_BUTTON_L1, KeyEvent.KEYCODE_BUTTON_R1,
+            KeyEvent.KEYCODE_BUTTON_A, KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_BUTTON_X, KeyEvent.KEYCODE_BUTTON_Y, KeyEvent.KEYCODE_BUTTON_L1, KeyEvent.KEYCODE_BUTTON_R1,
         )
     }
 }
