@@ -7,6 +7,8 @@
  */
 export const config = { runtime: 'edge' }
 
+import { genreEs } from '../src/lib/genres.js'
+
 declare const process: { env: Record<string, string | undefined> }
 
 const TOKEN_URL = 'https://id.twitch.tv/oauth2/token'
@@ -31,7 +33,11 @@ function imageUrl(size: string, imageId: string): string {
 
 interface IgdbGame {
   name: string
+  /** In Spanish when we could get it (Spanish Wikipedia, else a translation of IGDB's); see spanishDescription. */
   description: string | null
+  /** IGDB's own text (English), kept for reference. */
+  descriptionEn?: string | null
+  descriptionSource?: 'wikipedia' | 'traducción' | 'igdb'
   trailerId: string | null
   screenshots: string[]
   coverUrl: string | null
@@ -48,18 +54,110 @@ function mapGame(g: any): IgdbGame {
     trailerId: g.videos?.[0]?.video_id ?? null,
     screenshots: (g.screenshots ?? []).map((s: any) => imageUrl('screenshot_big', s.image_id)),
     coverUrl: g.cover?.image_id ? imageUrl('cover_big', g.cover.image_id) : null,
-    genres: (g.genres ?? []).map((x: any) => x.name).filter(Boolean),
+    genres: (g.genres ?? []).map((x: any) => x.name).filter(Boolean).map(genreEs),
     year: g.first_release_date ? new Date(g.first_release_date * 1000).getUTCFullYear() : null,
     rating: g.rating != null ? Math.round(g.rating) / 10 : null,
   }
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
-function json(body: unknown, status = 200): Response {
+function json(body: unknown, status = 200, cacheDays = 0): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+    headers: {
+      'content-type': 'application/json; charset=utf-8',
+      // A found game rarely changes: Vercel's cache keeps it (the login middleware still runs first).
+      'cache-control': cacheDays ? `private, max-age=86400, s-maxage=${cacheDays * 86400}` : 'no-store',
+    },
   })
+}
+
+const CONSOLE_NAMES: Record<string, string> = {
+  nes: 'NES', snes: 'Super Nintendo', gb: 'Game Boy', gbc: 'Game Boy Color', gba: 'Game Boy Advance', psx: 'PlayStation',
+}
+/** The article must be about this console's version ("PlayStation", not "PlayStation 2"). */
+const CONSOLE_TEXT: Record<string, RegExp> = {
+  nes: /\bNES\b|Nintendo Entertainment System|Famicom/,
+  snes: /Super Nintendo|Super NES|\bSNES\b|Super Famicom/,
+  gb: /Game Boy(?! Advance| Color)/,
+  gbc: /Game Boy Color/,
+  gba: /Game Boy Advance/,
+  psx: /PlayStation(?!\s?[2-5]|\s?Portable|\s?Vita)/,
+}
+const looseKey = (s: string) => s.toLowerCase().normalize('NFD').replace(/[^a-z0-9]/g, '')
+const UA = { 'User-Agent': 'RetroStick/1.0 (personal retro games launcher)' }
+
+/**
+ * The game's article in the Spanish Wikipedia (its introduction), when there is one about this video game:
+ * real Spanish, usually better than a translation. Null otherwise.
+ */
+async function wikipediaEs(name: string, consoleId: string | null): Promise<string | null> {
+  const q = `${name} videojuego ${consoleId ? CONSOLE_NAMES[consoleId] ?? '' : ''}`.trim()
+  const url = 'https://es.wikipedia.org/w/api.php?action=query&format=json&redirects=1&generator=search' +
+    `&gsrsearch=${encodeURIComponent(q)}&gsrlimit=5&prop=extracts|description&exintro=1&explaintext=1&exlimit=5`
+  const res = await fetch(url, { headers: UA })
+  // Busy or refusing (too many requests): an error, so the answer is kept only briefly and retried later
+  if (!res.ok) throw new Error(`wikipedia ${res.status}`)
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const pages: any[] = Object.values(((await res.json()) as any).query?.pages ?? {})
+  pages.sort((a, b) => (a.index ?? 99) - (b.index ?? 99))
+  const want = looseKey(name)
+  for (const p of pages) {
+    const title = looseKey(String(p.title ?? '').replace(/\s*\(.*\)$/, ''))
+    const text = String(p.extract ?? '').trim()
+    const aboutGame = /videojuego/i.test(String(p.description ?? '')) || /videojuego/i.test(text.slice(0, 400))
+    if (!aboutGame || text.length < 80) continue
+    // Exactly this game: not its series ("The Legend of Zelda") nor a namesake on another console
+    if (title !== want) continue
+    if (consoleId && CONSOLE_TEXT[consoleId] && !CONSOLE_TEXT[consoleId].test(text)) continue
+    return trimText(text)
+  }
+  /* eslint-enable @typescript-eslint/no-explicit-any */
+  return null
+}
+
+/** IGDB's English text through Google's free translation endpoint (no key). Null if it fails. */
+async function translateEs(text: string): Promise<string | null> {
+  const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=es&dt=t&q=${encodeURIComponent(text.slice(0, 4500))}`
+  const res = await fetch(url, { headers: UA })
+  if (!res.ok) return null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const data = (await res.json()) as any
+  const out = (data?.[0] ?? []).map((part: unknown[]) => part?.[0] ?? '').join('').trim()
+  return out || null
+}
+
+/** At most ~900 characters, cut at the end of a sentence (Wikipedia introductions can be long). */
+function trimText(text: string): string {
+  const clean = text
+    .replace(/\u200b/g, '')
+    // Japanese names in brackets: "(ドンキーコング, Donkī Kongu?)"
+    .replace(/\s*\([^)]*[\u3040-\u30ff\u4e00-\u9fff][^)]*\)/g, '')
+    .replace(/\n+/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+  if (clean.length <= 900) return clean
+  const cut = clean.slice(0, 900)
+  const end = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('.'))
+  return end > 300 ? cut.slice(0, end + 1) : cut.trimEnd() + '…'
+}
+
+/** Set when Wikipedia could not be asked: the response is then cached for a day instead of a month. */
+let wikiFailed = false
+
+async function spanishDescription(game: IgdbGame, consoleId: string | null): Promise<IgdbGame> {
+  const en = game.description
+  wikiFailed = false
+  const fromWiki = await wikipediaEs(game.name, consoleId).catch(() => {
+    wikiFailed = true
+    return null
+  })
+  if (fromWiki) return { ...game, description: fromWiki, descriptionEn: en, descriptionSource: 'wikipedia' }
+  if (en) {
+    const es = await translateEs(en).catch(() => null)
+    if (es) return { ...game, description: es, descriptionEn: en, descriptionSource: 'traducción' }
+  }
+  return { ...game, descriptionEn: en, descriptionSource: 'igdb' }
 }
 
 /** IGDB platform ids per console (as in scripts/build-igdb.ts); GBC sets also hold Game Boy games. */
@@ -97,7 +195,8 @@ export default async function handler(request: Request): Promise<Response> {
     const exact = games
       .filter((g) => g.name && loose(g.name) === loose(title))
       .sort((a, b) => Number(!!a.version_parent) - Number(!!b.version_parent) || (b.total_rating_count ?? 0) - (a.total_rating_count ?? 0))
-    return json(mapGame(exact[0] ?? games[0]))
+    const game = await spanishDescription(mapGame(exact[0] ?? games[0]), params.get('console'))
+    return json(game, 200, wikiFailed ? 1 : 30)
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : String(e) }, 500)
   }

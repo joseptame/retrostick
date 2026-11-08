@@ -21,6 +21,7 @@ import { configureData } from '../src/lib/data.js'
 import { loadLookup } from '../src/lib/igdbdb.js'
 import { baseName, bestVariants, coverUrl, displayTitle, isDemo, looseKey, safeThumbName } from '../src/lib/names.js'
 import { DEFAULT_COLLECTIONS } from '../src/lib/recents.js'
+import { genreEs } from '../src/lib/genres.js'
 import { coverFor, loadDb } from '../src/lib/romdb.js'
 
 // Node.js, not edge: Vercel's edge adds a "Forwarded" header to outgoing requests and archive.org answers
@@ -84,7 +85,8 @@ async function build(id: ConsoleId, collection: string): Promise<string> {
     if (e.pack) game.p = e.pack
     if (e.discs) game.d = e.discs.map((d) => ({ f: d.name, s: d.size }))
     if (info?.rating != null) game.r = info.rating
-    if (info?.genres.length) game.g = info.genres.map(genreIndex)
+    // Spanish names, as in the webapp ("Racing" -> "Carreras")
+    if (info?.genres.length) game.g = info.genres.map((g) => genreIndex(genreEs(g)))
     if (info?.year) game.y = info.year
     return game
   })
