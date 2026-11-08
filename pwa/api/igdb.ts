@@ -42,6 +42,8 @@ interface IgdbGame {
   screenshots: string[]
   coverUrl: string | null
   genres: string[]
+  /** Most people who can play at once on the console (IGDB's offline modes); 1 = single player only */
+  players: number | null
   year: number | null
   rating: number | null
 }
@@ -55,11 +57,24 @@ function mapGame(g: any): IgdbGame {
     screenshots: (g.screenshots ?? []).map((s: any) => imageUrl('screenshot_big', s.image_id)),
     coverUrl: g.cover?.image_id ? imageUrl('cover_big', g.cover.image_id) : null,
     genres: (g.genres ?? []).map((x: any) => x.name).filter(Boolean).map(genreEs),
+    players: playersOf(g),
     year: g.first_release_date ? new Date(g.first_release_date * 1000).getUTCFullYear() : null,
     rating: g.rating != null ? Math.round(g.rating) / 10 : null,
   }
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
+
+/** Local players: the offline maximum IGDB gives; split screen or co-op without a number counts as two. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function playersOf(g: any): number | null {
+  const modes: number[] = g.game_modes ?? []
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const offline = Math.max(0, ...(g.multiplayer_modes ?? []).map((m: any) => Math.max(m.offlinemax ?? 0, m.offlinecoopmax ?? 0)))
+  if (offline > 1) return offline
+  if (modes.includes(4) || modes.includes(3)) return 2
+  if (modes.length) return 1
+  return null
+}
 
 function json(body: unknown, status = 200, cacheDays = 0): Response {
   return new Response(JSON.stringify(body), {
@@ -177,7 +192,7 @@ export default async function handler(request: Request): Promise<Response> {
   try {
     const access = await accessToken(id, secret)
     const query = async (where: string) => {
-      const body = `search "${title.replace(/"/g, '')}"; fields name,summary,storyline,cover.image_id,genres.name,platforms.name,first_release_date,rating,videos.video_id,screenshots.image_id,version_parent,total_rating_count;${where} limit 15;`
+      const body = `search "${title.replace(/"/g, '')}"; fields name,summary,storyline,cover.image_id,genres.name,game_modes,multiplayer_modes.offlinemax,multiplayer_modes.offlinecoopmax,platforms.name,first_release_date,rating,videos.video_id,screenshots.image_id,version_parent,total_rating_count;${where} limit 15;`
       const res = await fetch(`${API}/games`, {
         method: 'POST',
         headers: { 'Client-ID': id, Authorization: `Bearer ${access}`, Accept: 'application/json' },

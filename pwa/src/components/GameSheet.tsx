@@ -191,6 +191,7 @@ export function GameSheet(p: Props) {
                       {g}
                     </span>
                   ))}
+                  {d.players != null && d.players > 1 && <span className="gs-genre">👥 Hasta {d.players} jugadores</span>}
                 </div>
               )}
 

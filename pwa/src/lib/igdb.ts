@@ -6,6 +6,8 @@ export interface IgdbGame {
   screenshots: string[]
   coverUrl: string | null
   genres: string[]
+  /** Local players (offline): 1 = single player, null = unknown */
+  players?: number | null
   year: number | null
   rating: number | null
 }

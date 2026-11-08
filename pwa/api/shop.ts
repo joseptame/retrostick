@@ -17,7 +17,7 @@
  */
 import { configureArchive, groupDiscs, listItemFiles, type ArchiveEntry } from '../src/lib/archive.js'
 import { consoleForFile, CONSOLES, isCartridge, type ConsoleId } from '../src/lib/consoles.js'
-import { configureData } from '../src/lib/data.js'
+import { configureData, fetchData } from '../src/lib/data.js'
 import { loadLookup } from '../src/lib/igdbdb.js'
 import { baseName, bestVariants, coverUrl, displayTitle, isDemo, looseKey, safeThumbName } from '../src/lib/names.js'
 import { DEFAULT_COLLECTIONS } from '../src/lib/recents.js'
@@ -40,6 +40,8 @@ interface ShopGame {
   r?: number
   g?: number[]
   y?: number
+  /** Players on one console when two or more (scripts/build-players.ts): RetroShop's «Para dos» filter */
+  m?: number
   c?: string
 }
 
@@ -97,6 +99,11 @@ async function build(id: ConsoleId, collection: string): Promise<string> {
   covers.forEach((c, i) => {
     games[i].c = c ?? coverUrl(thumbs, safeThumbName(baseName(list[i].name)), 'Named_Titles')
   })
+  const players = await fetchData<{ games: Record<string, number> }>(`db/players-${id}.json`).catch(() => null)
+  if (players) for (const g of games) {
+    const p = players.games[looseKey(g.t)] ?? players.games[looseKey(displayTitle(g.n))]
+    if (p) g.m = p
+  }
   games.sort((a, b) => (b.r ?? -1) - (a.r ?? -1) || a.t.localeCompare(b.t, 'es'))
   return JSON.stringify({ console: id, collection, title, restricted, archive, genres, games })
 }
