@@ -70,11 +70,13 @@ object ShopCard {
     fun shelfContent(context: Context, console: Console): View {
         val s = style(console)
         fun dp(v: Number) = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v.toFloat(), context.resources.displayMetrics).toInt()
+        // White, like the unselected tabs: the colour logos (Game Boy Color's dark letters) get lost on the card's colour
         val logo = ImageView(context).apply {
             adjustViewBounds = true
             scaleType = ImageView.ScaleType.FIT_START
-            setImageResource(console.logo)
-            if (console.whiteWhenSelected) setColorFilter(Color.WHITE)
+            if (console.logoWhite != null) setImageResource(console.logoWhite)
+            else { setImageResource(console.logo); setColorFilter(Color.WHITE) }
+            alpha = 0.92f
         }
         val media = ConsoleMediaView(context, console)
         val plus = TextView(context).apply {
@@ -95,7 +97,7 @@ object ShopCard {
         }
         count.text = countText(context, console) { count.text = it }
         return FrameLayout(context).apply {
-            addView(logo, FrameLayout.LayoutParams(dp(54), dp(10), Gravity.TOP or Gravity.START).apply { leftMargin = dp(7); topMargin = dp(7) })
+            addView(logo, FrameLayout.LayoutParams(dp(70), dp(13), Gravity.TOP or Gravity.START).apply { leftMargin = dp(7); topMargin = dp(7) })
             addView(media, FrameLayout.LayoutParams(dp(54), dp(48), Gravity.CENTER_HORIZONTAL or Gravity.TOP).apply { topMargin = dp(21) })
             addView(plus, FrameLayout.LayoutParams(dp(16), dp(16), Gravity.TOP or Gravity.START).apply { leftMargin = dp(64); topMargin = dp(55) })
             addView(LinearLayout(context).apply {
