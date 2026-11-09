@@ -113,7 +113,7 @@ class Library(private val context: Context) {
                 game.finished = finished[game.key]
                 // <name>.srm, <name>.state, <name>.state.auto, <name>.state1...
                 game.saveFiles = saves.filter {
-                    it.name == "${game.baseName}.srm" || it.name.startsWith("${game.baseName}.state")
+                    it.name == "${game.baseName}.srm" || (it.name.startsWith("${game.baseName}.state") && !it.name.endsWith(".png"))
                 }
                 readRuntime(game, logs.filter { it.name == "${game.baseName}.lrtl" })
                 if (game.lastPlayed == 0L) game.lastPlayed = game.saveFiles.maxOfOrNull { it.lastModified() } ?: 0
@@ -131,7 +131,7 @@ class Library(private val context: Context) {
     fun describe(game: Game) {
         game.finished = Finished.load()[game.key]
         val saves = listFiles(savesDir) + listFiles(statesDir)
-        game.saveFiles = saves.filter { it.name == "${game.baseName}.srm" || it.name.startsWith("${game.baseName}.state") }
+        game.saveFiles = saves.filter { it.name == "${game.baseName}.srm" || (it.name.startsWith("${game.baseName}.state") && !it.name.endsWith(".png")) }
         val logs = runtimeLogs.listFiles()?.filter { it.isDirectory }?.flatMap { listFiles(it) }.orEmpty()
         readRuntime(game, logs.filter { it.name == "${game.baseName}.lrtl" })
         if (game.lastPlayed == 0L) game.lastPlayed = game.saveFiles.maxOfOrNull { it.lastModified() } ?: 0
@@ -205,6 +205,8 @@ fun launchInRetroArch(context: Context, game: Game, resume: Resume = Resume.TITL
         "savestate_auto_load" to (resume != Resume.TITLE).toString(),
         "savestate_auto_save" to "true",
         "savestate_auto_index" to "false",
+        // A picture with each save (<state>.png): the cards of Detalles → Jugar
+        "savestate_thumbnail_enable" to "true",
         "state_slot" to "0",
         // RetroArch shortcuts, the same on every console: hold Create + L1 = quick save, + R1 = load it,
         // + R2 = fast-forward. DualSense codes on Android 9 (docs/mandos.md): Create 104, L1 100, R1 101, R2 103

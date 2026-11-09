@@ -1417,95 +1417,13 @@ class MainActivity : Activity() {
         reload()
     }
 
+    /** Detalles, full screen (DetailsActivity): continue, progress, saves, finished, manual, delete. */
     private fun showDetails() {
         val game = currentGame ?: return
         keySound = Sounds.Sound.OPEN
-        val date = SimpleDateFormat("d MMM yyyy, HH:mm", Locale("es", "ES"))
-        val text = buildString {
-            appendLine("Archivo: ${game.file.name}")
-            appendLine("Tamaño: ${Formatter.formatShortFileSize(this@MainActivity, game.file.length())}")
-            appendLine("Consola: ${game.console.name}")
-            appendLine("Veces jugado: ${game.playCount}")
-            appendLine("Tiempo jugado: ${formatDuration(game.runtimeSeconds)}")
-            game.finished?.let { appendLine("$TROPHY Terminado el ${date.format(it.at)} (${formatDuration(it.seconds)})") }
-            appendLine()
-            if (game.saveFiles.isEmpty()) appendLine("Sin partidas guardadas en el stick.")
-            else {
-                appendLine("Partidas en el stick:")
-                game.saveFiles.sortedByDescending { it.lastModified() }.forEach {
-                    appendLine("• ${it.name.removePrefix(game.baseName)} — ${date.format(it.lastModified())}")
-                }
-            }
-        }
-        val hasState = lastState(game) != null || quickState(game) != null
-        AlertDialog.Builder(this, R.style.Dialog_RetroStick)
-            .setTitle(game.title)
-            .setMessage(text.trim())
-            .setPositiveButton(if (hasState) "▶ Continuar…" else "Cerrar") { _, _ -> if (hasState) chooseResume(game) }
-            .setNeutralButton("Borrar…") { _, _ -> confirmRemove(game) }
-            .setNegativeButton(if (game.finished == null) "$TROPHY Lo he terminado" else "Quitar de terminados") { _, _ -> toggleFinished(game) }
-            .showForPad()
-            .withIcons()
-    }
-
-    /** Where to continue: where it was closed (.state.auto) or the quick save (Share+L1), with their dates. */
-    private fun chooseResume(game: Game) {
-        val date = SimpleDateFormat("d MMM, HH:mm", Locale("es", "ES"))
-        val options = listOfNotNull(
-            lastState(game)?.let { "Donde lo dejaste · ${date.format(it.lastModified())}" to Resume.LAST },
-            quickState(game)?.let { "Guardado rápido · ${date.format(it.lastModified())}" to Resume.QUICK },
-        )
-        AlertDialog.Builder(this, R.style.Dialog_RetroStick)
-            .setTitle("Continuar ${game.title}")
-            .setItems(options.map { it.first }.toTypedArray()) { _, which -> play(options[which].second); render() }
-            .setNegativeButton(R.string.cancel, null)
-            .showForPad()
-    }
-
-    private fun toggleFinished(game: Game) {
-        val done = game.finished == null
-        io.execute {
-            val r = runCatching { Finished.set(game, done) }
-            main.post {
-                r.onSuccess {
-                    Sounds.play(if (done) Sounds.Sound.DONE else Sounds.Sound.BACK)
-                    Toast.makeText(this, if (done) "${game.title}: ¡terminado! (${formatDuration(game.runtimeSeconds)})" else "${game.title} ya no está en terminados", Toast.LENGTH_LONG).show()
-                }.onFailure { Toast.makeText(this, "No se pudo guardar: ${it.message}", Toast.LENGTH_LONG).show() }
-                reload()
-            }
-        }
-    }
-
-    /** Off the stick only (kept in the Drive collection) or also from Drive (to its bin). Saves always stay. */
-    private fun confirmRemove(game: Game) {
-        val auth = DriveAuth(this)
-        val withDrive = auth.isConfigured && auth.isConnected
-        val options = if (withDrive) arrayOf(
-            "Quitar solo del stick (se queda en tu colección de Drive)",
-            "Borrar también de Drive (va a la papelera de Drive)",
-        ) else arrayOf("Borrar del stick")
-        AlertDialog.Builder(this, R.style.Dialog_RetroStick)
-            .setTitle("Borrar ${game.title}")
-            .setItems(options) { _, which -> removeGame(game, alsoDrive = withDrive && which == 1) }
-            .setNegativeButton("Cancelar", null)
-            .showForPad()
-    }
-
-    private fun removeGame(game: Game, alsoDrive: Boolean) {
-        Toast.makeText(this, "Borrando ${game.title}…", Toast.LENGTH_SHORT).show()
-        DriveSync.removeGame(this, game, alsoDrive) { error ->
-            Sounds.play(if (error != null) Sounds.Sound.ERROR else Sounds.Sound.BACK)
-            val msg = when {
-                error != null -> "No se pudo borrar ${game.title}: $error"
-                alsoDrive -> "${game.title} borrado del stick y de Drive. Las partidas guardadas se conservan."
-                else -> "${game.title} quitado del stick. Sigue en tu colección de Drive."
-            }
-            Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
-            if (error == null) Fichas.forget(this, game)
-            reload()
-            // "Quitar solo del stick": it shows up in the Drive section
-            DriveCollection.refresh(this, force = true)
-        }
+        open(Intent(this, DetailsActivity::class.java)
+            .putExtra(DetailsActivity.EXTRA_CONSOLE, game.console.id)
+            .putExtra(DetailsActivity.EXTRA_FILE, game.file.path))
     }
 
     private fun render() {

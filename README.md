@@ -446,8 +446,8 @@ https://raw.githubusercontent.com/libretro-thumbnails/<Sistema>/master/Named_Box
   - *Logros:* conseguidos / total en RetroAchievements; «No válida» si la ROM no es una versión que admitan sus
     logros; sin columna en Super Nintendo, en Drive o sin cuenta (ver 8.2c).
   - *Partida guardada:* "✓ Copia en Drive" si todas sus partidas están subidas tal como están en el stick; "Pendiente de subir" si no; "En el stick" sin Drive conectado.
-  - Botón **Jugar**: el juego empieza siempre desde el título (`savestate_auto_load = "false"`). Para seguir, □
-    Detalles → **Continuar…**: *Donde lo dejaste* (`.state.auto`, se guarda al cerrar) o *Guardado rápido*
+  - Botón **Jugar**: el juego empieza siempre desde el título (`savestate_auto_load = "false"`). Para seguir, □ Detalles (pantalla completa, `DetailsActivity`: Jugar con tres tarjetas con la captura de cada guardado —`savestate_thumbnail_enable`—, progreso, partidas, Lo he terminado, Manual y Borrar) →
+    *Donde lo dejaste* (`.state.auto`, se guarda al cerrar) o *Guardado rápido*
     (`.state`, Create+L1 en partida; el launcher lo copia a `.state.auto` y activa la carga automática solo para esa
     partida).
 - **Estante** con las portadas de la consola, marca "Jugando" en el último jugado y tarjeta final "+ Añade juegos desde la app del móvil".

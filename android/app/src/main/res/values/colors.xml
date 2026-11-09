@@ -17,6 +17,7 @@
     <color name="accent_start">#5B4BD6</color>
     <color name="accent_end">#3A2D9C</color>
     <color name="ok">#4ADE80</color>
+    <color name="danger_text">#FCA5A5</color>
     <color name="off">#8F88BD</color>
     <color name="button_text">#1B1446</color>
     <!-- Xbox face button colours -->
