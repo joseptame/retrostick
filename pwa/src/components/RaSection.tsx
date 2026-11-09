@@ -11,8 +11,7 @@ import { Icon } from './icons'
 export function RaSection({ state }: { state: AppState }) {
   const folders = state.folders
   const [account, setAccount] = useState<{ user: string } | null | undefined>(undefined)
-  // Opened from the TV's QR (…/?ra=1): the form is open at once
-  const [open, setOpen] = useState(() => new URL(location.href).searchParams.has('ra'))
+  const [open, setOpen] = useState(false)
   const [user, setUser] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
@@ -39,13 +38,7 @@ export function RaSection({ state }: { state: AppState }) {
       setAccount({ user: j.user })
       setOpen(false)
       setPassword('')
-      const fromTv = new URL(location.href).searchParams.has('ra')
-      if (fromTv) history.replaceState(null, '', location.pathname)
-      state.notify(
-        fromTv
-          ? `Sesión iniciada como ${j.user}. La tele la recogerá en unos segundos`
-          : `Sesión iniciada como ${j.user}. El stick la recibirá en la próxima sincronización`,
-      )
+      state.notify(`Sesión iniciada como ${j.user}. El stick la recibirá en la próxima sincronización`)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {

@@ -13,6 +13,7 @@ import { Ficha } from './screens/Ficha'
 import { Login } from './screens/Login'
 import { Partidas } from './screens/Partidas'
 import { Stick } from './screens/Stick'
+import { RaLanding } from './screens/RaLanding'
 import { Subir } from './screens/Subir'
 
 export interface AppState {
@@ -61,8 +62,9 @@ export default function App() {
 }
 
 function Main({ onSignOut }: { onSignOut: () => void }) {
-  // …/?ra=1: the TV's "Iniciar sesión con el móvil" QR (Retro Ajustes → Mis logros) opens Stick → RetroAchievements
-  const [tab, setTab] = useState<Tab>(() => (new URL(location.href).searchParams.has('ra') ? 'stick' : 'coleccion'))
+  const [tab, setTab] = useState<Tab>('coleccion')
+  // …/?ra=1: the TV's QR (Retro Ajustes → Mis logros) opens the RetroAchievements login page (RaLanding)
+  const [raLanding, setRaLanding] = useState(() => new URL(location.href).searchParams.has('ra'))
   const [library, setLib] = useState<Library | null>(cachedLibrary())
   const [folders, setFolders] = useState<Folders | null>(null)
   const [online, setOnline] = useState(navigator.onLine)
@@ -191,6 +193,23 @@ function Main({ onSignOut }: { onSignOut: () => void }) {
     uploadsApi,
   }
   const game = selected ? library?.games.find((g) => g.key === selected) : undefined
+
+  if (raLanding) {
+    return (
+      <div className="app">
+        <RaLanding
+          state={state}
+          onClose={() => {
+            setRaLanding(false)
+            history.replaceState(null, '', '/')
+            setTab('coleccion')
+            window.scrollTo({ top: 0 })
+          }}
+        />
+        {toast && <div className="toast">{toast}</div>}
+      </div>
+    )
+  }
 
   return (
     <div className="app">
