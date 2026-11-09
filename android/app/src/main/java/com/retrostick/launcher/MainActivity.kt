@@ -39,7 +39,7 @@ import java.util.Calendar
 import java.util.Locale
 import java.util.concurrent.Executors
 
-private const val SETTINGS_COLUMNS = 4
+private const val SETTINGS_COLUMNS = 5
 /** Index of the "Sonidos" card in Retro Ajustes (the last one). */
 private const val SOUNDS_SETTING = 11
 /** Index of the "Vista del inicio" card (after Sonidos). */
@@ -721,16 +721,15 @@ class MainActivity : Activity() {
         val info = entry?.info
         val known = entry != null || Fichas.failed(game.title, game.console.id)
         if (entry == null || entry.stale) requestFicha(game.title, game.console.id)
-        findViewById<TextView>(R.id.gameMeta).text =
-            listOfNotNull(
+        findViewById<TextView>(R.id.gameMeta).apply { text = withPlayersIcon(listOfNotNull(
                 info?.rating?.let { "★ " + String.format("%.1f", it).replace('.', ',') },
                 info?.year?.toString(),
                 info?.genres?.take(2)?.joinToString(", ")?.takeIf { it.isNotEmpty() },
-                info?.players?.takeIf { it >= 2 }?.let { "👥 Hasta $it" },
+                info?.players?.takeIf { it >= 2 }?.let { "$PLAYERS Hasta $it" },
                 console.name.takeIf { info == null }, game.region,
                 if (drive != null) getString(R.string.in_drive_meta) else null,
                 game.finished?.let { "🏆 Terminado" },
-            ).joinToString("  ·  ")
+            ).joinToString("  ·  ")) }
         gameDesc.text = when {
             info?.description != null -> info.description
             !known -> ""

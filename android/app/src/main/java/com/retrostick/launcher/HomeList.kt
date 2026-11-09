@@ -226,13 +226,13 @@ class HomeList(private val ctx: Context, private val covers: CoverLoader) {
         val entry = Fichas.cached(ctx, sheet.title, sheet.consoleId)
         val known = entry != null || Fichas.failed(sheet.title, sheet.consoleId)
         val i = entry?.info
-        meta.text = listOfNotNull(
+        meta.text = meta.withPlayersIcon(listOfNotNull(
             i?.rating?.let { "★ " + String.format("%.1f", it).replace('.', ',') },
             i?.year?.toString(),
             i?.genres?.take(2)?.joinToString(", ")?.takeIf { it.isNotEmpty() },
-            i?.players?.takeIf { it >= 2 }?.let { "👥 Hasta $it" },
+            i?.players?.takeIf { it >= 2 }?.let { "$PLAYERS Hasta $it" },
             sheet.consoleName.takeIf { i == null } ,
-        ).joinToString("   ·   ")
+        ).joinToString("   ·   "))
         // Loading: the pulsing bars stand in for the description and the screenshots
         desc.visibility = if (known) View.VISIBLE else View.GONE
         loading.show(!known && view.visibility == View.VISIBLE)

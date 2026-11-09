@@ -552,7 +552,7 @@ class ShopActivity : Activity() {
             }
             v.alpha = if (selected) 1f else 0.75f
         }
-        val labels = listOf(query?.let { "«$it»" } ?: "Buscar") + Sort.values().map { it.label } + "Género: ${genre ?: "Todos"}" + "👥 Para dos"
+        val labels = listOf(query?.let { "«$it»" } ?: "Buscar") + Sort.values().map { it.label } + "Género: ${genre ?: "Todos"}" + "Para dos"
         filterViews.forEachIndexed { i, v ->
             v.text = labels[i]
             val on = when {
@@ -567,6 +567,7 @@ class ShopActivity : Activity() {
             }
             v.setTextColor(if (on || focus) Color.WHITE else getColor(R.color.chip_text))
             if (i == 0) v.icon(R.drawable.ic_shop_search, 13, v.currentTextColor)
+            if (i == filterViews.lastIndex) v.icon(R.drawable.ic_players, 13, v.currentTextColor)
         }
         message.visibility = if (shown.isEmpty()) View.VISIBLE else View.GONE
         message.text = when {
@@ -905,12 +906,12 @@ class ShopActivity : Activity() {
         fichaCover.setImageDrawable(null)
         loadCover(g) { bmp -> if (ficha === g) fichaCover.setImageBitmap(bmp ?: logoCover(this, console, dp(200))) }
         fichaTitle.text = g.title
-        fichaMeta.text = listOfNotNull(
+        fichaMeta.text = fichaMeta.withPlayersIcon(listOfNotNull(
             g.rating?.let { "★ " + String.format("%.1f", it).replace('.', ',') },
             g.year?.toString(),
             g.genres.joinToString(", ").takeIf { it.isNotEmpty() },
-            g.players.takeIf { it >= 2 }?.let { "👥 Hasta $it jugadores" },
-        ).joinToString("   ·   ")
+            g.players.takeIf { it >= 2 }?.let { "$PLAYERS Hasta $it jugadores" },
+        ).joinToString("   ·   "))
         val size = sizeOf(g)
         fichaInfo.text = listOf(if (g.discs.size > 1) "${g.discs.size} discos · $size" else size, console.name, g.name).joinToString("   ·   ")
         // Languages of this release (from its file name), Spanish highlighted

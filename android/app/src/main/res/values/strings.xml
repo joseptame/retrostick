@@ -70,7 +70,7 @@
     <string name="favorite_removed">Quitado de favoritos</string>
 
     <string name="set_pair">Emparejar mando</string>
-    <string name="set_pair_sub">Añadir DualSense o Pro Controller</string>
+    <string name="set_pair_sub">DualSense o Pro Controller</string>
     <string name="set_sync">Sincronizar ahora</string>
     <string name="set_wifi">Wi-Fi</string>
     <string name="set_android">Ajustes de Android</string>
@@ -99,5 +99,5 @@
     <string name="hint_search">Buscar</string>
     <string name="hint_view">Vista</string>
     <string name="hint_manual">Manual</string>
-    <string name="set_shop_sub">Descarga juegos con el mando</string>
+    <string name="set_shop_sub">Juegos con el mando</string>
 </resources>
