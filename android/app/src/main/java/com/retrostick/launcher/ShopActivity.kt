@@ -317,7 +317,7 @@ class ShopActivity : Activity() {
         root.addView(pairPanel, FrameLayout.LayoutParams(-1, -1))
 
         col.addView(text(9.5f, R.color.text_3).apply {
-            text = hints("[X]  Ver juego      [TRI]  Buscar      L1 / R1  Consola      [O]  Volver")
+            text = hints("[X]  Ver juego      [TRI]  Buscar      [L1R1]  Consola      [O]  Volver")
             gravity = Gravity.END
         })
         return root
@@ -823,7 +823,7 @@ class ShopActivity : Activity() {
             visibility = View.GONE
             addView(kbText)
             addView(text(9.5f, R.color.text_3).apply {
-                text = hints("[X]  Escribir      [SQ]  Borrar      L1 / R1  Consola      [O]  Cerrar")
+                text = hints("[X]  Escribir      [SQ]  Borrar      [L1R1]  Consola      [O]  Cerrar")
                 setPadding(0, dp(4), 0, dp(8))
             })
             addView(rows)
@@ -1241,23 +1241,9 @@ class ShopActivity : Activity() {
         return android.text.SpannableString(" ").apply { setSpan(android.text.style.ImageSpan(d, android.text.style.DynamicDrawableSpan.ALIGN_BOTTOM), 0, 1, 0) }
     }
 
-    /** Controller hints with the home screen's glyphs: [X] [O] [SQ] [TRI]. */
-    private fun hints(text: String): CharSequence {
-        val glyphs = mapOf(
-            "[X]" to R.drawable.ic_hint_cross, "[O]" to R.drawable.ic_hint_circle,
-            "[SQ]" to R.drawable.ic_hint_square, "[TRI]" to R.drawable.ic_hint_triangle,
-        )
-        val out = android.text.SpannableStringBuilder(text)
-        for ((token, res) in glyphs) {
-            var at = out.indexOf(token)
-            while (at >= 0) {
-                val d = getDrawable(res)!!.mutate().apply { setBounds(0, 0, dp(14), dp(14)) }
-                out.setSpan(android.text.style.ImageSpan(d, android.text.style.DynamicDrawableSpan.ALIGN_BOTTOM), at, at + token.length, 0)
-                at = out.indexOf(token, at + token.length)
-            }
-        }
-        return out
-    }
+    /** Controller hints with the buttons of the pad in use (PadHints): [X] [O] [SQ] [TRI] [L1R1]… */
+    private fun hints(text: String): CharSequence =
+        PadHints.build(this, text, if (padStyle == PadStyle.REMOTE) StickStatus.firstPadStyle() else padStyle, getColor(R.color.chip_text), dp(14))
 
     private fun text(sp: Float, color: Int) = TextView(this).apply {
         setTextSize(TypedValue.COMPLEX_UNIT_SP, sp)

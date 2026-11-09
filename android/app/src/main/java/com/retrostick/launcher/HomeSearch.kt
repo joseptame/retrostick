@@ -79,7 +79,8 @@ class HomeSearch(private val ctx: Context, private val covers: CoverLoader) {
     }
 
     fun open() {
-        scopeText.text = "$scope.      ✕ Escribir / Abrir      □ Borrar      ○ Cerrar"
+        scopeText.text = PadHints.build(ctx, "$scope.      [X]  Escribir / Abrir      [SQ]  Borrar      [O]  Cerrar",
+            StickStatus.firstPadStyle(), scopeText.currentTextColor, (scopeText.textSize * 1.25f).toInt())
         query = ""
         kbRow = 1; kbCol = 0; hitFocus = -1
         view.visibility = View.VISIBLE

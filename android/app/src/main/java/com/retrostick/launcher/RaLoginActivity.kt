@@ -93,7 +93,8 @@ class RaLoginActivity : Activity() {
             addView(or, LinearLayout.LayoutParams(dp(56), -2))
             addView(right, LinearLayout.LayoutParams(dp(360), -2))
         }
-        val hints = text(10.5f, R.color.chip_text).apply { text = "▲ ▼ Moverse      ✕ Escribir / Entrar      ○ Volver" }
+        val hints = text(10.5f, R.color.chip_text)
+        setHints(hints, "▲ ▼ Moverse      [X]  Escribir / Entrar      [O]  Volver")
         setContentView(FrameLayout(this).apply {
             setBackgroundResource(R.drawable.bg_screen)
             addView(LinearLayout(this@RaLoginActivity).apply {
@@ -177,6 +178,7 @@ class RaLoginActivity : Activity() {
      * the DualSense's Cross arrives as BUTTON_B, which the system would take as "back".
      */
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.action == KeyEvent.ACTION_DOWN && StickStatus.isGamepad(event.device)) followPad(event)
         when (StickStatus.standardKey(event.device, event.keyCode)) {
             KeyEvent.KEYCODE_BUTTON_A -> {
                 return super.dispatchKeyEvent(KeyEvent(event.downTime, event.eventTime, event.action, KeyEvent.KEYCODE_DPAD_CENTER, event.repeatCount))
@@ -216,6 +218,30 @@ class RaLoginActivity : Activity() {
     }
 
     private fun section(name: String) = text(9f, R.color.text_3).apply { text = name.uppercase(); letterSpacing = 0.14f; typeface = font(R.font.inter_semibold) }
+
+
+    // ---- Hints with the buttons of the pad in use (PadHints) ----
+    private var hintsTemplate = ""
+    private var hintsView: TextView? = null
+    private var hintsStyle = PadStyle.PLAYSTATION
+
+    private fun setHints(view: TextView, template: String) {
+        hintsView = view
+        hintsTemplate = template
+        hintsStyle = StickStatus.firstPadStyle()
+        showHints()
+    }
+
+    private fun showHints() {
+        val v = hintsView ?: return
+        v.text = PadHints.build(this, hintsTemplate, hintsStyle, v.currentTextColor, (v.textSize * 1.25f).toInt())
+    }
+
+    /** The pad that pressed a key now decides the glyphs. */
+    private fun followPad(event: KeyEvent) {
+        val style = StickStatus.padStyle(event.device)
+        if (style != hintsStyle) { hintsStyle = style; showHints() }
+    }
 
     private fun text(sp: Float, color: Int) = TextView(this).apply {
         setTextColor(getColor(color)); setTextSize(TypedValue.COMPLEX_UNIT_SP, sp); typeface = font(R.font.inter_regular)

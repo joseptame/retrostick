@@ -101,7 +101,7 @@ class DetailsActivity : Activity() {
         cards = listOf(
             card("Donde lo dejaste", auto?.let { "Se guardó al cerrar · ${formatWhen(it.lastModified())}" } ?: "Aún no hay: se guarda al cerrar el juego",
                 auto, auto != null, Resume.LAST, play = true),
-            card("Guardado rápido", quick?.let { "Create + L1 · ${formatWhen(it.lastModified())}" } ?: "Aún no hay · Create + L1 en partida",
+            card("Guardado rápido", quick?.let { "${PadHints.quickSave(StickStatus.firstPadStyle())} · ${formatWhen(it.lastModified())}" } ?: "Aún no hay · ${PadHints.quickSave(StickStatus.firstPadStyle())} en partida",
                 quick, quick != null, Resume.QUICK),
             card("Desde el título", if (game.hasProgress) "Tu partida del juego se mantiene" else "Empezar a jugar", null, true, Resume.TITLE, titleScreen = true),
         )
@@ -129,7 +129,7 @@ class DetailsActivity : Activity() {
         listOfNotNull(
             srm?.let { Triple("Partida del juego", "guardado del cartucho", it) },
             auto?.let { Triple("Donde lo dejaste", "al cerrar", it) },
-            quick?.let { Triple("Guardado rápido", "Create + L1", it) },
+            quick?.let { Triple("Guardado rápido", PadHints.quickSave(StickStatus.firstPadStyle()), it) },
         ).forEach { (name, what, f) ->
             saves.addView(saveRow(name, what, formatWhen(f.lastModified()), backedUp), LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(5) })
         }
@@ -166,9 +166,8 @@ class DetailsActivity : Activity() {
         actionList += Action(actionView("Borrar…", R.drawable.ic_trash, danger = true)) { confirmRemove() }
         actions = actionList
         val actionRow = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; actions.forEach { addView(it.view, LinearLayout.LayoutParams(-2, dp(32)).apply { marginEnd = dp(7) }) } }
-        val hints = text(9.5f, R.color.chip_text).apply {
-            text = listOfNotNull("✕ Elegir", "◀ ▶ ▲ ▼ Moverse", "R2 Logros".takeIf { ra != null && ra.supported }, "○ Volver").joinToString("      ")
-        }
+        val hints = text(9.5f, R.color.chip_text)
+        setHints(hints, listOfNotNull("[X]  Elegir", "◀ ▶ ▲ ▼ Moverse", "[R2]  Logros".takeIf { ra != null && ra.supported }, "[O]  Volver").joinToString("      "))
         val bar = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(40), 0, dp(40), 0)
@@ -313,6 +312,7 @@ class DetailsActivity : Activity() {
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.action != KeyEvent.ACTION_DOWN) return super.dispatchKeyEvent(event)
+        followPad(event)
         when (StickStatus.standardKey(event.device, event.keyCode)) {
             KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_BUTTON_B -> { Sounds.play(Sounds.Sound.BACK); finish() }
             KeyEvent.KEYCODE_DPAD_LEFT -> move(-1)
@@ -433,6 +433,30 @@ class DetailsActivity : Activity() {
         val h = seconds / 3600
         val m = (seconds % 3600) / 60
         return when { h > 0 -> "$h h $m min"; m > 0 -> "$m min"; else -> "< 1 min" }
+    }
+
+
+    // ---- Hints with the buttons of the pad in use (PadHints) ----
+    private var hintsTemplate = ""
+    private var hintsView: TextView? = null
+    private var hintsStyle = PadStyle.PLAYSTATION
+
+    private fun setHints(view: TextView, template: String) {
+        hintsView = view
+        hintsTemplate = template
+        hintsStyle = StickStatus.firstPadStyle()
+        showHints()
+    }
+
+    private fun showHints() {
+        val v = hintsView ?: return
+        v.text = PadHints.build(this, hintsTemplate, hintsStyle, v.currentTextColor, (v.textSize * 1.25f).toInt())
+    }
+
+    /** The pad that pressed a key now decides the glyphs. */
+    private fun followPad(event: KeyEvent) {
+        val style = StickStatus.padStyle(event.device)
+        if (style != hintsStyle) { hintsStyle = style; showHints() }
     }
 
     private fun text(sp: Float, color: Int) = TextView(this).apply {

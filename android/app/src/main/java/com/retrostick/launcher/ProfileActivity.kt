@@ -80,7 +80,8 @@ class ProfileActivity : Activity() {
                 addView(rank, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(2) })
             }, LinearLayout.LayoutParams(dp(300), -2))
         }
-        val hints = text(10.5f, R.color.chip_text).apply { text = "▲ ▼ Moverse      ✕ Ver sus logros      L1 / R1  Juegos · Recientes      △ Cerrar sesión      ○ Volver" }
+        val hints = text(10.5f, R.color.chip_text)
+        setHints(hints, "▲ ▼ Moverse      [X]  Ver sus logros      [L1R1]  Juegos · Recientes      [TRI]  Cerrar sesión      [O]  Volver")
         setContentView(FrameLayout(this).apply {
             setBackgroundResource(R.drawable.bg_screen)
             addView(LinearLayout(this@ProfileActivity).apply {
@@ -270,6 +271,7 @@ class ProfileActivity : Activity() {
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.action != KeyEvent.ACTION_DOWN) return super.dispatchKeyEvent(event)
+        followPad(event)
         val code = StickStatus.standardKey(event.device, event.keyCode)
         val n = rowViews.size
         when (code) {
@@ -290,6 +292,30 @@ class ProfileActivity : Activity() {
             else -> return super.dispatchKeyEvent(event)
         }
         return true
+    }
+
+
+    // ---- Hints with the buttons of the pad in use (PadHints) ----
+    private var hintsTemplate = ""
+    private var hintsView: TextView? = null
+    private var hintsStyle = PadStyle.PLAYSTATION
+
+    private fun setHints(view: TextView, template: String) {
+        hintsView = view
+        hintsTemplate = template
+        hintsStyle = StickStatus.firstPadStyle()
+        showHints()
+    }
+
+    private fun showHints() {
+        val v = hintsView ?: return
+        v.text = PadHints.build(this, hintsTemplate, hintsStyle, v.currentTextColor, (v.textSize * 1.25f).toInt())
+    }
+
+    /** The pad that pressed a key now decides the glyphs. */
+    private fun followPad(event: KeyEvent) {
+        val style = StickStatus.padStyle(event.device)
+        if (style != hintsStyle) { hintsStyle = style; showHints() }
     }
 
     private fun text(sp: Float, color: Int) = TextView(this).apply {

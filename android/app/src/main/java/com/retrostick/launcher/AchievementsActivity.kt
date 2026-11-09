@@ -102,7 +102,8 @@ class AchievementsActivity : Activity() {
                 addView(summary, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(5) })
             })
         }
-        val hints = text(10.5f, R.color.chip_text).apply { text = "▲ ▼ Moverse      L1 / R1  Todos · Conseguidos · Por conseguir      ○ Volver" }
+        val hints = text(10.5f, R.color.chip_text)
+        setHints(hints, "▲ ▼ Moverse      [L1R1]  Todos · Conseguidos · Por conseguir      [O]  Volver")
         setContentView(FrameLayout(this).apply {
             setBackgroundResource(R.drawable.bg_screen)
             addView(LinearLayout(this@AchievementsActivity).apply {
@@ -246,6 +247,7 @@ class AchievementsActivity : Activity() {
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.action != KeyEvent.ACTION_DOWN) return super.dispatchKeyEvent(event)
+        followPad(event)
         val code = StickStatus.standardKey(event.device, event.keyCode)
         val n = shown.size
         when (code) {
@@ -257,6 +259,30 @@ class AchievementsActivity : Activity() {
             else -> return super.dispatchKeyEvent(event)
         }
         return true
+    }
+
+
+    // ---- Hints with the buttons of the pad in use (PadHints) ----
+    private var hintsTemplate = ""
+    private var hintsView: TextView? = null
+    private var hintsStyle = PadStyle.PLAYSTATION
+
+    private fun setHints(view: TextView, template: String) {
+        hintsView = view
+        hintsTemplate = template
+        hintsStyle = StickStatus.firstPadStyle()
+        showHints()
+    }
+
+    private fun showHints() {
+        val v = hintsView ?: return
+        v.text = PadHints.build(this, hintsTemplate, hintsStyle, v.currentTextColor, (v.textSize * 1.25f).toInt())
+    }
+
+    /** The pad that pressed a key now decides the glyphs. */
+    private fun followPad(event: KeyEvent) {
+        val style = StickStatus.padStyle(event.device)
+        if (style != hintsStyle) { hintsStyle = style; showHints() }
     }
 
     private fun text(sp: Float, color: Int) = TextView(this).apply {

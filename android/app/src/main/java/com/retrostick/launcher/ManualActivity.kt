@@ -117,7 +117,7 @@ class ManualActivity : Activity() {
                     show(prefs.getInt(name, 0))
                 }.onFailure {
                     Sounds.play(Sounds.Sound.ERROR)
-                    status.text = "No se pudo abrir el manual: ${it.message}\n\nPulsa ○ para volver."
+                    status.text = "No se pudo abrir el manual: ${it.message}\n\nPulsa atrás para volver."
                 }
             }
         }
@@ -147,12 +147,12 @@ class ManualActivity : Activity() {
         bitmap = bmp
         scroll.scrollTo(0, 0)
         val title = intent.getStringExtra(EXTRA_TITLE) ?: ""
-        info.text = infoText()
+        info.text = PadHints.build(this, infoText(), StickStatus.firstPadStyle(), info.currentTextColor, (info.textSize * 1.25f).toInt())
     }
 
     private fun infoText(): String {
         val title = intent.getStringExtra(EXTRA_TITLE) ?: ""
-        return "$title · página ${page + 1} de $pageCount      ◀ ▶ Página      ✕ ${if (wide) "Página entera" else "Ampliar"}      ○ Volver"
+        return "$title · página ${page + 1} de $pageCount      ◀ ▶ Página      [X]  ${if (wide) "Página entera" else "Ampliar"}      [O]  Volver"
     }
 
     /** A page of an image manual: downloaded (once) and decoded at screen size off the UI thread. */
@@ -161,7 +161,7 @@ class ManualActivity : Activity() {
         prefs.edit().putInt(name, page).apply()
         val want = page
         val wideNow = wide
-        info.text = infoText()
+        info.text = PadHints.build(this, infoText(), StickStatus.firstPadStyle(), info.currentTextColor, (info.textSize * 1.25f).toInt())
         // Not downloaded yet: say so (the page stays as it was until the new one is ready)
         val ready = Manuals.hasPage(this, console, name, want)
         loadingPage.text = "Cargando la página ${want + 1}…"
