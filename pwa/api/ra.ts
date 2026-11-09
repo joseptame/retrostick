@@ -97,10 +97,69 @@ async function spanish(gameId: number, titles: string[], descriptions: string[])
   return out
 }
 
+/** "Warning: Unsupported Core", "Unsupported Game Version": 0-point warnings, not real achievements. */
+const isWarning = (a: Any) => !a.Points && /unsupported|warning/i.test(`${a.Title ?? ''}`)
+
+/**
+ * ?profile=1&user=…: the user's trophy profile (Retro Ajustes → Mis logros): points and rank, every game
+ * with achievements they've played (progress) and the last achievements earned (30 days), in Spanish.
+ */
+async function profile(user: string, key: string): Promise<Response> {
+  const u = encodeURIComponent(user)
+  const [summary, completion, recent] = await Promise.all([
+    get(`API_GetUserSummary.php?u=${u}&g=0&a=0`, key) as Promise<Any>,
+    get(`API_GetUserCompletionProgress.php?u=${u}&c=500`, key) as Promise<Any>,
+    get(`API_GetUserRecentAchievements.php?u=${u}&m=43200`, key) as Promise<Any[]>,
+  ])
+  const real = (recent ?? []).filter((a) => !isWarning(a)).slice(0, 30)
+  const [titles, descriptions] = await Promise.all([
+    translateLines(real.map((a) => a.Title ?? '')).catch(() => null),
+    translateLines(real.map((a) => a.Description ?? '')).catch(() => null),
+  ])
+  const games = ((completion?.Results ?? []) as Any[])
+    .filter((g) => (g.MaxPossible ?? 0) > 0)
+    .map((g) => ({
+      id: g.GameID,
+      title: g.Title,
+      console: g.ConsoleName,
+      icon: g.ImageIcon ? `${MEDIA}${g.ImageIcon}` : null,
+      total: g.MaxPossible,
+      earned: Math.max(g.NumAwarded ?? 0, g.NumAwardedHardcore ?? 0),
+      last: g.MostRecentAwardedDate ?? null,
+    }))
+  return json({
+    user: summary?.User ?? user,
+    avatar: summary?.UserPic ? `${MEDIA}${summary.UserPic}` : null,
+    points: Number(summary?.TotalPoints) || 0,
+    softcorePoints: Number(summary?.TotalSoftcorePoints) || 0,
+    rank: Number(summary?.Rank) || null,
+    memberSince: summary?.MemberSince ?? null,
+    games,
+    recent: real.map((a, i) => ({
+      title: titles?.[i] || a.Title,
+      description: descriptions?.[i] || a.Description,
+      points: a.Points ?? 0,
+      badge: a.BadgeURL ? `${MEDIA}${a.BadgeURL}` : null,
+      game: a.GameTitle,
+      console: a.ConsoleName,
+      date: a.Date,
+    })),
+  })
+}
+
 export default async function handler(request: Request): Promise<Response> {
   const key = process.env.RA_API_KEY?.replace(/^["']|["']$/g, '')
   if (!key) return json({ error: 'RetroAchievements no está configurado (falta RA_API_KEY).' }, 503)
   const url = new URL(request.url)
+  if (url.searchParams.get('profile')) {
+    const who = url.searchParams.get('user')?.trim()
+    if (!who) return json({ error: 'Falta user.' }, 400)
+    try {
+      return await profile(who, key)
+    } catch (e) {
+      return json({ error: e instanceof Error ? e.message : String(e) }, 502)
+    }
+  }
   const consoleId = CONSOLE_IDS[url.searchParams.get('console') ?? '']
   const title = url.searchParams.get('title')?.trim() ?? ''
   const md5 = url.searchParams.get('md5')
@@ -116,7 +175,7 @@ export default async function handler(request: Request): Promise<Response> {
       key,
     )) as Any
     const players = Number(info.NumDistinctPlayers) || 0
-    const list = Object.values(info.Achievements ?? {}) as Any[]
+    const list = (Object.values(info.Achievements ?? {}) as Any[]).filter((a) => !isWarning(a))
     list.sort((a, b) => (a.DisplayOrder ?? 0) - (b.DisplayOrder ?? 0) || a.ID - b.ID)
     const es = await spanish(game.ID, list.map((a) => a.Title ?? ''), list.map((a) => a.Description ?? ''))
     const achievements = list.map((a, i) => ({
