@@ -44,10 +44,8 @@ object RetroAchievements {
 
     /** Writes the account (or "off") into retroarch.cfg; keys missing from the file are added at the end. */
     fun apply(context: Context) {
-        val cfg = File(RETROARCH_CFG)
-        if (!cfg.isFile) return
         val a = account(context)
-        val keys = linkedMapOf(
+        writeRetroArchCfg(linkedMapOf(
             "cheevos_enable" to (a != null).toString(),
             "cheevos_username" to (a?.user ?: ""),
             "cheevos_token" to (a?.token ?: ""),
@@ -56,20 +54,7 @@ object RetroAchievements {
             // The unlock pop-up with the achievement's badge and a sound, like a console's trophy
             "cheevos_badges_enable" to "true",
             "cheevos_unlock_sound_enable" to "true",
-        )
-        runCatching {
-            val lines = cfg.readLines().toMutableList()
-            var changed = false
-            for ((k, v) in keys) {
-                val line = "$k = \"$v\""
-                val i = lines.indexOfFirst { it.substringBefore('=').trim() == k }
-                when {
-                    i < 0 -> { lines += line; changed = true }
-                    lines[i] != line -> { lines[i] = line; changed = true }
-                }
-            }
-            if (changed) cfg.writeText(lines.joinToString("\n", postfix = "\n"))
-        }.onFailure { Log.w("RetroStick", "RetroAchievements: retroarch.cfg not written", it) }
+        ))
     }
 
     // ---- A game's achievements (api/ra.ts): the Logros screen and the count in the ficha ----

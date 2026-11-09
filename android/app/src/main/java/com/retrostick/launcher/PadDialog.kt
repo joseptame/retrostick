@@ -45,3 +45,16 @@ fun AlertDialog.Builder.showForPad(): AlertDialog = create().also {
     it.padKeys()
     it.show()
 }
+
+/** Draws the icon tokens ([TROPHY], [PLAYERS]) of the shown dialog's message and buttons as line icons. */
+fun AlertDialog.withIcons(): AlertDialog = also { d ->
+    d.findViewById<android.widget.TextView>(android.R.id.message)?.let { it.text = it.withIcons(it.text) }
+    listOf(AlertDialog.BUTTON_POSITIVE, AlertDialog.BUTTON_NEGATIVE, AlertDialog.BUTTON_NEUTRAL)
+        .mapNotNull { d.getButton(it) }
+        .forEach { b ->
+            // All caps would drop the icon spans: upper-cased by hand instead (the tokens have no letters)
+            val text = if (b.isAllCaps) b.text.toString().uppercase(java.util.Locale("es", "ES")) else b.text
+            b.isAllCaps = false
+            b.text = b.withIcons(text)
+        }
+}

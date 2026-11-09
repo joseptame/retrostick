@@ -201,7 +201,7 @@ class HomeList(private val ctx: Context, private val covers: CoverLoader) {
         styleButton(manualBtn, false)
         manualBtn.text = PillSpan.text(sheet.manualGlyph, "Manual", manualBtn.currentTextColor, ctx.resources.displayMetrics.density,
             if (sheet.manualGlyph == "Share") ctx.getDrawable(R.drawable.ic_share) else null)
-        langs.text = android.text.SpannableStringBuilder().apply {
+        langs.text = langs.withIcons(android.text.SpannableStringBuilder().apply {
             if (sheet.languages.isNotEmpty()) {
                 append("Idiomas   ")
                 sheet.languages.forEachIndexed { i, l ->
@@ -214,8 +214,8 @@ class HomeList(private val ctx: Context, private val covers: CoverLoader) {
                     }
                 }
             }
-            sheet.finished?.let { if (isNotEmpty()) append("      "); append("🏆 $it") }
-        }
+            sheet.finished?.let { if (isNotEmpty()) append("      "); append("$TROPHY $it") }
+        })
         sheet.coverGame?.let { g ->
             if (cover.tag != g.key) {
                 cover.tag = g.key
@@ -226,7 +226,7 @@ class HomeList(private val ctx: Context, private val covers: CoverLoader) {
         val entry = Fichas.cached(ctx, sheet.title, sheet.consoleId)
         val known = entry != null || Fichas.failed(sheet.title, sheet.consoleId)
         val i = entry?.info
-        meta.text = meta.withPlayersIcon(listOfNotNull(
+        meta.text = meta.withIcons(listOfNotNull(
             i?.rating?.let { "★ " + String.format("%.1f", it).replace('.', ',') },
             i?.year?.toString(),
             i?.genres?.take(2)?.joinToString(", ")?.takeIf { it.isNotEmpty() },
@@ -326,7 +326,7 @@ class HomeList(private val ctx: Context, private val covers: CoverLoader) {
                 is Entry.Stick -> {
                     t.text = e.game.title
                     s.text = rowSub(e.game)
-                    badge.text = when { e.playing -> "▶ Jugando"; e.game.finished != null -> "🏆"; e.game.favorite -> "★"; else -> "" }
+                    badge.text = badge.withIcons(when { e.playing -> "▶ Jugando"; e.game.finished != null -> TROPHY; e.game.favorite -> "★"; else -> "" })
                     covers.load(e.game, dp(38)) { b -> thumb.setImageBitmap(b ?: logoCover(ctx, e.game.console, dp(38))) }
                 }
                 is Entry.Drive -> {

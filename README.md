@@ -207,7 +207,7 @@ sort_savestates_enable = "false"
 
 # Guardado
 savestate_auto_save = "true"
-savestate_auto_load = "true"
+savestate_auto_load = "false"   # desde el título; «Continuar…» en Detalles lo activa para esa partida
 autosave_interval = "10"
 savestate_thumbnail_enable = "false"
 

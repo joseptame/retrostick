@@ -163,13 +163,57 @@ class Library(private val context: Context) {
     private fun listFiles(dir: File) = dir.listFiles()?.filter { it.isFile }.orEmpty()
 }
 
+/** Where a game starts: the title screen, where it was closed (.state.auto) or the quick save (.state, Share+L1). */
+enum class Resume { TITLE, LAST, QUICK }
+
+internal val STATES_DIR = File("$SDCARD/Partidas/states")
+
+/** The state RetroArch writes when the game is closed (savestate_auto_save). */
+fun lastState(game: Game) = File(STATES_DIR, "${game.baseName}.state.auto").takeIf { it.isFile }
+/** The quick save of slot 0: Share+L1 saves it, Share+R1 loads it. */
+fun quickState(game: Game) = File(STATES_DIR, "${game.baseName}.state").takeIf { it.isFile }
+
+/** Writes these keys into retroarch.cfg (missing ones are added at the end); false if it couldn't. */
+fun writeRetroArchCfg(keys: Map<String, String>): Boolean {
+    val cfg = File(RETROARCH_CFG)
+    if (!cfg.isFile) return false
+    return runCatching {
+        val lines = cfg.readLines().toMutableList()
+        var changed = false
+        for ((k, v) in keys) {
+            val line = "$k = \"$v\""
+            val i = lines.indexOfFirst { it.substringBefore('=').trim() == k }
+            when {
+                i < 0 -> { lines += line; changed = true }
+                lines[i] != line -> { lines[i] = line; changed = true }
+            }
+        }
+        if (changed) cfg.writeText(lines.joinToString("\n", postfix = "\n"))
+    }.onFailure { android.util.Log.w("RetroStick", "retroarch.cfg not written", it) }.isSuccess
+}
+
 /** Same intent verified by ADB in docs/dispositivo.md. Returns false when RetroArch is missing. */
-fun launchInRetroArch(context: Context, game: Game): Boolean {
+fun launchInRetroArch(context: Context, game: Game, resume: Resume = Resume.TITLE): Boolean {
     val dataDir = try {
         context.packageManager.getApplicationInfo(RETROARCH_PACKAGE, 0).dataDir
     } catch (e: Exception) {
         return false
     }
+    // RetroArch only auto-loads .state.auto: the quick save goes there first (closing writes it again anyway)
+    if (resume == Resume.QUICK) quickState(game)?.let { runCatching { it.copyTo(File(STATES_DIR, "${game.baseName}.state.auto"), overwrite = true) } }
+    writeRetroArchCfg(linkedMapOf(
+        // From the title screen unless asked to continue; the state on closing is always kept
+        "savestate_auto_load" to (resume != Resume.TITLE).toString(),
+        "savestate_auto_save" to "true",
+        "savestate_auto_index" to "false",
+        "state_slot" to "0",
+        // RetroArch shortcuts, the same on every console: hold Create + L1 = quick save, + R1 = load it,
+        // + R2 = fast-forward. DualSense codes on Android 9 (docs/mandos.md): Create 104, L1 100, R1 101, R2 103
+        "input_enable_hotkey_btn" to "104",
+        "input_save_state_btn" to "100",
+        "input_load_state_btn" to "101",
+        "input_toggle_fast_forward_btn" to "103",
+    ))
     // RetroArch rewrites its config when it closes: the RetroAchievements account goes back in every time
     RetroAchievements.apply(context)
     val intent = Intent(Intent.ACTION_MAIN)

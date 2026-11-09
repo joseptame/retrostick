@@ -906,7 +906,7 @@ class ShopActivity : Activity() {
         fichaCover.setImageDrawable(null)
         loadCover(g) { bmp -> if (ficha === g) fichaCover.setImageBitmap(bmp ?: logoCover(this, console, dp(200))) }
         fichaTitle.text = g.title
-        fichaMeta.text = fichaMeta.withPlayersIcon(listOfNotNull(
+        fichaMeta.text = fichaMeta.withIcons(listOfNotNull(
             g.rating?.let { "★ " + String.format("%.1f", it).replace('.', ',') },
             g.year?.toString(),
             g.genres.joinToString(", ").takeIf { it.isNotEmpty() },

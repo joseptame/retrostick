@@ -603,7 +603,7 @@ class MainActivity : Activity() {
             inner.clipToOutline = true
             v.findViewById<TextView>(R.id.coverTitle).text = game.title
             v.findViewById<TextView>(R.id.coverFavorite).apply {
-                text = listOfNotNull("★".takeIf { game.favorite }, "🏆".takeIf { game.finished != null }).joinToString(" ")
+                text = withIcons(listOfNotNull("★".takeIf { game.favorite }, TROPHY.takeIf { game.finished != null }).joinToString(" "))
                 visibility = if (text.isEmpty()) View.GONE else View.VISIBLE
             }
             v.findViewById<View>(R.id.coverBadge).visibility = if (game == playing) View.VISIBLE else View.GONE
@@ -721,14 +721,14 @@ class MainActivity : Activity() {
         val info = entry?.info
         val known = entry != null || Fichas.failed(game.title, game.console.id)
         if (entry == null || entry.stale) requestFicha(game.title, game.console.id)
-        findViewById<TextView>(R.id.gameMeta).apply { text = withPlayersIcon(listOfNotNull(
+        findViewById<TextView>(R.id.gameMeta).apply { text = withIcons(listOfNotNull(
                 info?.rating?.let { "★ " + String.format("%.1f", it).replace('.', ',') },
                 info?.year?.toString(),
                 info?.genres?.take(2)?.joinToString(", ")?.takeIf { it.isNotEmpty() },
                 info?.players?.takeIf { it >= 2 }?.let { "$PLAYERS Hasta $it" },
                 console.name.takeIf { info == null }, game.region,
                 if (drive != null) getString(R.string.in_drive_meta) else null,
-                game.finished?.let { "🏆 Terminado" },
+                game.finished?.let { "$TROPHY Terminado" },
             ).joinToString("  ·  ")) }
         gameDesc.text = when {
             info?.description != null -> info.description
@@ -756,7 +756,6 @@ class MainActivity : Activity() {
         }
         findViewById<TextView>(R.id.playText).setText(when {
             drive != null -> R.string.see_ficha
-            game.hasProgress -> R.string.continue_game
             else -> R.string.play
         })
 
@@ -1373,12 +1372,13 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun play() {
+    /** The game from its title screen; from Detalles, where it was left or the quick save. */
+    private fun play(resume: Resume = Resume.TITLE) {
         currentDrive?.let { return openDriveGame(it) }
         val game = currentGame ?: return openShop()
         DriveSync.cancel()
         keySound = Sounds.Sound.LAUNCH
-        if (!launchInRetroArch(this, game)) {
+        if (!launchInRetroArch(this, game, resume)) {
             keySound = Sounds.Sound.ERROR
             toast(R.string.retroarch_missing)
         }
@@ -1417,7 +1417,7 @@ class MainActivity : Activity() {
             appendLine("Consola: ${game.console.name}")
             appendLine("Veces jugado: ${game.playCount}")
             appendLine("Tiempo jugado: ${formatDuration(game.runtimeSeconds)}")
-            game.finished?.let { appendLine("🏆 Terminado el ${date.format(it.at)} (${formatDuration(it.seconds)})") }
+            game.finished?.let { appendLine("$TROPHY Terminado el ${date.format(it.at)} (${formatDuration(it.seconds)})") }
             appendLine()
             if (game.saveFiles.isEmpty()) appendLine("Sin partidas guardadas en el stick.")
             else {
@@ -1427,12 +1427,28 @@ class MainActivity : Activity() {
                 }
             }
         }
+        val hasState = lastState(game) != null || quickState(game) != null
         AlertDialog.Builder(this, R.style.Dialog_RetroStick)
             .setTitle(game.title)
             .setMessage(text.trim())
-            .setPositiveButton("Cerrar", null)
+            .setPositiveButton(if (hasState) "▶ Continuar…" else "Cerrar") { _, _ -> if (hasState) chooseResume(game) }
             .setNeutralButton("Borrar…") { _, _ -> confirmRemove(game) }
-            .setNegativeButton(if (game.finished == null) "🏆 Lo he terminado" else "Quitar de terminados") { _, _ -> toggleFinished(game) }
+            .setNegativeButton(if (game.finished == null) "$TROPHY Lo he terminado" else "Quitar de terminados") { _, _ -> toggleFinished(game) }
+            .showForPad()
+            .withIcons()
+    }
+
+    /** Where to continue: where it was closed (.state.auto) or the quick save (Share+L1), with their dates. */
+    private fun chooseResume(game: Game) {
+        val date = SimpleDateFormat("d MMM, HH:mm", Locale("es", "ES"))
+        val options = listOfNotNull(
+            lastState(game)?.let { "Donde lo dejaste · ${date.format(it.lastModified())}" to Resume.LAST },
+            quickState(game)?.let { "Guardado rápido · ${date.format(it.lastModified())}" to Resume.QUICK },
+        )
+        AlertDialog.Builder(this, R.style.Dialog_RetroStick)
+            .setTitle("Continuar ${game.title}")
+            .setItems(options.map { it.first }.toTypedArray()) { _, which -> play(options[which].second); render() }
+            .setNegativeButton(R.string.cancel, null)
             .showForPad()
     }
 
@@ -1443,7 +1459,7 @@ class MainActivity : Activity() {
             main.post {
                 r.onSuccess {
                     Sounds.play(if (done) Sounds.Sound.DONE else Sounds.Sound.BACK)
-                    Toast.makeText(this, if (done) "🏆 ${game.title}: ¡terminado! (${formatDuration(game.runtimeSeconds)})" else "${game.title} ya no está en terminados", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this, if (done) "${game.title}: ¡terminado! (${formatDuration(game.runtimeSeconds)})" else "${game.title} ya no está en terminados", Toast.LENGTH_LONG).show()
                 }.onFailure { Toast.makeText(this, "No se pudo guardar: ${it.message}", Toast.LENGTH_LONG).show() }
                 reload()
             }
@@ -1612,7 +1628,7 @@ class MainActivity : Activity() {
             title = game.title, consoleId = game.console.id, consoleName = game.console.name, coverGame = game,
             last = formatWhen(game.lastPlayed), time = formatDuration(game.runtimeSeconds), save = save, saveOk = backedUp,
             achievements = achievementsText(game, onStick = !inDrive),
-            playLabel = when { inDrive -> "Ver ficha y pasar al stick"; game.hasProgress -> getString(R.string.continue_game); else -> getString(R.string.play) },
+            playLabel = if (inDrive) "Ver ficha y pasar al stick" else getString(R.string.play),
             languages = Languages.of(game.file.name),
             finished = game.finished?.let { "Terminado el ${date.format(it.at)} · ${formatDuration(it.seconds)}" },
             manual = Manuals.find(this, game.console, game.baseName) != null, manualGlyph = manualGlyph(), inDrive = inDrive,

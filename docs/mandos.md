@@ -62,10 +62,13 @@ Sin root no se puede añadir un `.kl` al sistema (`/vendor` es de solo lectura),
 | Options | Start | Start | Start | Start | Start / Pause | Start |
 | Create | Select | Select | Select | Select | Mode / — | Select |
 | Cruceta y stick izquierdo | Moverse | Moverse | Moverse | Moverse | Moverse | Cruceta / stick |
-| L1 | **Guardado rápido** | L | **Guardado rápido** | L | — | L1 |
-| R1 | **Avance rápido x2** (activar/desactivar) | R | **Avance rápido x2** (activar/desactivar) | R | — | R1 |
-| L2 | — | **Guardado rápido** | — | **Guardado rápido** | **Guardado rápido** | L2 |
-| R2 | — | **Avance rápido x2** (activar/desactivar) | — | **Avance rápido x2** (activar/desactivar) | **Avance rápido x2** (activar/desactivar) | R2 |
+| L1 | — | L | — | L | — | L1 |
+| R1 | — | R | — | R | — | R1 |
+| L2 | — | — | — | — | — | L2 |
+| R2 | — | — | — | — | — | R2 |
+| Create + L1 | **Guardado rápido** | **Guardado rápido** | **Guardado rápido** | **Guardado rápido** | **Guardado rápido** | **Guardado rápido** |
+| Create + R1 | **Cargar el guardado rápido** | **Cargar el guardado rápido** | **Cargar el guardado rápido** | **Cargar el guardado rápido** | **Cargar el guardado rápido** | **Cargar el guardado rápido** |
+| Create + R2 | **Avance rápido x2** (activar/desactivar) | **Avance rápido x2** (activar/desactivar) | **Avance rápido x2** (activar/desactivar) | **Avance rápido x2** (activar/desactivar) | **Avance rápido x2** (activar/desactivar) | **Avance rápido x2** (activar/desactivar) |
 | PS | Menú de RetroArch | Menú de RetroArch | Menú de RetroArch | Menú de RetroArch | Menú de RetroArch | Menú de RetroArch |
 | Panel táctil (clic) | **Quitar / poner el marco** | **Quitar / poner el marco** | **Quitar / poner el marco** | **Quitar / poner el marco** | **Quitar / poner el marco** | **Quitar / poner el marco** |
 
@@ -76,25 +79,24 @@ Archivos (los instala `install.ps1`):
 | Archivo del repo | En el stick | Qué hace |
 |---|---|---|
 | `stick/retroarch/remaps/Gambatte/Gambatte.rmp` | `RetroArch/config/remaps/Gambatte/` | ✕○ → A, □△ → B, L/R sin función, stick = cruceta |
-| `stick/retroarch/overrides/Gambatte/Gambatte.cfg` | `RetroArch/config/Gambatte/` | L1 guardar, R1 avance rápido, x2 |
 | `stick/retroarch/remaps/mGBA/mGBA.rmp` | `RetroArch/config/remaps/mGBA/` | ✕○ → A, □△ → B, L2/R2 sin función, stick = cruceta |
-| `stick/retroarch/overrides/mGBA/mGBA.cfg` | `RetroArch/config/mGBA/` | L2 guardar, R2 avance rápido, x2 |
 | `stick/retroarch/remaps/FCEUmm/FCEUmm.rmp` | `RetroArch/config/remaps/FCEUmm/` | Como el mando original: ✕□ → B, ○△ → A, L/R sin función, stick = cruceta |
-| `stick/retroarch/overrides/FCEUmm/FCEUmm.cfg` | `RetroArch/config/FCEUmm/` | L1 guardar, R1 avance rápido, x2 |
 | `stick/retroarch/remaps/Snes9x 2010/Snes9x 2010.rmp` | `RetroArch/config/remaps/Snes9x 2010/` | Botones como el mando de SNES, L2/R2 sin función, stick = cruceta |
-| `stick/retroarch/overrides/Snes9x 2010/Snes9x 2010.cfg` | `RetroArch/config/Snes9x 2010/` | L2 guardar, R2 avance rápido, x2 |
 | `stick/retroarch/remaps/Genesis Plus GX/Genesis Plus GX.rmp` | `RetroArch/config/remaps/Genesis Plus GX/` | Botones del núcleo (□✕○ = A B C), L2/R2 sin función, stick = cruceta |
-| `stick/retroarch/overrides/Genesis Plus GX/Genesis Plus GX.cfg` | `RetroArch/config/Genesis Plus GX/` | L2 guardar, R2 avance rápido, x2 |
+| `stick/retroarch/overrides/<Núcleo>/<Núcleo>.cfg` | `RetroArch/config/<Núcleo>/` | Avance rápido a x2 (los atajos están en `retroarch.cfg`) |
 | `stick/retroarch/overrides/<Núcleo>/<consola>.cfg` | `RetroArch/config/<Núcleo>/` | Tamaño fijo del juego y marco de esa consola (ver README 6.4) |
 | `stick/retroarch/overlays/retrostick/` | `RetroArch/overlays/retrostick/` | Marcos (PNG 1920×1080) |
 
-Los atajos de las configuraciones por núcleo usan los códigos del DualSense (100/101/102/103). Con otro mando habrá
-que añadir sus códigos cuando se empareje.
+Los atajos (Create + L1 / R1 / R2) son los mismos en todas las consolas: el launcher los escribe en `retroarch.cfg`
+antes de cada partida (`input_enable_hotkey_btn = "104"`, Create). Usan los códigos del DualSense en Android 9; con
+otro mando habrá que añadir los suyos.
 
 `remap_save_on_exit = "false"` evita que RetroArch reescriba los remapeos al salir.
 
-El guardado rápido (L1 en NES y GB/GBC, L2 en SNES y GBA) va a la posición 0 (`<juego>.state` en `/Partidas/states`). Para cargarlo:
-PS → *Cargar guardado rápido*. Al abrir un juego se carga solo el `.state.auto` del cierre anterior.
+Los juegos empiezan desde el título (`savestate_auto_load = "false"`). El guardado rápido va a la posición 0
+(`<juego>.state` en `/Partidas/states`) y al cerrar se guarda también `<juego>.state.auto`. En el launcher,
+□ Detalles → **Continuar…** abre el juego en uno de los dos: *Donde lo dejaste* (`.state.auto`) o *Guardado rápido*
+(`.state`; el launcher lo copia a `.state.auto` y activa la carga automática solo para esa partida).
 
 ## Botones en el inicio del launcher (DualSense)
 
@@ -103,7 +105,7 @@ PS → *Cargar guardado rápido*. Al abrir un juego se carga solo el `.state.aut
 | ✕ | Jugar / abrir |
 | ○ | Atrás |
 | △ | Favorito |
-| □ | Detalles (borrar, «Lo he terminado») |
+| □ | Detalles (continuar desde un guardado, borrar, «Lo he terminado») |
 | L1 / R1 | Cambiar de consola |
 | L2 | Buscar entre tus juegos del stick y de Drive |
 | Options | Cambiar la vista del inicio: carátulas o lista |
