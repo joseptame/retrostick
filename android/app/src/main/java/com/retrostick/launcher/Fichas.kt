@@ -19,10 +19,16 @@ import java.util.concurrent.Executors
  * RetroShop not paired) isn't kept.
  */
 object Fichas {
-    class Entry(val info: IgdbInfo?, val at: Long) {
-        /** Only "IGDB doesn't know it" is asked again; a ficha found is kept for good (retro games don't change). */
-        val stale get() = info == null && System.currentTimeMillis() - at > RETRY_NONE_MS
+    class Entry(val info: IgdbInfo?, val at: Long, private val outdated: Boolean = false) {
+        /**
+         * Only "IGDB doesn't know it" is asked again; a ficha found is kept for good (retro games don't change),
+         * unless it was kept by an older format ([outdated]: asked once more, the old one shows meanwhile).
+         */
+        val stale get() = outdated || (info == null && System.currentTimeMillis() - at > RETRY_NONE_MS)
     }
+
+    /** v3: a port's year and captures are its own console's (api/igdb.ts), not the original's (Impossible Mission). */
+    private const val VERSION = 3
 
     private const val RETRY_NONE_MS = 24L * 60 * 60 * 1000
 
@@ -130,7 +136,7 @@ object Fichas {
     fun igdbTitle(title: String) = ALIASES.fold(title) { t, (es, en) -> t.replace(es, en, ignoreCase = true) }
 
     private fun write(e: Entry) = JSONObject().apply {
-        put("v", 2)
+        put("v", VERSION)
         put("at", e.at)
         val i = e.info
         put("found", i != null)
@@ -160,6 +166,7 @@ object Fichas {
                 players = if (j.isNull("players")) null else j.optInt("players").takeIf { it > 0 },
             ),
             at,
+            outdated = j.optInt("v") < VERSION,
         )
     }
 }

@@ -177,6 +177,54 @@ async function spanishDescription(game: IgdbGame, consoleId: string | null): Pro
   return { ...game, descriptionEn: en, descriptionSource: 'igdb' }
 }
 
+/** libretro-thumbnails system per console (android Library.kt thumbnailSystem). */
+const LIBRETRO: Record<string, string> = {
+  nes: 'Nintendo - Nintendo Entertainment System', snes: 'Nintendo - Super Nintendo Entertainment System',
+  gb: 'Nintendo - Game Boy', gbc: 'Nintendo - Game Boy Color', gba: 'Nintendo - Game Boy Advance',
+  md: 'Sega - Mega Drive - Genesis', sms: 'Sega - Master System - Mark III', psx: 'Sony - PlayStation',
+}
+const snapIndex = new Map<string, { at: number; names: string[] }>()
+
+/** Names in a libretro-thumbnails folder (its server lists them), kept a day per server instance. */
+async function libretroNames(system: string, folder: string): Promise<string[]> {
+  const k = `${system}/${folder}`
+  const hit = snapIndex.get(k)
+  if (hit && Date.now() - hit.at < 86_400_000) return hit.names
+  const res = await fetch(`https://thumbnails.libretro.com/${encodeURIComponent(system)}/${folder}/`)
+  if (!res.ok) return hit?.names ?? []
+  const html = await res.text()
+  const names = [...html.matchAll(/href="([^"]+)\.png"/g)].map((m) => decodeURIComponent(m[1]))
+  snapIndex.set(k, { at: Date.now(), names })
+  return names
+}
+
+/**
+ * Title screen and in-game capture of THIS console's version (libretro-thumbnails, by No-Intro name): for a
+ * port, IGDB's screenshots are the original's (Impossible Mission on Master System showed the C64 one).
+ * Europe first, betas / prototypes last; resized by wsrv.nl like the box art.
+ */
+async function consoleShots(console: string, title: string): Promise<string[]> {
+  const system = LIBRETRO[console]
+  if (!system) return []
+  const loose = (s: string) => s.toLowerCase().normalize('NFD').replace(/\(.*?\)|\[.*?\]/g, '').replace(/[^a-z0-9]/g, '')
+  const want = loose(title.replace(/^(.*), (The|A|An)(?=\W|$)/i, '$2 $1'))
+  const rank = (n: string) =>
+    (/\((Beta|Proto|Demo|Sample)/i.test(n) ? 10 : 0) + (/Europe/.test(n) ? 0 : /USA/.test(n) ? 1 : 2)
+  const url = (folder: string, name: string) => {
+    const direct = `https://thumbnails.libretro.com/${encodeURIComponent(system)}/${folder}/${encodeURIComponent(name)}.png`
+    return `https://wsrv.nl/?url=${encodeURIComponent(direct)}&w=640&output=webp&q=82`
+  }
+  const out: string[] = []
+  for (const folder of ['Named_Titles', 'Named_Snaps']) {
+    const names = (await libretroNames(system, folder).catch(() => [])).filter(
+      (n) => loose(n.replace(/^(.*), (The|A|An)(?=\W|$)/i, '$2 $1')) === want,
+    )
+    names.sort((a, b) => rank(a) - rank(b))
+    if (names[0]) out.push(url(folder, names[0]))
+  }
+  return out
+}
+
 /** IGDB platform ids per console (as in scripts/build-igdb.ts); GBC sets also hold Game Boy games. */
 const PLATFORMS: Record<string, number[]> = { gb: [33], gbc: [22, 33], gba: [24], nes: [18, 99], snes: [19, 58], md: [29], sms: [64], psx: [7] }
 
@@ -194,14 +242,17 @@ export default async function handler(request: Request): Promise<Response> {
   try {
     const access = await accessToken(id, secret)
     const query = async (where: string) => {
-      const body = `search "${title.replace(/"/g, '')}"; fields name,summary,storyline,cover.image_id,genres.name,game_modes,multiplayer_modes.offlinemax,multiplayer_modes.offlinecoopmax,platforms.name,first_release_date,rating,videos.video_id,screenshots.image_id,version_parent,total_rating_count;${where} limit 15;`
+      const body = `search "${title.replace(/"/g, '')}"; fields name,summary,storyline,cover.image_id,genres.name,game_modes,multiplayer_modes.offlinemax,multiplayer_modes.offlinecoopmax,platforms.name,first_release_date,release_dates.platform,release_dates.date,rating,videos.video_id,screenshots.image_id,version_parent,total_rating_count;${where} limit 15;`
       const res = await fetch(`${API}/games`, {
         method: 'POST',
         headers: { 'Client-ID': id, Authorization: `Bearer ${access}`, Accept: 'application/json' },
         body,
       })
       if (!res.ok) throw new Error(`igdb ${res.status}`)
-      return (await res.json()) as { name?: string; version_parent?: number; total_rating_count?: number }[]
+      return (await res.json()) as {
+        name?: string; version_parent?: number; total_rating_count?: number; first_release_date?: number
+        release_dates?: { platform?: number; date?: number }[]
+      }[]
     }
     let games = platforms ? await query(` where platforms = (${platforms.join(',')});`) : []
     if (!games.length) games = await query('')
@@ -212,7 +263,20 @@ export default async function handler(request: Request): Promise<Response> {
     const exact = games
       .filter((g) => g.name && loose(g.name) === loose(title))
       .sort((a, b) => Number(!!a.version_parent) - Number(!!b.version_parent) || (b.total_rating_count ?? 0) - (a.total_rating_count ?? 0))
-    const game = await spanishDescription(mapGame(exact[0] ?? games[0]), params.get('console'))
+    const chosen = exact[0] ?? games[0]
+    let mapped = mapGame(chosen)
+    // A port (this console's release came out well after the original's, on another platform): IGDB's
+    // screenshots, trailer and year are the original's. This console's year and its own captures instead.
+    const console = params.get('console') ?? ''
+    const dates = (chosen.release_dates ?? []).filter((r) => r.date && platforms?.includes(r.platform ?? -1)).map((r) => r.date!)
+    const here = dates.length ? Math.min(...dates) : null
+    const isPort = here != null && chosen.first_release_date != null && here - chosen.first_release_date > 180 * 86400
+    if (isPort || !mapped.screenshots.length) {
+      const shots = await consoleShots(console, title).catch(() => [])
+      if (isPort) mapped = { ...mapped, year: new Date(here! * 1000).getUTCFullYear(), trailerId: null, screenshots: shots }
+      else if (shots.length) mapped = { ...mapped, screenshots: shots }
+    }
+    const game = await spanishDescription(mapped, params.get('console'))
     return json(game, 200, wikiFailed ? 1 : 30)
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : String(e) }, 500)
