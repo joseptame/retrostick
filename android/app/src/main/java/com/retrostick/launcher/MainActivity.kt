@@ -62,6 +62,8 @@ private val HANDLED_KEYS = setOf(
     KeyEvent.KEYCODE_BUTTON_L1, KeyEvent.KEYCODE_BUTTON_R1,
     // Options = list / covers view, Create = manual, L2 = search
     KeyEvent.KEYCODE_BUTTON_START, KeyEvent.KEYCODE_BUTTON_SELECT, KeyEvent.KEYCODE_BUTTON_L2,
+    // R2 = the game's achievements (RetroAchievements)
+    KeyEvent.KEYCODE_BUTTON_R2,
 )
 
 class MainActivity : Activity() {
@@ -301,6 +303,7 @@ class MainActivity : Activity() {
         }
         (gamePanel as LinearLayout).apply { clipChildren = false }.addView(mediaCol, LinearLayout.LayoutParams(dp(240), -2).apply { marginStart = dp(20) })
         Fichas.addListener(fichaListener)
+        RetroAchievements.addListener(fichaListener)
         homeSearch = HomeSearch(this, covers).also { hs ->
             root.addView(hs.view, root.indexOfChild(splash), FrameLayout.LayoutParams(-1, -1))
             hs.candidates = { searchCandidates() }
@@ -718,6 +721,11 @@ class MainActivity : Activity() {
         val info = entry?.info
         val known = entry != null || Fichas.failed(game.title, game.console.id)
         if (entry == null || entry.stale) requestFicha(game.title, game.console.id)
+        // Achievements earned (RetroAchievements), for games on the stick
+        val ra = if (drive == null && RetroAchievements.account(this) != null) {
+            RetroAchievements.request(this, game)
+            RetroAchievements.cached(game)
+        } else null
         findViewById<TextView>(R.id.gameMeta).text =
             listOfNotNull(
                 info?.rating?.let { "★ " + String.format("%.1f", it).replace('.', ',') },
@@ -727,6 +735,7 @@ class MainActivity : Activity() {
                 console.name.takeIf { info == null }, game.region,
                 if (drive != null) getString(R.string.in_drive_meta) else null,
                 game.finished?.let { "🏆 Terminado" },
+                ra?.let { "🏆 ${it.earned}/${it.total} logros" },
             ).joinToString("  ·  ")
         gameDesc.text = when {
             info?.description != null -> info.description
@@ -1049,6 +1058,8 @@ class MainActivity : Activity() {
                     compoundDrawablePadding = dp(2)
                 }
             }
+            if (currentGame != null && RetroAchievements.account(this) != null)
+                addHint(Glyph.Pill(when (padStyle) { PadStyle.XBOX -> "RT"; PadStyle.NINTENDO -> "ZR"; else -> "R2" }), R.string.hint_achievements)
             addHint(Glyph.Pill(when (padStyle) { PadStyle.XBOX -> "LT"; PadStyle.NINTENDO -> "ZL"; else -> "L2" }), R.string.hint_search)
             addHint(Glyph.Pill(when (padStyle) { PadStyle.XBOX -> "Menu"; PadStyle.NINTENDO -> "+"; else -> "Options" }), R.string.hint_view)
         }
@@ -1176,6 +1187,7 @@ class MainActivity : Activity() {
                 homeSearch.open(); keySound = Sounds.Sound.OPEN; return
             }
             KeyEvent.KEYCODE_BUTTON_SELECT -> { openManual(); render(); return }
+            KeyEvent.KEYCODE_BUTTON_R2 -> { openAchievements(); return }
         }
         if (listMode && !settingsTab && zone == Zone.CONTENT && handleListKey(code)) { render(); return }
         if (!listMode && !settingsTab && zone == Zone.CONTENT && handleCoverMediaKey(code)) { render(); return }
@@ -1624,6 +1636,21 @@ class MainActivity : Activity() {
     private fun currentManual(): String? {
         val game = currentGame ?: currentDrive?.probe() ?: return null
         return Manuals.find(this, game.console, game.baseName)
+    }
+
+    /** The selected game's achievements (only games on the stick: RetroArch earns them). */
+    private fun openAchievements() {
+        val game = currentGame
+        if (settingsTab || game == null) return
+        if (RetroAchievements.account(this) == null) {
+            keySound = Sounds.Sound.ERROR
+            Toast.makeText(this, "RetroAchievements no está activado", Toast.LENGTH_SHORT).show()
+            return
+        }
+        Sounds.play(Sounds.Sound.OPEN)
+        open(Intent(this, AchievementsActivity::class.java)
+            .putExtra(AchievementsActivity.EXTRA_CONSOLE, game.console.id)
+            .putExtra(AchievementsActivity.EXTRA_FILE, game.file.path))
     }
 
     private fun openManual() {

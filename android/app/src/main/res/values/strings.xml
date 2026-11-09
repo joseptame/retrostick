@@ -55,6 +55,7 @@
 
     <string name="hint_play">Jugar</string>
     <string name="hint_open">Abrir</string>
+    <string name="hint_achievements">Logros</string>
     <string name="hint_back">Atrás</string>
     <string name="hint_favorite">Favorito</string>
     <string name="hint_details">Detalles</string>
