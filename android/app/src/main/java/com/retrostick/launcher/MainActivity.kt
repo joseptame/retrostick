@@ -617,12 +617,15 @@ class MainActivity : Activity() {
             coverRow.addView(v)
             coverViews += v
         }
+        // «Añadir juegos» of this console: its logo, its cartridge or disc and RetroShop's count (ShopCard)
         val add = layoutInflater.inflate(R.layout.item_cover, coverRow, false)
-        add.findViewById<View>(R.id.coverInner).setBackgroundResource(R.drawable.bg_add_card)
-        add.findViewById<TextView>(R.id.coverTitle).apply {
-            setText(R.string.add_games)
-            setTextColor(getColor(R.color.text_2))
-            typeface = resources.getFont(R.font.inter_semibold)
+        val console = CONSOLES[tab]
+        add.findViewById<FrameLayout>(R.id.coverInner).apply {
+            background = ShopCard.background(console, dp(8).toFloat())
+            clipToOutline = true
+            findViewById<View>(R.id.coverTitle).visibility = View.GONE
+            findViewById<View>(R.id.coverImage).visibility = View.GONE
+            addView(ShopCard.shelfContent(this@MainActivity, console), 0, FrameLayout.LayoutParams(-1, -1))
         }
         coverRow.addView(add)
         // Selectable: last card of the shelf, opens RetroShop on this console
@@ -1485,7 +1488,7 @@ class MainActivity : Activity() {
             out += HomeList.Entry.Header("En tu Drive · no están en el stick")
             driveItems.forEach { out += HomeList.Entry.Drive(it, it.probe()) }
         }
-        out += HomeList.Entry.Add
+        out += HomeList.Entry.Add(CONSOLES[tab])
         return out
     }
 
@@ -1502,7 +1505,7 @@ class MainActivity : Activity() {
         when (val e = entries[i]) {
             is HomeList.Entry.Stick -> { inDrive[tab] = false; selected[tab] = i }
             is HomeList.Entry.Drive -> { inDrive[tab] = true; driveSel[tab] = driveItems.indexOf(e.item).coerceAtLeast(0) }
-            HomeList.Entry.Add -> { inDrive[tab] = false; selected[tab] = consoleGames.size }
+            is HomeList.Entry.Add -> { inDrive[tab] = false; selected[tab] = consoleGames.size }
             else -> Unit
         }
     }

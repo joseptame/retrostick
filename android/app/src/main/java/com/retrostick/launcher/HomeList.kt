@@ -29,7 +29,8 @@ class HomeList(private val ctx: Context, private val covers: CoverLoader) {
         class Stick(val game: Game, val playing: Boolean) : Entry() { override val key get() = "s:" + game.key }
         class Drive(val item: DriveCollection.Item, val probe: Game) : Entry() { override val key get() = "d:" + item.key }
         class Header(val text: String) : Entry() { override val key get() = "h:$text" }
-        object Add : Entry() { override val key = "add" }
+        /** «Añadir juegos» of [console] (ShopCard): its cartridge or disc, RetroShop's count */
+        class Add(val console: Console) : Entry() { override val key get() = "add:${console.id}" }
     }
 
     /** What the sheet shows for the selected entry (MainActivity fills it from the game and its stats). */
@@ -336,11 +337,20 @@ class HomeList(private val ctx: Context, private val covers: CoverLoader) {
                     thumb.alpha = 0.65f
                     covers.load(e.probe, dp(38)) { b -> thumb.setImageBitmap(b ?: logoCover(ctx, e.item.console, dp(38))) }
                 }
-                Entry.Add -> {
-                    t.text = "Añade juegos desde RetroShop"
-                    s.text = "La tienda, en esta consola"
-                    thumb.background = round(Color.TRANSPARENT, 5).apply { setStroke(dp(1), Color.parseColor("#55FFFFFF"), dp(3).toFloat(), dp(3).toFloat()) }
+                is Entry.Add -> {
+                    t.text = "Añadir juegos"
+                    s.text = ShopCard.countText(ctx, e.console) { s.text = it }
+                    // The console's cartridge or disc on its colour, like the shelf's card
+                    thumb.background = ShopCard.background(e.console, dp(5).toFloat())
                     thumb.setImageBitmap(null)
+                    (thumb.parent as? LinearLayout)?.let { row ->
+                        val i = row.indexOfChild(thumb)
+                        row.removeView(thumb)
+                        row.addView(FrameLayout(ctx).apply {
+                            background = ShopCard.background(e.console, dp(5).toFloat())
+                            addView(ConsoleMediaView(ctx, e.console), FrameLayout.LayoutParams(-1, -1).apply { setMargins(dp(4), dp(4), dp(4), dp(4)) })
+                        }, i, LinearLayout.LayoutParams(dp(38), dp(38)))
+                    }
                 }
                 else -> Unit
             }
