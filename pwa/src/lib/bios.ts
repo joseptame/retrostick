@@ -7,7 +7,7 @@ export interface BiosEntry {
   console: string
   /** Name the emulator looks for: the upload is renamed to it */
   file: string
-  /** Known good dumps; another one is kept and used all the same */
+  /** Known good dumps; the stick doesn't use any other (a bad PS1 one left games on a black screen) */
   md5: string[]
   shows: string
 }

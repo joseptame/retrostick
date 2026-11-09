@@ -37,7 +37,10 @@ object Bios {
 
     enum class State { MISSING, OK, UNKNOWN }
 
-    /** Whether each BIOS is on the stick, and whether it's a known dump (an unknown one is used all the same). */
+    /**
+     * Whether each BIOS is on the stick and is a known dump. An unknown one is not used: a PS1 BIOS that reports
+     * v3.0 E but isn't a known dump left Dragon Ball - Final Bout on a black screen (2026-11-09).
+     */
     fun states(): List<Pair<Entry, State>> = ALL.map { e ->
         val f = File(SYSTEM_DIR, e.file)
         e to when {
@@ -71,12 +74,20 @@ object Bios {
     /** Each core's boot screen option, written into its .opt before a game (see [launchInRetroArch]). */
     fun applyOptions(context: Context) {
         val on = enabled(context)
-        val en = if (on) "enabled" else "disabled"
+        val ok = states().filter { it.second == State.OK }.map { it.first.file }.toSet()
+        // A core only uses a BIOS that is a known dump; otherwise it starts the game as before
+        fun use(vararg files: String) = files.any { it in ok }
+        fun en(b: Boolean) = if (b) "enabled" else "disabled"
+        val gb = use("gb_bios.bin", "gbc_bios.bin")
+        val gba = use("gba_bios.bin")
+        val psx = use("scph5502.bin")
+        val sega = use("bios_E.sms", "bios_MD.bin")
         val opts = mapOf(
-            "Gambatte" to mapOf("gambatte_gb_bootloader" to en),
-            "mGBA" to mapOf("mgba_use_bios" to "ON", "mgba_skip_bios" to if (on) "OFF" else "ON"),
-            "PCSX-ReARMed" to mapOf("pcsx_rearmed_show_bios_bootlogo" to en),
-            "Genesis Plus GX" to mapOf("genesis_plus_gx_bios" to en),
+            "Gambatte" to mapOf("gambatte_gb_bootloader" to en(on && gb)),
+            "mGBA" to mapOf("mgba_use_bios" to if (gba) "ON" else "OFF", "mgba_skip_bios" to if (on && gba) "OFF" else "ON"),
+            // HLE = PCSX ReARMed's own BIOS, the one used before
+            "PCSX-ReARMed" to mapOf("pcsx_rearmed_bios" to if (psx) "auto" else "HLE", "pcsx_rearmed_show_bios_bootlogo" to en(on && psx)),
+            "Genesis Plus GX" to mapOf("genesis_plus_gx_bios" to en(on && sega)),
         )
         for ((core, keys) in opts) {
             // Only when RetroArch already made the file (its first game with that core): it fills in the rest

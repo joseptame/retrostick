@@ -1517,7 +1517,7 @@ class MainActivity : Activity() {
 
     /** "Activadas · 3 de 6 BIOS" */
     private fun bootLabel(): String {
-        val have = Bios.states().count { it.second != Bios.State.MISSING }
+        val have = Bios.states().count { it.second == Bios.State.OK }
         return (if (Bios.enabled(this)) "Activadas" else "Desactivadas") + " · $have de ${Bios.ALL.size} BIOS"
     }
 
@@ -1530,7 +1530,7 @@ class MainActivity : Activity() {
             Bios.states().forEach { (e, s) ->
                 appendLine(when (s) {
                     Bios.State.OK -> "✓  ${e.console}"
-                    Bios.State.UNKNOWN -> "✓  ${e.console} (versión no reconocida, se usa igualmente)"
+                    Bios.State.UNKNOWN -> "✗  ${e.console}: versión no reconocida, no se usa (sube otra copia)"
                     Bios.State.MISSING -> "—  ${e.console}: falta"
                 })
             }

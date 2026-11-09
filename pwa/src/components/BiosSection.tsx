@@ -43,7 +43,7 @@ export function BiosSection({ state }: { state: AppState }) {
       state.notify(
         known
           ? `BIOS de ${e.console} subida. Llegará al stick en la próxima sincronización`
-          : `BIOS de ${e.console} subida, pero no es una versión conocida: se usará igualmente`,
+          : `Esa BIOS de ${e.console} no es una versión conocida: el stick no la usará. Prueba con otra copia`,
       )
       await load()
     } catch (err) {
@@ -78,7 +78,7 @@ export function BiosSection({ state }: { state: AppState }) {
                   {busy === e.file ? (
                     'Subiendo…'
                   ) : f ? (
-                    <span className={`chip ${known ? 'g' : 'w'}`}>{known ? 'Subida' : 'Versión no reconocida'}</span>
+                    <span className={`chip ${known ? 'g' : 'w'}`}>{known ? 'Subida' : 'No reconocida: no se usa'}</span>
                   ) : files === null ? (
                     'Comprobando…'
                   ) : (
