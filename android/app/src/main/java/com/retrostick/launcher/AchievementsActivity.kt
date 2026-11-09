@@ -25,7 +25,14 @@ import java.util.Locale
  * the home screen. Sizes in dp for the 960×540 dp screen.
  */
 class AchievementsActivity : Activity() {
-    private lateinit var game: Game
+    /** A game on the stick (R2 on the home screen), or null when opened from Mis logros by its RetroAchievements id */
+    private var game: Game? = null
+    private var raId = 0
+    private var gameTitle = ""
+    /** Progress fetched by id (Mis logros); [loaded] once it answered */
+    private var remote: RetroAchievements.Progress? = null
+    private var loaded = false
+    private var error: String? = null
     private lateinit var covers: CoverLoader
     private lateinit var icon: ImageView
     private lateinit var title: TextView
@@ -47,13 +54,23 @@ class AchievementsActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val console = CONSOLES.firstOrNull { it.id == intent.getStringExtra(EXTRA_CONSOLE) } ?: return finish()
-        game = Game(console, File(intent.getStringExtra(EXTRA_FILE) ?: return finish()))
+        raId = intent.getIntExtra(EXTRA_RA_ID, 0)
+        val consoleName: String
+        if (raId > 0) {
+            gameTitle = intent.getStringExtra(EXTRA_TITLE).orEmpty()
+            consoleName = intent.getStringExtra(EXTRA_CONSOLE_NAME).orEmpty()
+        } else {
+            val console = CONSOLES.firstOrNull { it.id == intent.getStringExtra(EXTRA_CONSOLE) } ?: return finish()
+            val g = Game(console, File(intent.getStringExtra(EXTRA_FILE) ?: return finish()))
+            game = g
+            gameTitle = g.title
+            consoleName = console.name
+        }
         covers = CoverLoader(this)
 
         icon = ImageView(this).apply { scaleType = ImageView.ScaleType.CENTER_CROP; clipToOutline = true; background = round(Color.parseColor("#14FFFFFF"), 10) }
-        title = text(22f, R.color.text).apply { typeface = font(R.font.inter_extrabold); maxLines = 1; ellipsize = TextUtils.TruncateAt.END; text = game.title }
-        val sub = text(10f, R.color.text_2).apply { text = "Logros · RetroAchievements · ${console.name}" }
+        title = text(22f, R.color.text).apply { typeface = font(R.font.inter_extrabold); maxLines = 1; ellipsize = TextUtils.TruncateAt.END; text = gameTitle }
+        val sub = text(10f, R.color.text_2).apply { text = listOf("Logros", "RetroAchievements", consoleName).filter { it.isNotEmpty() }.joinToString(" · ") }
         percent = text(28f, R.color.text).apply { typeface = font(R.font.inter_extrabold); gravity = Gravity.END }
         bar = FrameLayout(this).apply { background = round(Color.parseColor("#26FFFFFF"), 3) }
         barFill = View(this).apply { background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(getColor(R.color.accent_start), getColor(R.color.brand_accent))).apply { cornerRadius = dp(3).toFloat() } }
@@ -99,9 +116,21 @@ class AchievementsActivity : Activity() {
             addView(status, FrameLayout.LayoutParams(-1, -1).apply { leftMargin = dp(80); rightMargin = dp(80) })
             addView(hints, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.END).apply { rightMargin = dp(40); bottomMargin = dp(14) })
         })
-        RetroAchievements.addListener(listener)
-        // Fresh progress every time (achievements may have just been earned)
-        RetroAchievements.request(this, game, force = true)
+        val g = game
+        if (g != null) {
+            RetroAchievements.addListener(listener)
+            // Fresh progress every time (achievements may have just been earned)
+            RetroAchievements.request(this, g, force = true)
+        } else Thread {
+            val r = runCatching { RetroAchievements.fetchById(this, raId) }
+            runOnUiThread {
+                if (isDestroyed) return@runOnUiThread
+                loaded = true
+                remote = r.getOrNull()
+                error = r.exceptionOrNull()?.message
+                render()
+            }
+        }.start()
         render()
     }
 
@@ -111,18 +140,20 @@ class AchievementsActivity : Activity() {
     }
 
     private fun render() {
-        val p = RetroAchievements.cached(game)
-        val known = RetroAchievements.known(game)
+        val g = game
+        val p = if (g != null) RetroAchievements.cached(g) else remote
+        val known = if (g != null) RetroAchievements.known(g) else loaded
         loading.show(!known && RetroAchievements.account(this) != null)
         status.visibility = View.GONE
         when {
             RetroAchievements.account(this) == null -> return showStatus("RetroAchievements no está activado en este stick.")
             !known -> return
-            p == null -> return showStatus("${game.title} no tiene logros en RetroAchievements (o no se ha encontrado esta versión del juego).")
-            !p.supported -> return showStatus("Tu versión de ${game.title} no es compatible con sus logros de RetroAchievements: están hechos para otra versión del juego (normalmente la de EE. UU.). Por eso los logros están desactivados en este juego.")
+            error != null -> return showStatus("No se han podido cargar los logros: $error")
+            p == null -> return showStatus("$gameTitle no tiene logros en RetroAchievements (o no se ha encontrado esta versión del juego).")
+            !p.supported -> return showStatus("Tu versión de $gameTitle no es compatible con sus logros de RetroAchievements: están hechos para otra versión del juego (normalmente la de EE. UU.). Por eso los logros están desactivados en este juego.")
         }
         p!!
-        title.text = p.title.ifEmpty { game.title }
+        title.text = p.title.ifEmpty { gameTitle }
         p.icon?.let { url -> if (icon.tag != url) { icon.tag = url; covers.loadUrl(url, dp(56)) { b -> icon.setImageBitmap(b) } } }
         val pct = if (p.total > 0) p.earned * 100 / p.total else 0
         percent.text = "$pct %"
@@ -238,5 +269,8 @@ class AchievementsActivity : Activity() {
     companion object {
         const val EXTRA_CONSOLE = "console"
         const val EXTRA_FILE = "file"
+        const val EXTRA_RA_ID = "ra_id"
+        const val EXTRA_TITLE = "title"
+        const val EXTRA_CONSOLE_NAME = "console_name"
     }
 }

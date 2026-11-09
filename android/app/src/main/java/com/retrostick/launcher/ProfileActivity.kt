@@ -41,7 +41,9 @@ class ProfileActivity : Activity() {
     private var tab = 0
     private var selected = 0
     private var shownTab = -1
+    /** The selectable rows of the shown list (game headers in Recientes aren't), and the game each one opens */
     private var rowViews = listOf<View>()
+    private var rowGames = listOf<Triple<Int, String, String>>()
     private val io = Executors.newSingleThreadExecutor()
     private val es = Locale("es", "ES")
 
@@ -78,7 +80,7 @@ class ProfileActivity : Activity() {
                 addView(rank, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(2) })
             }, LinearLayout.LayoutParams(dp(300), -2))
         }
-        val hints = text(10.5f, R.color.chip_text).apply { text = "▲ ▼ Moverse      L1 / R1  Juegos · Recientes      ○ Volver" }
+        val hints = text(10.5f, R.color.chip_text).apply { text = "▲ ▼ Moverse      ✕ Ver sus logros      L1 / R1  Juegos · Recientes      ○ Volver" }
         setContentView(FrameLayout(this).apply {
             setBackgroundResource(R.drawable.bg_screen)
             addView(LinearLayout(this@ProfileActivity).apply {
@@ -136,8 +138,27 @@ class ProfileActivity : Activity() {
         if (shownTab != tab) {
             shownTab = tab
             rows.removeAllViews()
-            rowViews = if (tab == 0) p.games.map { gameRow(it) } else p.recent.map { recentRow(it) }
-            rowViews.forEach { rows.addView(it, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(4) }) }
+            val views = mutableListOf<View>()
+            val games = mutableListOf<Triple<Int, String, String>>()
+            if (tab == 0) p.games.forEach { g ->
+                views += gameRow(g).also { rows.addView(it, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(4) }) }
+                games += Triple(g.id, g.title, g.console)
+            } else {
+                // Grouped by game, the game with the newest achievement first
+                p.recent.groupBy { it.gameId }.values.forEachIndexed { i, list ->
+                    val first = list.first()
+                    rows.addView(text(10.5f, R.color.brand_accent).apply {
+                        text = "${first.game}  ·  ${first.console}  ·  ${list.size} ${if (list.size == 1) "logro" else "logros"}"
+                        typeface = font(R.font.inter_bold); maxLines = 1; ellipsize = TextUtils.TruncateAt.END
+                    }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = if (i == 0) 0 else dp(12); bottomMargin = dp(4); marginStart = dp(10) })
+                    list.forEach { a ->
+                        views += recentRow(a).also { rows.addView(it, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(4) }) }
+                        games += Triple(a.gameId, a.game, a.console)
+                    }
+                }
+            }
+            rowViews = views
+            rowGames = games
             selected = selected.coerceIn(0, maxOf(0, rowViews.size - 1))
             scroll.scrollTo(0, 0)
         }
@@ -207,7 +228,6 @@ class ProfileActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             addView(text(12.5f, R.color.text).apply { text = a.title; typeface = font(R.font.inter_bold); maxLines = 1; ellipsize = TextUtils.TruncateAt.END })
             addView(text(10f, R.color.text_2).apply { text = a.description; maxLines = 1; ellipsize = TextUtils.TruncateAt.END })
-            addView(text(9.5f, R.color.brand_accent).apply { text = a.game; maxLines = 1; ellipsize = TextUtils.TruncateAt.END; typeface = font(R.font.inter_semibold) })
         }, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(14); marginEnd = dp(16) })
         addView(LinearLayout(this@ProfileActivity).apply {
             orientation = LinearLayout.VERTICAL
@@ -233,6 +253,14 @@ class ProfileActivity : Activity() {
         val n = rowViews.size
         when (code) {
             KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_BUTTON_B -> { Sounds.play(Sounds.Sound.BACK); finish() }
+            KeyEvent.KEYCODE_BUTTON_A, KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> rowGames.getOrNull(selected)?.let { (id, title, console) ->
+                if (id <= 0) return true
+                Sounds.play(Sounds.Sound.OPEN)
+                startActivity(android.content.Intent(this, AchievementsActivity::class.java)
+                    .putExtra(AchievementsActivity.EXTRA_RA_ID, id)
+                    .putExtra(AchievementsActivity.EXTRA_TITLE, title)
+                    .putExtra(AchievementsActivity.EXTRA_CONSOLE_NAME, console))
+            }
             KeyEvent.KEYCODE_DPAD_DOWN -> if (selected < n - 1) { selected++; Sounds.play(Sounds.Sound.MOVE); render() }
             KeyEvent.KEYCODE_DPAD_UP -> if (selected > 0) { selected--; Sounds.play(Sounds.Sound.MOVE); render() }
             KeyEvent.KEYCODE_BUTTON_R1, KeyEvent.KEYCODE_DPAD_RIGHT -> if (event.repeatCount == 0 && tab < 1) { tab++; selected = 0; Sounds.play(Sounds.Sound.TAB); render() }
