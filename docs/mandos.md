@@ -110,7 +110,12 @@ Los juegos empiezan desde el título (`savestate_auto_load = "false"`). El guard
 | L2 | Buscar entre tus juegos del stick y de Drive |
 | Options | Cambiar la vista del inicio: carátulas o lista |
 | Create | Manual del juego (si hay) |
+| R2 | Logros del juego (RetroAchievements; no en Super Nintendo) |
+| ▲ (vista de carátulas, desde el estante) | Ir al tráiler y las capturas de la ficha |
 | ▶ (vista de lista) | Ir al tráiler y las capturas de la ficha |
+
+En **Mis logros** (Retro Ajustes): ▲▼ moverse, L1/R1 Juegos · Recientes, ✕ ver los logros de ese juego, ○ volver.
+En los **logros de un juego**: ▲▼ moverse, L1/R1 Todos · Conseguidos · Por conseguir, ○ volver.
 
 ## Jugar a dos
 

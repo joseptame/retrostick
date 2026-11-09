@@ -258,7 +258,9 @@ config_save_on_exit = "false"             # para que la configuración del repo 
 - Renderizado en hilo: activado si existe la opción.
 - Resolución interna: original (sin mejoras).
 - Salto de fotogramas: desactivado.
-- BIOS: usa la del usuario si existe en `system/`, si no la HLE. ⚠️ VERIFICAR qué nombres de archivo busca la versión instalada (habitualmente `scph1001.bin`, `scph5501.bin`, `scph7001.bin`, `scph101.bin`; comprobar si admite la PAL `scph5502.bin`). Documentar en `docs/bios-ps1.md` cómo extraerla de una PS1 propia (FreePSXBoot + volcador), **sin enlaces a descargas de BIOS**.
+- BIOS: usa la del usuario (`system/scph5502.bin`, verificado con una SCPH-7502 v4.1 E el 2026-11-09) si es una
+  versión conocida; si no, la HLE (8.2d). Documentar en `docs/bios-ps1.md` cómo extraerla de una PS1 propia
+  (FreePSXBoot + volcador), **sin enlaces a descargas de BIOS**.
 
 ### 6.4 Overlays y marcos
 Marcos propios que imitan cada consola (diseño en `docs/maquetas/marcos.html`; de ahí salen los PNG de
@@ -377,6 +379,13 @@ Barra inferior: **Colección · Buscar · Subir · Partidas · Stick**.
 **Stick**
 - Datos de `status.json`: última sincronización, espacio libre, mando conectado y versión de Retro Ajustes.
 - Si `status.json` tiene más de 24 h: aviso "El stick no se ha sincronizado desde…".
+- **RetroShop:** escanear el QR de la tele para vincular la tienda del stick.
+- **RetroAchievements:** iniciar sesión con usuario y contraseña (`api/ra.ts?login=1` los cambia por el token de
+  RetroAchievements; la contraseña no se guarda en ningún sitio) → `Retro/Config/ra.json` `{user, token}`, que el stick
+  copia a RetroArch al sincronizar. También para volver a entrar tras cambiar la contraseña, cambiar de cuenta o
+  desactivar los logros (borra `ra.json`).
+- **Pantallas de inicio:** una fila por consola para subir la BIOS propia del usuario a `Retro/Config/bios` con el
+  nombre que espera el emulador; avisa si no es una versión conocida (MD5 de Drive). Ver 8.2d.
 
 ### 7.5 Portadas
 ```
@@ -412,6 +421,11 @@ https://raw.githubusercontent.com/libretro-thumbnails/<Sistema>/master/Named_Box
    - `IGDB_CLIENT_SECRET` = el Client Secret
    (sin prefijo `VITE_`: son variables del servidor). Redeploy.
 - Sin estas variables, la ficha muestra "IGDB no está configurado" y solo se ve la portada y los botones de subir.
+- **Ports:** IGDB junta las versiones de un juego en una sola entrada (Impossible Mission: C64, Master System…). Si
+  la versión de la consola pedida salió más de medio año después que la original (`release_dates`), el año es el
+  de esa consola y las capturas son las de su propia versión (`Named_Titles` y `Named_Snaps` de libretro-thumbnails,
+  buscadas por título en el índice de su servidor), sin el tráiler del original. Si IGDB no tiene capturas, también
+  se usan las de libretro. El launcher guarda las fichas con versión (`v`): al subirla, las pide de nuevo una vez.
 
 ---
 
@@ -429,26 +443,70 @@ https://raw.githubusercontent.com/libretro-thumbnails/<Sistema>/master/Named_Box
 - **Juego seleccionado:** portada grande, nombre (No-Intro sin la parte entre paréntesis), consola y región.
   - *Última partida:* fecha del `.srm`/`.state.auto` en `/Partidas`.
   - *Tiempo jugado:* registro de tiempo de RetroArch (`content_runtime_log`). ⚠️ VERIFICAR la ruta y el formato en la 1.22.2.
+  - *Logros:* conseguidos / total en RetroAchievements; «No válida» si la ROM no es una versión que admitan sus
+    logros; sin columna en Super Nintendo, en Drive o sin cuenta (ver 8.2c).
   - *Partida guardada:* "✓ Copia en Drive" si todas sus partidas están subidas tal como están en el stick; "Pendiente de subir" si no; "En el stick" sin Drive conectado.
-  - Botón **Continuar partida** o **Jugar** (si no hay partida).
+  - Botón **Jugar**: el juego empieza siempre desde el título (`savestate_auto_load = "false"`). Para seguir, □
+    Detalles → **Continuar…**: *Donde lo dejaste* (`.state.auto`, se guarda al cerrar) o *Guardado rápido*
+    (`.state`, Create+L1 en partida; el launcher lo copia a `.state.auto` y activa la carga automática solo para esa
+    partida).
 - **Estante** con las portadas de la consola, marca "Jugando" en el último jugado y tarjeta final "+ Añade juegos desde la app del móvil".
 - **Ayudas de botones** abajo, con los símbolos del mando que se está usando (por *vendor id*: Sony, Nintendo, Microsoft u otros con el esquema A/B/X/Y de Android):
   PlayStation ✕ Jugar · ○ Atrás · △ Favorito · □ Detalles · L1/R1 · Xbox A/B/Y/X (colores) · LB/RB · Switch A/B/X/Y · L/R (con mando Nintendo, confirmar = botón derecho; ⚠️ VERIFICAR al emparejar el Pro Controller) · sin mando: OK Jugar · ↑ Consolas.
+- **Vistas:** carátulas (estante) o lista, con Options o la tarjeta «Vista del inicio». En carátulas, ▲ desde el
+  estante lleva a la fila de tráiler y capturas; en la lista, ▶.
 - **Lanzar un juego:** intent a `com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture` con `ROM`, `LIBRETRO` y `CONFIGFILE` (verificado, ver `docs/dispositivo.md`).
+  Antes, el launcher escribe en `retroarch.cfg` la carga automática (según Continuar…), los atajos (Create + L1 /
+  R1 / R2, `docs/mandos.md`), la cuenta de RetroAchievements y un arranque limpio (sin la franja de carga ni los
+  avisos de sesión, reasignaciones, configuración o mando), y en los `.opt` de cada núcleo la pantalla de inicio.
 - **Portadas:** libretro-thumbnails (misma regla que la PWA, 7.5), con caché en disco y tarjeta de degradado si no hay portada o no hay red.
 
 ### 8.2b Pestaña Retro Ajustes
-Botones grandes navegables con el mando, con el estilo de la maqueta de TV:
+Tarjetas grandes navegables con el mando, en 5 columnas (3 filas en la pantalla, sin desplazarse), con los
+emojis como iconos (decisión del usuario):
 
 | Botón | Acción |
 |---|---|
 | 🎮 **Emparejar mando** | `com.google.android.intent.action.CONNECT_INPUT` (verificado: `AddAccessoryActivity`). `ACTION_BLUETOOTH_SETTINGS` **no existe** en este stick. |
 | 🔄 **Sincronizar ahora** | Conecta Google Drive (código) o lanza la sincronización. |
-| ☁️ **Cuenta de Drive** | Muestra el correo conectado; permite desconectar. |
 | 📶 **Wi-Fi** | `Settings.ACTION_WIFI_SETTINGS` |
 | ⚙️ **Ajustes de Android** | `Settings.ACTION_SETTINGS` (salida de emergencia si se sustituyó el launcher) |
 | 💾 **Espacio** | Muestra el espacio libre (interno + USB si hay) y lo que ocupa `/ROMs` |
 | 🕹️ **Mandos conectados** | Lista de `InputDevice` con fuente `SOURCE_GAMEPAD` |
+| 👾 **RetroArch** | Abre RetroArch (su menú y ajustes) |
+| 📱 **Otras apps** | Abre FLauncher |
+| ☁️ **Cuenta de Drive** | Muestra el correo conectado; permite desconectar. |
+| 🛒 **RetroShop** | La tienda (descargar juegos con el mando) |
+| ⬆️ **Actualizar launcher** | Ver 8.4 |
+| 🔊 **Sonidos** | Volumen de los sonidos del menú |
+| 🗂️ **Vista del inicio** | Carátulas o lista (también con Options) |
+| ✨ **Pantallas de inicio** | Cuántas BIOS hay; activarlas o desactivarlas (8.2d) |
+| 🏆 **Mis logros** | Perfil de RetroAchievements (8.2c) |
+
+### 8.2c Logros (RetroAchievements)
+- Cuenta: `Retro/Config/ra.json` (desde la app del móvil, 7.4), escrita en `retroarch.cfg` antes de cada partida
+  (modo normal, no *hardcore*: el guardado rápido y el avance rápido siguen funcionando). El aviso de logro en
+  partida lleva insignia y sonido.
+- **R2** en el inicio: los logros del juego al estilo PS5 (progreso, Todos / Conseguidos / Por conseguir, insignia,
+  cómo se consigue, puntos, rareza y fecha), traducidos al español (`api/ra.ts`). La ROM se identifica por su hash.
+- **Versión no admitida:** si el hash de la ROM no es de una versión que admitan los logros del juego (se encontró
+  por el título), la ficha dice «No válida» y el launcher escribe un *override* del juego
+  (`RetroArch/config/<núcleo>/<juego>.cfg`, `cheevos_enable = "false"`): sin el aviso «Unsupported Game Version» ni
+  logros que fallen. Los logros de aviso de 0 puntos («Unsupported…») no cuentan en las listas.
+- **Super Nintendo sin logros:** RetroAchievements no admite Snes9x 2010 (y el S805Y no mueve el Snes9x actual).
+- **Mis logros** (Retro Ajustes): avatar, puntos y resumen; *Juegos* (cada juego con logros jugado, con su
+  progreso) y *Recientes* (últimos 30 días, agrupados por juego), con L1/R1. ✕ sobre un juego abre su lista de
+  logros por su id de RetroAchievements, aunque ya no esté en el stick (`api/ra.ts?profile=1`, `?id=`).
+
+### 8.2d Pantallas de inicio (BIOS del usuario)
+- Cada consola muestra su pantalla de arranque con su BIOS: `gb_bios.bin`, `gbc_bios.bin`, `gba_bios.bin`,
+  `scph5502.bin` (cualquier BIOS de PS1 conocida, con ese nombre), `bios_E.sms` y `bios_MD.bin`. NES y Super
+  Nintendo no tenían.
+- Llegan de `Retro/Config/bios` a `RetroArch/system` en cada sincronización (las quitadas de Drive se borran).
+- **Solo se usan las versiones conocidas** (MD5 en `Bios.kt` y `pwa/src/lib/bios.ts`): una BIOS de PS1 no reconocida
+  dejaba los juegos en negro. Si no hay una conocida, el núcleo arranca como antes (PS1 con su BIOS HLE).
+- Opciones que escribe el launcher: `gambatte_gb_bootloader`, `mgba_use_bios` / `mgba_skip_bios`,
+  `pcsx_rearmed_bios` (`auto` / `HLE`) y `pcsx_rearmed_show_bios_bootlogo`, `genesis_plus_gx_bios`.
 
 ### 8.3 `status.json`
 Al abrir la app y periódicamente (WorkManager, cada 60 min), escribir `/storage/emulated/0/Partidas/.stick/status.json`:
