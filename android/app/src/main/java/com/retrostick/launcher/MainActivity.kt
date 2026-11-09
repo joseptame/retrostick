@@ -1134,21 +1134,9 @@ class MainActivity : Activity() {
             val style = StickStatus.padStyle(event.device)
             forcedPadStyle = null
             setPadStyle(style)
-            onKey(semanticKey(code, style))
+            onKey(code)
         }
         return true
-    }
-
-    /**
-     * Android reports face buttons by position (BUTTON_A = bottom, BUTTON_B = right). Nintendo confirms with
-     * the right button (labelled A) and goes back with the bottom one (B), so those two are swapped.
-     * ⚠️ To verify with the Pro Controller paired: assumes Android 9 sends positional codes for it.
-     */
-    private fun semanticKey(code: Int, style: PadStyle) = when {
-        style != PadStyle.NINTENDO -> code
-        code == KeyEvent.KEYCODE_BUTTON_A -> KeyEvent.KEYCODE_BUTTON_B
-        code == KeyEvent.KEYCODE_BUTTON_B -> KeyEvent.KEYCODE_BUTTON_A
-        else -> code
     }
 
     private fun setPadStyle(style: PadStyle) {

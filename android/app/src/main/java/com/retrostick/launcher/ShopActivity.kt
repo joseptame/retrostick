@@ -685,13 +685,7 @@ class ShopActivity : Activity() {
         val shoulder = code == KeyEvent.KEYCODE_BUTTON_L1 || code == KeyEvent.KEYCODE_BUTTON_R1
         if (event.action == KeyEvent.ACTION_DOWN && !(shoulder && event.repeatCount > 0)) {
             padStyle = StickStatus.padStyle(event.device)
-            // Nintendo pads confirm with the right button (see MainActivity.semanticKey)
-            val key = when {
-                padStyle != PadStyle.NINTENDO -> code
-                code == KeyEvent.KEYCODE_BUTTON_A -> KeyEvent.KEYCODE_BUTTON_B
-                code == KeyEvent.KEYCODE_BUTTON_B -> KeyEvent.KEYCODE_BUTTON_A
-                else -> code
-            }
+            val key = code
             val before = navState()
             onKey(key)
             val changed = navState() != before

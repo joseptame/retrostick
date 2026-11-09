@@ -51,6 +51,32 @@ Sin root no se puede añadir un `.kl` al sistema (`/vendor` es de solo lectura),
 - **Si se vuelve a usar *Actualizar perfiles de mando* en RetroArch, hay que ejecutar `install.ps1` otra vez.**
 - Los `(default-off)` tienen las líneas de identificación comentadas: no compiten.
 
+## Switch Pro Controller en Android 9 (medido el 2026-11-09)
+
+Igual que el DualSense, llega por `Generic.kl` en el orden HID (`getevent -lt`):
+
+| Botón | Evento del núcleo | Código Android (`Generic.kl`) | Valor |
+|---|---|---|---|
+| A | `BTN_GAMEPAD` | `BUTTON_A` | 96 |
+| B | `BTN_EAST` | `BUTTON_B` | 97 |
+| X | `BTN_C` | `BUTTON_C` | 98 |
+| Y | `BTN_NORTH` | `BUTTON_X` | 99 |
+| L / R | `BTN_WEST` / `BTN_Z` | `BUTTON_Y` / `BUTTON_Z` | 100 / 101 |
+| ZL / ZR | `BTN_TL` / `BTN_TR` | `BUTTON_L1` / `BUTTON_R1` | 102 / 103 |
+| − / + | `BTN_TL2` / `BTN_TR2` | `BUTTON_L2` / `BUTTON_R2` | 104 / 105 |
+| Captura | `BTN_THUMBL` | `BUTTON_THUMBL` | 106 |
+| L3 / R3 | `BTN_SELECT` / `BTN_START` | `BUTTON_SELECT` / `BUTTON_START` | 109 / 108 |
+| Home | `BTN_MODE` | `BUTTON_MODE` | 110 |
+
+Los mismos códigos que el DualSense salvo los cuatro de la cara. **Se juega como el mando de la Play** (decisión
+del usuario): **A = ✕**, **B = ○**, **Y = □**, **X = △**; L/R = L1/R1, ZL/ZR = L2/R2, − = Create, + = Options,
+Home = PS, Captura = panel táctil. Así valen tal cual los atajos (− + L / R / ZR) y las tablas de abajo.
+
+- **Launcher:** `StickStatus.standardKey()` (tabla `PRO_CONTROLLER_GENERIC_KL`); las ayudas de la pantalla muestran
+  las letras de Nintendo (A Jugar · B Atrás · Y Detalles · X Favorito · L/R · ZL Buscar · ZR Logros · − Manual · + Vista).
+- **RetroArch:** perfil `stick/retroarch/autoconfig/android/Pro Controller (Android 9, RetroStick).cfg`. El oficial
+  `Pro Controller.cfg` (códigos de Android 11+, la X sería L) se mueve a `autoconfig/disabled/`.
+
 ## Botones en cada consola (DualSense)
 
 | | NES (FCEUmm) | Super Nintendo (Snes9x 2010) | Game Boy / Color (Gambatte) | Game Boy Advance (mGBA) | Mega Drive / Master System (Genesis Plus GX) | PlayStation (PCSX ReARMed) |

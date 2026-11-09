@@ -21,6 +21,7 @@ enum class PadStyle { PLAYSTATION, NINTENDO, XBOX, REMOTE }
 private const val VENDOR_SONY = 0x054C
 private const val VENDOR_NINTENDO = 0x057E
 private const val PRODUCT_DUALSENSE = 0x0CE6
+private const val PRODUCT_PRO_CONTROLLER = 0x2009
 
 /**
  * Android < 11 has no key layout for the DualSense, so Generic.kl maps its HID buttons in HID order.
@@ -39,6 +40,19 @@ private val DUALSENSE_GENERIC_KL = mapOf(
     KeyEvent.KEYCODE_BUTTON_R2 to KeyEvent.KEYCODE_BUTTON_START,      // Options
     KeyEvent.KEYCODE_BUTTON_SELECT to KeyEvent.KEYCODE_BUTTON_THUMBL, // L3
     KeyEvent.KEYCODE_BUTTON_START to KeyEvent.KEYCODE_BUTTON_THUMBR,  // R3
+)
+
+/**
+ * The Switch Pro Controller on Android 9 also comes through Generic.kl in HID order (getevent, 2026-11-09):
+ * A=BUTTON_A, B=BUTTON_B, X=BUTTON_C, Y=BUTTON_X, then the same codes as the DualSense. Played like the
+ * PlayStation pad (user's choice): A confirms (as Cross), B goes back (Circle), Y = Square (Detalles),
+ * X = Triangle (Favorito); L/R = L1/R1, ZL/ZR = L2/R2, - = Create, + = Options.
+ */
+private val PRO_CONTROLLER_GENERIC_KL = DUALSENSE_GENERIC_KL + mapOf(
+    KeyEvent.KEYCODE_BUTTON_A to KeyEvent.KEYCODE_BUTTON_A,           // A: confirm
+    KeyEvent.KEYCODE_BUTTON_B to KeyEvent.KEYCODE_BUTTON_B,           // B: back
+    KeyEvent.KEYCODE_BUTTON_C to KeyEvent.KEYCODE_BUTTON_Y,           // X: Triangle
+    KeyEvent.KEYCODE_BUTTON_X to KeyEvent.KEYCODE_BUTTON_X,           // Y: Square
 )
 
 object StickStatus {
@@ -66,11 +80,25 @@ object StickStatus {
 
     fun firstPadStyle() = gamepads().firstOrNull()?.let(::padStyle) ?: PadStyle.REMOTE
 
-    /** Key code as Android's standard gamepad layout would report it (fixes the DualSense on Android 9). */
-    fun standardKey(device: InputDevice?, code: Int): Int =
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R && device != null &&
-            device.vendorId == VENDOR_SONY && device.productId == PRODUCT_DUALSENSE
-        ) DUALSENSE_GENERIC_KL[code] ?: code else code
+    /**
+     * The key as the app means it — BUTTON_A confirms, BUTTON_B goes back, BUTTON_X = Detalles (left / Square),
+     * BUTTON_Y = Favorito (top / Triangle) — whatever the pad: fixes the DualSense and the Pro Controller on
+     * Android 9, and swaps A/B on other Nintendo pads (positional codes; Nintendo confirms with A, on the right).
+     */
+    fun standardKey(device: InputDevice?, code: Int): Int {
+        if (device == null) return code
+        val oldAndroid = Build.VERSION.SDK_INT < Build.VERSION_CODES.R
+        return when {
+            oldAndroid && device.vendorId == VENDOR_SONY && device.productId == PRODUCT_DUALSENSE -> DUALSENSE_GENERIC_KL[code] ?: code
+            oldAndroid && device.vendorId == VENDOR_NINTENDO && device.productId == PRODUCT_PRO_CONTROLLER -> PRO_CONTROLLER_GENERIC_KL[code] ?: code
+            device.vendorId == VENDOR_NINTENDO -> when (code) {
+                KeyEvent.KEYCODE_BUTTON_A -> KeyEvent.KEYCODE_BUTTON_B
+                KeyEvent.KEYCODE_BUTTON_B -> KeyEvent.KEYCODE_BUTTON_A
+                else -> code
+            }
+            else -> code
+        }
+    }
 
     fun shortControllerName(name: String) = when {
         name.startsWith("DualSense") -> "DualSense"
