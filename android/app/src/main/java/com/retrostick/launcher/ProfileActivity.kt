@@ -80,7 +80,7 @@ class ProfileActivity : Activity() {
                 addView(rank, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(2) })
             }, LinearLayout.LayoutParams(dp(300), -2))
         }
-        val hints = text(10.5f, R.color.chip_text).apply { text = "▲ ▼ Moverse      ✕ Ver sus logros      L1 / R1  Juegos · Recientes      ○ Volver" }
+        val hints = text(10.5f, R.color.chip_text).apply { text = "▲ ▼ Moverse      ✕ Ver sus logros      L1 / R1  Juegos · Recientes      △ Cerrar sesión      ○ Volver" }
         setContentView(FrameLayout(this).apply {
             setBackgroundResource(R.drawable.bg_screen)
             addView(LinearLayout(this@ProfileActivity).apply {
@@ -240,6 +240,27 @@ class ProfileActivity : Activity() {
     }
 
     /** "2026-11-08 22:48:20" or "2026-11-08T22:48:20+00:00" → "8 nov 2026" */
+    /** Signing out: off the stick and out of Drive; what was earned stays in the RetroAchievements account. */
+    private fun confirmSignOut() {
+        val user = RetroAchievements.account(this)?.user ?: return
+        Sounds.play(Sounds.Sound.OPEN)
+        android.app.AlertDialog.Builder(this, R.style.Dialog_RetroStick)
+            .setTitle("Cerrar sesión de $user")
+            .setMessage("Los logros se desactivan en el stick (también se quita la cuenta de Drive). Los que has conseguido siguen en tu cuenta de RetroAchievements.")
+            .setPositiveButton("Cerrar sesión") { _, _ ->
+                io.execute {
+                    val r = runCatching { RetroAchievements.signOut(this) }
+                    runOnUiThread {
+                        r.onSuccess { Sounds.play(Sounds.Sound.BACK); android.widget.Toast.makeText(this, "Sesión cerrada: logros desactivados", android.widget.Toast.LENGTH_LONG).show() }
+                            .onFailure { android.widget.Toast.makeText(this, "Se quitó del stick, pero no de Drive: ${it.message}", android.widget.Toast.LENGTH_LONG).show() }
+                        finish()
+                    }
+                }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .showForPad()
+    }
+
     private fun formatDate(s: String): String {
         val d = listOf("yyyy-MM-dd'T'HH:mm:ssXXX", "yyyy-MM-dd HH:mm:ss")
             .firstNotNullOfOrNull { p -> runCatching { SimpleDateFormat(p, Locale.US).parse(s) }.getOrNull() }
@@ -253,6 +274,7 @@ class ProfileActivity : Activity() {
         val n = rowViews.size
         when (code) {
             KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_BUTTON_B -> { Sounds.play(Sounds.Sound.BACK); finish() }
+            KeyEvent.KEYCODE_BUTTON_Y -> if (event.repeatCount == 0) confirmSignOut()
             KeyEvent.KEYCODE_BUTTON_A, KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> rowGames.getOrNull(selected)?.let { (id, title, console) ->
                 if (id <= 0) return true
                 Sounds.play(Sounds.Sound.OPEN)
