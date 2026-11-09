@@ -46,6 +46,8 @@ private const val SOUNDS_SETTING = 11
 private const val VIEW_SETTING = 12
 /** Index of the "Pantallas de inicio" card (the consoles' boot screens, from the user's BIOS). */
 private const val BOOT_SETTING = 13
+/** Index of the "Mis logros" card (RetroAchievements account and profile). */
+private const val RA_SETTING = 14
 private const val PERMISSION_REQUEST = 1
 private const val CONNECT_INPUT = "com.google.android.intent.action.CONNECT_INPUT"
 private const val FLAUNCHER_PACKAGE = "me.efesser.flauncher"
@@ -919,12 +921,7 @@ class MainActivity : Activity() {
             },
             Setting("🗂️", getString(R.string.set_view), viewLabel()) { toggleView() },
             Setting("✨", getString(R.string.set_boot), bootLabel()) { showBootScreens() },
-            Setting("🏆", getString(R.string.set_trophies), trophiesLabel()) {
-                if (RetroAchievements.account(this) == null) {
-                    keySound = Sounds.Sound.ERROR
-                    toast(R.string.trophies_off)
-                } else open(Intent(this, ProfileActivity::class.java))
-            },
+            Setting("🏆", getString(R.string.set_trophies), trophiesLabel()) { showRaMenu() },
         )
         settings.forEach { s ->
             val v = layoutInflater.inflate(R.layout.item_setting, settingsGrid, false)
@@ -981,6 +978,7 @@ class MainActivity : Activity() {
         settings[SOUNDS_SETTING].subtitle = Sounds.level.label
         settings[VIEW_SETTING].subtitle = viewLabel()
         settings[BOOT_SETTING].subtitle = bootLabel()
+        settings[RA_SETTING].subtitle = trophiesLabel()
         settings[10].subtitle = Updater.available?.let { getString(R.string.update_available_sub, it.versionName) }
             ?: getString(R.string.update_current, BuildConfig.VERSION_NAME)
         settings[2].subtitle = net?.let { "Conectado por $it" } ?: getString(R.string.offline)
@@ -1428,6 +1426,149 @@ class MainActivity : Activity() {
     // ---- List view, search, manuals ----
 
     private fun trophiesLabel() = RetroAchievements.account(this)?.let { "RetroAchievements · ${it.user}" } ?: getString(R.string.trophies_off)
+
+    // ---- RetroAchievements account (Mis logros card) ----
+
+    /** Signed in: see the profile, switch account or sign out. Signed out: log in with the phone (QR) or here. */
+    private fun showRaMenu() {
+        val account = RetroAchievements.account(this)
+        val items = if (account != null) listOf<Pair<String, () -> Unit>>(
+            "Ver mis logros" to { open(Intent(this, ProfileActivity::class.java)) },
+            "Cambiar de cuenta con el móvil (QR)" to { showRaQr() },
+            "Cambiar de cuenta con el teclado" to { showRaKeyboard() },
+            "Cerrar sesión" to { confirmRaSignOut(account.user) },
+        ) else listOf(
+            "Iniciar sesión con el móvil (QR)" to { showRaQr() },
+            "Iniciar sesión con el teclado" to { showRaKeyboard() },
+        )
+        AlertDialog.Builder(this, R.style.Dialog_RetroStick)
+            .setTitle(account?.let { "RetroAchievements · ${it.user}" } ?: "RetroAchievements")
+            .setItems(items.map { it.first }.toTypedArray()) { _, which -> items[which].second() }
+            .setNegativeButton(R.string.cancel, null)
+            .showForPad()
+    }
+
+    private fun raChanged() {
+        settings[RA_SETTING].subtitle = trophiesLabel()
+        render()
+    }
+
+    private fun confirmRaSignOut(user: String) {
+        AlertDialog.Builder(this, R.style.Dialog_RetroStick)
+            .setTitle("Cerrar sesión de $user")
+            .setMessage("Los logros se desactivan en el stick (también se quita la cuenta de Drive). Los que has conseguido siguen en tu cuenta de RetroAchievements.")
+            .setPositiveButton("Cerrar sesión") { _, _ ->
+                io.execute {
+                    val r = runCatching { RetroAchievements.signOut(this) }
+                    main.post {
+                        r.onSuccess { Sounds.play(Sounds.Sound.BACK); Toast.makeText(this, "Sesión cerrada: logros desactivados", Toast.LENGTH_LONG).show() }
+                            .onFailure { Toast.makeText(this, "Se quitó del stick, pero no de Drive: ${it.message}", Toast.LENGTH_LONG).show() }
+                        raChanged()
+                    }
+                }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .showForPad()
+    }
+
+    /**
+     * QR that opens the app's RetroAchievements login on the phone. While it shows, the stick looks in Drive every
+     * few seconds and closes it when the account (a new one, or another user) arrives.
+     */
+    private fun showRaQr() {
+        if (!driveAuth.isConnected) {
+            Toast.makeText(this, "Conecta Google Drive primero (Retro Ajustes → Sincronizar ahora)", Toast.LENGTH_LONG).show()
+            return
+        }
+        val before = RetroAchievements.account(this)?.let { it.user + "|" + it.token }
+        val qr = ImageView(this).apply { setBackgroundColor(Color.WHITE) }
+        val note = TextView(this).apply {
+            setTextColor(getColor(R.color.text_2)); setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+            text = "Escanéalo con la cámara del móvil: se abre la app RetroStick en Stick → RetroAchievements.\nEscribe tu usuario y contraseña allí; la tele lo recogerá sola."
+            setLineSpacing(0f, 1.2f)
+        }
+        val box = LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(24), dp(12), dp(24), dp(4))
+            addView(qr, LinearLayout.LayoutParams(dp(170), dp(170)).apply { marginEnd = dp(22) })
+            addView(note, LinearLayout.LayoutParams(0, -2, 1f))
+        }
+        val dialog = AlertDialog.Builder(this, R.style.Dialog_RetroStick)
+            .setTitle("Iniciar sesión con el móvil")
+            .setView(box)
+            .setNegativeButton("Cerrar", null)
+            .showForPad()
+        io.execute {
+            val bmp = runCatching { ShopPairing.raLoginQr(dp(170)) }
+            main.post { bmp.onSuccess { qr.setImageBitmap(it) }.onFailure { note.text = "No se pudo generar el QR: ${it.message}" } }
+        }
+        val poll = object : Runnable {
+            override fun run() {
+                if (!dialog.isShowing) return
+                io.execute {
+                    runCatching { RetroAchievements.pullFromDrive(this@MainActivity) }
+                    val now = RetroAchievements.account(this@MainActivity)
+                    main.post {
+                        if (!dialog.isShowing) return@post
+                        if (now != null && now.user + "|" + now.token != before) {
+                            dialog.dismiss()
+                            Sounds.play(Sounds.Sound.DONE)
+                            Toast.makeText(this@MainActivity, "Sesión iniciada como ${now.user}", Toast.LENGTH_LONG).show()
+                            raChanged()
+                        } else main.postDelayed(this, 5000)
+                    }
+                }
+            }
+        }
+        main.postDelayed(poll, 5000)
+    }
+
+    /** User and password with the TV's on-screen keyboard; the password is only sent to log in, never kept. */
+    private fun showRaKeyboard() {
+        val user = android.widget.EditText(this).apply {
+            hint = "Usuario"; setSingleLine(); setTextColor(getColor(R.color.text)); setHintTextColor(getColor(R.color.text_3))
+            RetroAchievements.account(this@MainActivity)?.let { setText(it.user) }
+        }
+        val password = android.widget.EditText(this).apply {
+            hint = "Contraseña"; setSingleLine(); setTextColor(getColor(R.color.text)); setHintTextColor(getColor(R.color.text_3))
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+        }
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(24), dp(8), dp(24), 0)
+            addView(user, LinearLayout.LayoutParams(-1, -2))
+            addView(password, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(6) })
+            addView(TextView(this@MainActivity).apply {
+                setTextColor(getColor(R.color.text_3)); setTextSize(TypedValue.COMPLEX_UNIT_SP, 9.5f)
+                text = "La contraseña solo se usa para pedir el acceso a RetroAchievements: no se guarda."
+            }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
+        }
+        AlertDialog.Builder(this, R.style.Dialog_RetroStick)
+            .setTitle("Iniciar sesión en RetroAchievements")
+            .setView(box)
+            .setPositiveButton("Entrar") { _, _ ->
+                val u = user.text.toString().trim()
+                val p = password.text.toString()
+                if (u.isEmpty() || p.isEmpty()) return@setPositiveButton
+                Toast.makeText(this, "Entrando…", Toast.LENGTH_SHORT).show()
+                io.execute {
+                    val r = runCatching { RetroAchievements.login(this, u, p) }
+                    main.post {
+                        r.onSuccess { name ->
+                            Sounds.play(Sounds.Sound.DONE)
+                            Toast.makeText(this, "Sesión iniciada como $name", Toast.LENGTH_LONG).show()
+                        }.onFailure {
+                            Sounds.play(Sounds.Sound.ERROR)
+                            Toast.makeText(this, "No se pudo iniciar sesión: ${it.message}", Toast.LENGTH_LONG).show()
+                        }
+                        raChanged()
+                    }
+                }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .showForPad()
+        user.requestFocus()
+    }
 
     /** "Activadas · 3 de 6 BIOS" */
     private fun bootLabel(): String {

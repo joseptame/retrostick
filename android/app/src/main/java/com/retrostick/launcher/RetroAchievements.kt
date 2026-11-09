@@ -49,6 +49,63 @@ object RetroAchievements {
         apply(context)
     }
 
+    // ---- Account from the stick (Retro Ajustes → Mis logros) ----
+
+    /** Drive's Retro/Config, or null when Drive isn't connected. */
+    private fun driveConfig(context: Context): Pair<DriveClient, String>? {
+        val auth = DriveAuth(context)
+        if (!auth.isConfigured || !auth.isConnected) return null
+        val drive = DriveClient(auth)
+        return drive to DriveSync.folderId(context, drive, "Retro/Config")
+    }
+
+    /** Off the stick and out of Drive (else the next sync would bring it back). Blocking. */
+    fun signOut(context: Context) {
+        File(context.filesDir, FILE).delete()
+        apply(context)
+        progress.clear()
+        driveConfig(context)?.let { (drive, config) ->
+            drive.list(config).filter { !it.isFolder && it.name == FILE }.forEach { drive.trash(it.id) }
+        }
+    }
+
+    /**
+     * Logs in with the user and password (api/ra.ts?login=1 gives the token back; the password is sent once and
+     * never kept), then keeps {user, token} on the stick and in Drive, as the phone app would. Blocking.
+     */
+    fun login(context: Context, user: String, password: String): String {
+        val conn = ShopApi.open("${BuildConfig.WEBAPP_URL}/api/ra?login=1")
+        val j = try {
+            conn.requestMethod = "POST"
+            conn.doOutput = true
+            conn.setRequestProperty("content-type", "application/json")
+            conn.outputStream.use { it.write(JSONObject().put("user", user).put("password", password).toString().toByteArray()) }
+            if (conn.contentType?.startsWith("application/json") != true) throw NotPairedException()
+            val stream = if (conn.responseCode in 200..299) conn.inputStream else conn.errorStream
+            JSONObject(stream.bufferedReader().readText())
+        } finally {
+            conn.disconnect()
+        }
+        if (j.has("error")) throw IllegalStateException(j.optString("error"))
+        val name = j.getString("user")
+        val local = File(context.filesDir, FILE)
+        local.writeText(JSONObject().put("user", name).put("token", j.getString("token")).toString())
+        apply(context)
+        progress.clear()
+        driveConfig(context)?.let { (drive, config) ->
+            val old = drive.list(config).filter { !it.isFolder && it.name == FILE }
+            drive.upload(local, config, old.firstOrNull()?.id)
+            old.drop(1).forEach { drive.trash(it.id) }
+        }
+        return name
+    }
+
+    /** The account the phone app just left in Drive (the QR login), without waiting for a full sync. Blocking. */
+    fun pullFromDrive(context: Context) {
+        val (drive, config) = driveConfig(context) ?: return
+        sync(context, drive, config)
+    }
+
     /** Writes the account (or "off") into retroarch.cfg; keys missing from the file are added at the end. */
     fun apply(context: Context) {
         val a = account(context)

@@ -81,8 +81,13 @@ object ShopPairing {
     }
 
     /** QR of the pairing link, drawn from the module matrix of api/qr.ts (white quiet zone included). */
-    fun qrBitmap(code: String, sizePx: Int): android.graphics.Bitmap {
-        val conn = ShopApi.open("${BuildConfig.WEBAPP_URL}/api/qr?code=$code")
+    fun qrBitmap(code: String, sizePx: Int) = qrFrom("code=$code", sizePx)
+
+    /** QR that opens the app's RetroAchievements login (Retro Ajustes → Mis logros). */
+    fun raLoginQr(sizePx: Int) = qrFrom("ra=1", sizePx)
+
+    private fun qrFrom(query: String, sizePx: Int): android.graphics.Bitmap {
+        val conn = ShopApi.open("${BuildConfig.WEBAPP_URL}/api/qr?$query")
         val json = try {
             if (conn.responseCode != 200) throw IllegalStateException("La webapp respondió ${conn.responseCode}")
             JSONObject(conn.inputStream.bufferedReader().readText())
