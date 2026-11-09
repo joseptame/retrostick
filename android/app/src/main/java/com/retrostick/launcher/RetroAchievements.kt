@@ -140,6 +140,44 @@ object RetroAchievements {
         )
     }
 
+    // ---- The user's trophy profile (Retro Ajustes → Mis logros) ----
+
+    class ProfileGame(val title: String, val console: String, val icon: String?, val total: Int, val earned: Int, val last: String?)
+    class Recent(val title: String, val description: String, val points: Int, val badge: String?, val game: String, val date: String)
+    class Profile(
+        val user: String, val avatar: String?, val points: Int, val rank: Int?,
+        val games: List<ProfileGame>, val recent: List<Recent>,
+    )
+
+    /** The profile, or an exception (no account, offline…). Slow: call it off the main thread. */
+    fun fetchProfile(context: Context): Profile {
+        val a = account(context) ?: throw IllegalStateException("RetroAchievements no está activado en este stick.")
+        val conn = ShopApi.open("${BuildConfig.WEBAPP_URL}/api/ra?profile=1&user=${enc(a.user)}")
+        val j = try {
+            if (conn.responseCode != 200) throw IllegalStateException("La webapp respondió ${conn.responseCode}")
+            if (conn.contentType?.startsWith("application/json") != true) throw NotPairedException()
+            JSONObject(conn.inputStream.bufferedReader().readText())
+        } finally {
+            conn.disconnect()
+        }
+        if (j.has("error")) throw IllegalStateException(j.optString("error"))
+        fun str(o: JSONObject, k: String) = if (o.isNull(k)) null else o.optString(k)
+        val games = j.optJSONArray("games")?.let { arr ->
+            List(arr.length()) { i ->
+                val o = arr.getJSONObject(i)
+                ProfileGame(o.optString("title"), o.optString("console"), str(o, "icon"), o.optInt("total"), o.optInt("earned"), str(o, "last"))
+            }
+        }.orEmpty()
+        val recent = j.optJSONArray("recent")?.let { arr ->
+            List(arr.length()) { i ->
+                val o = arr.getJSONObject(i)
+                Recent(o.optString("title"), o.optString("description"), o.optInt("points"), str(o, "badge"), o.optString("game"), o.optString("date"))
+            }
+        }.orEmpty()
+        val points = maxOf(j.optInt("points"), j.optInt("softcorePoints"))
+        return Profile(j.optString("user", a.user), str(j, "avatar"), points, if (j.isNull("rank")) null else j.optInt("rank"), games, recent)
+    }
+
     /** Each core's folder in RetroArch/config (its overrides). */
     private val CORE_DIRS = mapOf(
         "fceumm" to "FCEUmm", "snes9x2010" to "Snes9x 2010", "gambatte" to "Gambatte", "mgba" to "mGBA",

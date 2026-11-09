@@ -97,6 +97,8 @@
     <string name="set_sounds">Sonidos</string>
     <string name="set_view">Vista del inicio</string>
     <string name="set_boot">Pantallas de inicio</string>
+    <string name="set_trophies">Mis logros</string>
+    <string name="trophies_off">RetroAchievements no está activado</string>
     <string name="hint_search">Buscar</string>
     <string name="hint_view">Vista</string>
     <string name="hint_manual">Manual</string>

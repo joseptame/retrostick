@@ -919,6 +919,12 @@ class MainActivity : Activity() {
             },
             Setting("🗂️", getString(R.string.set_view), viewLabel()) { toggleView() },
             Setting("✨", getString(R.string.set_boot), bootLabel()) { showBootScreens() },
+            Setting("🏆", getString(R.string.set_trophies), trophiesLabel()) {
+                if (RetroAchievements.account(this) == null) {
+                    keySound = Sounds.Sound.ERROR
+                    toast(R.string.trophies_off)
+                } else open(Intent(this, ProfileActivity::class.java))
+            },
         )
         settings.forEach { s ->
             val v = layoutInflater.inflate(R.layout.item_setting, settingsGrid, false)
@@ -1515,6 +1521,8 @@ class MainActivity : Activity() {
 
     // ---- List view, search, manuals ----
 
+    private fun trophiesLabel() = RetroAchievements.account(this)?.let { "RetroAchievements · ${it.user}" } ?: getString(R.string.trophies_off)
+
     /** "Activadas · 3 de 6 BIOS" */
     private fun bootLabel(): String {
         val have = Bios.states().count { it.second == Bios.State.OK }
@@ -1684,7 +1692,7 @@ class MainActivity : Activity() {
         RetroAchievements.request(this, game)
         val p = RetroAchievements.cached(game)
         return when {
-            p != null && !p.supported -> "No compatible"
+            p != null && !p.supported -> "No válida"
             p != null -> "${p.earned}/${p.total}"
             RetroAchievements.known(game) -> "—"
             else -> "…"

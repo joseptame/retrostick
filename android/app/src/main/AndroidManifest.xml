@@ -60,6 +60,11 @@
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|uiMode"
             android:exported="false"
             android:screenOrientation="landscape" />
+        <activity
+            android:name=".ProfileActivity"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|uiMode"
+            android:exported="false"
+            android:screenOrientation="landscape" />
 
         <!-- Hands the downloaded update to the package installer -->
         <provider
