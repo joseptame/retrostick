@@ -17,8 +17,13 @@ export default defineConfig({
         short_name: 'RetroStick',
         description: 'Tu colección retro, tus partidas y tu stick, desde el móvil.',
         lang: 'es',
+        id: '/',
         start_url: '/',
+        scope: '/',
         display: 'standalone',
+        // Installed on Android (Chrome): links to this site (the TV's QRs: …/?ra=1, …/?vincular=) open in the app,
+        // reusing its window when it's already open. iOS ignores both: Safari opens them.
+        ...({ handle_links: 'preferred', launch_handler: { client_mode: ['navigate-existing', 'auto'] } } as object),
         background_color: '#0d0b1f',
         theme_color: '#0d0b1f',
         icons: [
