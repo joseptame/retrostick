@@ -53,6 +53,9 @@ object RetroAchievements {
             "cheevos_token" to (a?.token ?: ""),
             "cheevos_password" to "",
             "cheevos_hardcore_mode_enable" to "false",
+            // The unlock pop-up with the achievement's badge and a sound, like a console's trophy
+            "cheevos_badges_enable" to "true",
+            "cheevos_unlock_sound_enable" to "true",
         )
         runCatching {
             val lines = cfg.readLines().toMutableList()
