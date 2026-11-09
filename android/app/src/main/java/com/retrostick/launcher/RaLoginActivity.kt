@@ -49,6 +49,11 @@ class RaLoginActivity : Activity() {
 
         user = field("Usuario", password = false)
         password = field("Contraseña", password = true)
+        // The keyboard's Enter: from the user on to the password (keyboard still open), from the password log in
+        user.imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_NEXT
+        password.imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_GO
+        user.setOnEditorActionListener { _, _, _ -> openKeyboard(password); true }
+        password.setOnEditorActionListener { _, _, _ -> hideKeyboard(); login(); true }
         enter = Button(this).apply {
             text = "Iniciar sesión"; isAllCaps = false; typeface = font(R.font.inter_bold)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
@@ -182,7 +187,8 @@ class RaLoginActivity : Activity() {
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.action == KeyEvent.ACTION_DOWN && StickStatus.isGamepad(event.device)) followPad(event)
         when (StickStatus.standardKey(event.device, event.keyCode)) {
-            KeyEvent.KEYCODE_BUTTON_A, KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
+            // (Enter is left to the field: the keyboard's Enter moves on / logs in, see setOnEditorActionListener)
+            KeyEvent.KEYCODE_BUTTON_A, KeyEvent.KEYCODE_DPAD_CENTER -> {
                 val focused = currentFocus
                 if (focused is EditText) {
                     // Pressing a field opens the keyboard on it. Only a press made here: the release of the button
@@ -204,11 +210,18 @@ class RaLoginActivity : Activity() {
                 return true
             }
             KeyEvent.KEYCODE_BUTTON_B -> {
-                if (event.action == KeyEvent.ACTION_UP) { Sounds.play(Sounds.Sound.BACK); finish() }
+                // With the keyboard open, B only closes it; pressed again, back out
+                if (event.action == KeyEvent.ACTION_UP && !hideKeyboard()) { Sounds.play(Sounds.Sound.BACK); finish() }
                 return true
             }
         }
         return super.dispatchKeyEvent(event)
+    }
+
+    /** Closes the on-screen keyboard; false when it wasn't open. */
+    private fun hideKeyboard(): Boolean {
+        val token = (currentFocus ?: window.decorView).windowToken
+        return getSystemService(android.view.inputmethod.InputMethodManager::class.java).hideSoftInputFromWindow(token, 0)
     }
 
     private fun openKeyboard(field: EditText) {
