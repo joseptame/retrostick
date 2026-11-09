@@ -1,0 +1,142 @@
+/**
+ * Vercel Edge Function: a game's RetroAchievements for the stick's Logros screen.
+ *
+ *   GET /api/ra?console=md&title=Sonic%20The%20Hedgehog&md5=<ROM hash>&user=jfuster
+ *
+ * Finds the game in RetroAchievements (by the ROM's MD5 when the stick sends it, else by title), then the
+ * user's progress: every achievement with its badge, points, how rare it is and when it was earned. Titles and
+ * descriptions are translated to Spanish (Google's free endpoint, kept per game in memory). The Web API key
+ * (RA_API_KEY) stays server-side. Only reachable with the stick's pass (middleware.ts).
+ */
+export const config = { runtime: 'edge' }
+
+declare const process: { env: Record<string, string | undefined> }
+
+const API = 'https://retroachievements.org/API'
+const MEDIA = 'https://media.retroachievements.org'
+/** RetroAchievements console ids */
+const CONSOLE_IDS: Record<string, number> = { md: 1, snes: 3, gb: 4, gba: 5, gbc: 6, nes: 7, sms: 11, psx: 12 }
+
+interface ListGame { Title: string; ID: number; NumAchievements: number; Hashes?: string[] }
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Any = any
+
+const lists = new Map<number, { at: number; games: ListGame[] }>()
+const translations = new Map<string, { titles: string[]; descriptions: string[] }>()
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+  })
+}
+
+async function get(path: string, key: string): Promise<Any> {
+  const res = await fetch(`${API}/${path}${path.includes('?') ? '&' : '?'}y=${encodeURIComponent(key)}`, {
+    headers: { 'User-Agent': 'RetroStick/1.0 (+https://retrostick.vercel.app)' },
+  })
+  if (!res.ok) throw new Error(`RetroAchievements ${res.status}`)
+  return res.json()
+}
+
+/** Games with achievements of a console (with their ROM hashes), kept a day per server instance. */
+async function gameList(consoleId: number, key: string): Promise<ListGame[]> {
+  const cached = lists.get(consoleId)
+  if (cached && Date.now() - cached.at < 86_400_000) return cached.games
+  const games = (await get(`API_GetGameList.php?i=${consoleId}&h=1&f=1`, key)) as ListGame[]
+  lists.set(consoleId, { at: Date.now(), games })
+  return games
+}
+
+const loose = (s: string) =>
+  s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\(.*?\)|\[.*?\]/g, '').replace(/[^a-z0-9]/g, '')
+
+/** "~Hack~", "~Homebrew~", "[Subset - …]": never the retail game. */
+const isExtra = (t: string) => /~[^~]+~|\[subset/i.test(t)
+
+function findGame(games: ListGame[], title: string, md5: string | null): ListGame | null {
+  if (md5) {
+    const h = md5.toLowerCase()
+    const byHash = games.find((g) => g.Hashes?.some((x) => x.toLowerCase() === h))
+    if (byHash) return byHash
+  }
+  const want = loose(title.replace(/^(.*), (The|A|An)\b/i, '$2 $1'))
+  const retail = games.filter((g) => !isExtra(g.Title))
+  // RetroAchievements writes "Legend of Zelda, The: …" / "Pokemon FireRed Version | Pokemon LeafGreen Version" sometimes
+  const keys = (t: string) => t.split('|').map((p) => loose(p.replace(/^(.*), (The|A|An)\b/i, '$2 $1')))
+  return retail.find((g) => keys(g.Title).includes(want)) ?? null
+}
+
+/** Many short English lines to Spanish in one request; null if the line count doesn't survive. */
+async function translateLines(lines: string[]): Promise<string[] | null> {
+  if (!lines.length) return []
+  const res = await fetch('https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=es&dt=t', {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded', 'User-Agent': 'Mozilla/5.0' },
+    body: new URLSearchParams({ q: lines.join('\n') }),
+  })
+  if (!res.ok) return null
+  const data = (await res.json()) as Any
+  const out = (data?.[0] ?? []).map((p: unknown[]) => p?.[0] ?? '').join('').split('\n').map((s: string) => s.trim())
+  return out.length === lines.length ? out : null
+}
+
+async function spanish(gameId: number, titles: string[], descriptions: string[]) {
+  const k = String(gameId)
+  const hit = translations.get(k)
+  if (hit && hit.titles.length === titles.length) return hit
+  const [t, d] = await Promise.all([translateLines(titles).catch(() => null), translateLines(descriptions).catch(() => null)])
+  const out = { titles: t ?? titles, descriptions: d ?? descriptions }
+  if (t && d) translations.set(k, out)
+  return out
+}
+
+export default async function handler(request: Request): Promise<Response> {
+  const key = process.env.RA_API_KEY?.replace(/^["']|["']$/g, '')
+  if (!key) return json({ error: 'RetroAchievements no está configurado (falta RA_API_KEY).' }, 503)
+  const url = new URL(request.url)
+  const consoleId = CONSOLE_IDS[url.searchParams.get('console') ?? '']
+  const title = url.searchParams.get('title')?.trim() ?? ''
+  const md5 = url.searchParams.get('md5')
+  const user = url.searchParams.get('user')?.trim()
+  if (!consoleId || !title) return json({ error: 'Faltan console y title.' }, 400)
+
+  try {
+    const game = findGame(await gameList(consoleId, key), title, md5)
+    if (!game) return json({ found: false })
+    const info = (await get(
+      user ? `API_GetGameInfoAndUserProgress.php?g=${game.ID}&u=${encodeURIComponent(user)}` : `API_GetGameExtended.php?i=${game.ID}`,
+      key,
+    )) as Any
+    const players = Number(info.NumDistinctPlayers) || 0
+    const list = Object.values(info.Achievements ?? {}) as Any[]
+    list.sort((a, b) => (a.DisplayOrder ?? 0) - (b.DisplayOrder ?? 0) || a.ID - b.ID)
+    const es = await spanish(game.ID, list.map((a) => a.Title ?? ''), list.map((a) => a.Description ?? ''))
+    const achievements = list.map((a, i) => ({
+      id: a.ID,
+      title: es.titles[i] || a.Title,
+      description: es.descriptions[i] || a.Description,
+      points: a.Points ?? 0,
+      badge: `${MEDIA}/Badge/${a.BadgeName}.png`,
+      badgeLocked: `${MEDIA}/Badge/${a.BadgeName}_lock.png`,
+      earned: a.DateEarned ?? a.DateEarnedHardcore ?? null,
+      // Share of the game's players who have it (PS5-style rarity)
+      rarity: players ? Math.round(((a.NumAwarded ?? 0) / players) * 1000) / 10 : null,
+    }))
+    const earned = achievements.filter((a) => a.earned)
+    return json({
+      found: true,
+      id: game.ID,
+      title: info.Title ?? game.Title,
+      icon: info.ImageIcon ? `${MEDIA}${info.ImageIcon}` : null,
+      total: achievements.length,
+      earned: earned.length,
+      points: achievements.reduce((s, a) => s + a.points, 0),
+      earnedPoints: earned.reduce((s, a) => s + a.points, 0),
+      players,
+      achievements,
+    })
+  } catch (e) {
+    return json({ error: e instanceof Error ? e.message : String(e) }, 502)
+  }
+}
