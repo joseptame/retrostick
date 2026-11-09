@@ -226,6 +226,7 @@ fun launchInRetroArch(context: Context, game: Game, resume: Resume = Resume.TITL
     ))
     // RetroArch rewrites its config when it closes: the RetroAchievements account goes back in every time
     RetroAchievements.apply(context)
+    RetroAchievements.applyGame(game)
     // The consoles' boot screens (their BIOS), on or off in Retro Ajustes
     Bios.applyOptions(context)
     val intent = Intent(Intent.ACTION_MAIN)

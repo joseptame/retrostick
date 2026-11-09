@@ -119,6 +119,7 @@ class AchievementsActivity : Activity() {
             RetroAchievements.account(this) == null -> return showStatus("RetroAchievements no está activado en este stick.")
             !known -> return
             p == null -> return showStatus("${game.title} no tiene logros en RetroAchievements (o no se ha encontrado esta versión del juego).")
+            !p.supported -> return showStatus("Tu versión de ${game.title} no es compatible con sus logros de RetroAchievements: están hechos para otra versión del juego (normalmente la de EE. UU.). Por eso los logros están desactivados en este juego.")
         }
         p!!
         title.text = p.title.ifEmpty { game.title }

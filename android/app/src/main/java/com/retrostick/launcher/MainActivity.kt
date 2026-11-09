@@ -1684,6 +1684,7 @@ class MainActivity : Activity() {
         RetroAchievements.request(this, game)
         val p = RetroAchievements.cached(game)
         return when {
+            p != null && !p.supported -> "No compatible"
             p != null -> "${p.earned}/${p.total}"
             RetroAchievements.known(game) -> "—"
             else -> "…"

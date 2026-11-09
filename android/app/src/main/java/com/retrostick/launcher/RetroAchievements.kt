@@ -74,6 +74,8 @@ object RetroAchievements {
     class Progress(
         val title: String, val icon: String?, val total: Int, val earned: Int, val points: Int, val earnedPoints: Int,
         val achievements: List<Achievement>,
+        /** false: this ROM isn't a version the achievements support (found by title); they're off for it */
+        val supported: Boolean = true,
     )
 
     /** Session cache: game key → progress, or null = RetroAchievements has no achievements for it */
@@ -134,7 +136,35 @@ object RetroAchievements {
         return Progress(
             j.optString("title"), if (j.isNull("icon")) null else j.optString("icon"),
             j.optInt("total"), j.optInt("earned"), j.optInt("points"), j.optInt("earnedPoints"), list,
+            j.optBoolean("supported", true),
         )
+    }
+
+    /** Each core's folder in RetroArch/config (its overrides). */
+    private val CORE_DIRS = mapOf(
+        "fceumm" to "FCEUmm", "snes9x2010" to "Snes9x 2010", "gambatte" to "Gambatte", "mgba" to "mGBA",
+        "genesis_plus_gx" to "Genesis Plus GX", "pcsx_rearmed" to "PCSX-ReARMed",
+    )
+    private const val MARK = "# RetroStick: achievements off"
+
+    /**
+     * Before a game: a ROM that isn't a supported version gets a game override with achievements off (no
+     * "Unsupported Game Version" warning, no misfires); a supported one loses that override again.
+     */
+    fun applyGame(game: Game) {
+        val p = progress[game.key] ?: return
+        val dir = CORE_DIRS[game.console.core.removeSuffix("_libretro_android.so")] ?: return
+        val f = File("$SDCARD/RetroArch/config/$dir/${game.baseName}.cfg")
+        runCatching {
+            val unsupported = p.first?.supported == false
+            when {
+                unsupported -> {
+                    f.parentFile?.mkdirs()
+                    f.writeText("$MARK (not a version its achievements support)\ncheevos_enable = \"false\"\n")
+                }
+                f.isFile && f.readText().startsWith(MARK) -> f.delete()
+            }
+        }.onFailure { Log.w("RetroStick", "RetroAchievements: override for ${game.title}", it) }
     }
 
     private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")

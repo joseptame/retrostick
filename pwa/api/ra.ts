@@ -54,17 +54,23 @@ const loose = (s: string) =>
 /** "~Hack~", "~Homebrew~", "[Subset - …]": never the retail game. */
 const isExtra = (t: string) => /~[^~]+~|\[subset/i.test(t)
 
-function findGame(games: ListGame[], title: string, md5: string | null): ListGame | null {
+/**
+ * The game by the ROM's hash, or by title when the hash isn't one of the versions its achievements support
+ * (`supported: false`: RetroArch then unlocks "Unsupported Game Version" and the real ones may misfire).
+ * Without a hash (PS1 discs) the title decides and it counts as supported.
+ */
+function findGame(games: ListGame[], title: string, md5: string | null): { game: ListGame; supported: boolean } | null {
   if (md5) {
     const h = md5.toLowerCase()
     const byHash = games.find((g) => g.Hashes?.some((x) => x.toLowerCase() === h))
-    if (byHash) return byHash
+    if (byHash) return { game: byHash, supported: true }
   }
   const want = loose(title.replace(/^(.*), (The|A|An)\b/i, '$2 $1'))
   const retail = games.filter((g) => !isExtra(g.Title))
   // RetroAchievements writes "Legend of Zelda, The: …" / "Pokemon FireRed Version | Pokemon LeafGreen Version" sometimes
   const keys = (t: string) => t.split('|').map((p) => loose(p.replace(/^(.*), (The|A|An)\b/i, '$2 $1')))
-  return retail.find((g) => keys(g.Title).includes(want)) ?? null
+  const byTitle = retail.find((g) => keys(g.Title).includes(want))
+  return byTitle ? { game: byTitle, supported: !md5 } : null
 }
 
 /** Many short English lines to Spanish in one request; null if the line count doesn't survive. */
@@ -102,8 +108,9 @@ export default async function handler(request: Request): Promise<Response> {
   if (!consoleId || !title) return json({ error: 'Faltan console y title.' }, 400)
 
   try {
-    const game = findGame(await gameList(consoleId, key), title, md5)
-    if (!game) return json({ found: false })
+    const match = findGame(await gameList(consoleId, key), title, md5)
+    if (!match) return json({ found: false })
+    const game = match.game
     const info = (await get(
       user ? `API_GetGameInfoAndUserProgress.php?g=${game.ID}&u=${encodeURIComponent(user)}` : `API_GetGameExtended.php?i=${game.ID}`,
       key,
@@ -126,6 +133,7 @@ export default async function handler(request: Request): Promise<Response> {
     const earned = achievements.filter((a) => a.earned)
     return json({
       found: true,
+      supported: match.supported,
       id: game.ID,
       title: info.Title ?? game.Title,
       icon: info.ImageIcon ? `${MEDIA}${info.ImageIcon}` : null,
