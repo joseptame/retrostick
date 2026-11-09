@@ -201,6 +201,8 @@ object DriveSync {
             runCatching { Updater.check(context, drive, dir(Updater.FOLDER)) }.onFailure { Log.w("RetroStick", "Update check failed", it) }
             // RetroAchievements account (Retro/Config/ra.json) into RetroArch
             runCatching { RetroAchievements.sync(context, drive, dir("Retro/Config")) }.onFailure { Log.w("RetroStick", "RetroAchievements sync failed", it) }
+            // The user's BIOS (boot screens), uploaded from the phone app
+            runCatching { Bios.sync(drive, dir("Retro/Config/bios")) }.onFailure { Log.w("RetroStick", "BIOS sync failed", it) }
             CONSOLES.forEach { syncRoms(it) }
         }
 

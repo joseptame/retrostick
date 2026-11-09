@@ -44,6 +44,8 @@ private const val SETTINGS_COLUMNS = 5
 private const val SOUNDS_SETTING = 11
 /** Index of the "Vista del inicio" card (after Sonidos). */
 private const val VIEW_SETTING = 12
+/** Index of the "Pantallas de inicio" card (the consoles' boot screens, from the user's BIOS). */
+private const val BOOT_SETTING = 13
 private const val PERMISSION_REQUEST = 1
 private const val CONNECT_INPUT = "com.google.android.intent.action.CONNECT_INPUT"
 private const val FLAUNCHER_PACKAGE = "me.efesser.flauncher"
@@ -916,6 +918,7 @@ class MainActivity : Activity() {
                 keySound = Sounds.Sound.OPEN
             },
             Setting("🗂️", getString(R.string.set_view), viewLabel()) { toggleView() },
+            Setting("✨", getString(R.string.set_boot), bootLabel()) { showBootScreens() },
         )
         settings.forEach { s ->
             val v = layoutInflater.inflate(R.layout.item_setting, settingsGrid, false)
@@ -971,6 +974,7 @@ class MainActivity : Activity() {
         settings[8].subtitle = if (connected) driveAuth.email ?: getString(R.string.drive_connected) else getString(R.string.drive_not_connected)
         settings[SOUNDS_SETTING].subtitle = Sounds.level.label
         settings[VIEW_SETTING].subtitle = viewLabel()
+        settings[BOOT_SETTING].subtitle = bootLabel()
         settings[10].subtitle = Updater.available?.let { getString(R.string.update_available_sub, it.versionName) }
             ?: getString(R.string.update_current, BuildConfig.VERSION_NAME)
         settings[2].subtitle = net?.let { "Conectado por $it" } ?: getString(R.string.offline)
@@ -1510,6 +1514,40 @@ class MainActivity : Activity() {
     }
 
     // ---- List view, search, manuals ----
+
+    /** "Activadas · 3 de 6 BIOS" */
+    private fun bootLabel(): String {
+        val have = Bios.states().count { it.second != Bios.State.MISSING }
+        return (if (Bios.enabled(this)) "Activadas" else "Desactivadas") + " · $have de ${Bios.ALL.size} BIOS"
+    }
+
+    /** Which BIOS are on the stick (each console's boot screen needs its own) and the on/off switch. */
+    private fun showBootScreens() {
+        val on = Bios.enabled(this)
+        val text = buildString {
+            appendLine("Antes de cada juego se ve la pantalla de inicio de su consola (el logo de Nintendo en Game Boy, el de Sony en PlayStation…). Cada una necesita la BIOS de tu propia consola: súbela desde la app del móvil, en Stick → Pantallas de inicio.")
+            appendLine()
+            Bios.states().forEach { (e, s) ->
+                appendLine(when (s) {
+                    Bios.State.OK -> "✓  ${e.console}"
+                    Bios.State.UNKNOWN -> "✓  ${e.console} (versión no reconocida, se usa igualmente)"
+                    Bios.State.MISSING -> "—  ${e.console}: falta"
+                })
+            }
+            appendLine()
+            append("NES y Super Nintendo no tenían pantalla de inicio.")
+        }
+        AlertDialog.Builder(this, R.style.Dialog_RetroStick)
+            .setTitle(getString(R.string.set_boot))
+            .setMessage(text)
+            .setPositiveButton(if (on) "Desactivar" else "Activar") { _, _ ->
+                Bios.setEnabled(this, !on)
+                settings[BOOT_SETTING].subtitle = bootLabel()
+                render()
+            }
+            .setNegativeButton("Cerrar", null)
+            .showForPad()
+    }
 
     private fun viewLabel() = (if (listMode) "Lista" else "Carátulas") + " · Options la cambia"
 

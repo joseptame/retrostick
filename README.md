@@ -103,7 +103,7 @@ Retro/
 │   ├── states/         ← RetroArch savestate_directory (*.state, *.state.auto)
 │   └── .stick/status.json
 └── Config/
-    └── bios/           ← scph*.bin del usuario (opcional)
+    └── bios/           ← BIOS del usuario (gb_bios.bin, gbc_bios.bin, gba_bios.bin, scph5502.bin, bios_E.sms, bios_MD.bin), subidas desde la app (Stick → Pantallas de inicio); el stick las copia a RetroArch/system
 ```
 
 - Los nombres de carpeta de consola (`gb`, `gbc`, `gba`, `psx`) son fijos. Los usan la PWA y el launcher.

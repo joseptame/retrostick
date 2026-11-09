@@ -173,9 +173,8 @@ fun lastState(game: Game) = File(STATES_DIR, "${game.baseName}.state.auto").take
 /** The quick save of slot 0: Share+L1 saves it, Share+R1 loads it. */
 fun quickState(game: Game) = File(STATES_DIR, "${game.baseName}.state").takeIf { it.isFile }
 
-/** Writes these keys into retroarch.cfg (missing ones are added at the end); false if it couldn't. */
-fun writeRetroArchCfg(keys: Map<String, String>): Boolean {
-    val cfg = File(RETROARCH_CFG)
+/** Writes these keys into retroarch.cfg, or a core's .opt (missing ones are added at the end); false if it couldn't. */
+fun writeRetroArchCfg(keys: Map<String, String>, cfg: File = File(RETROARCH_CFG)): Boolean {
     if (!cfg.isFile) return false
     return runCatching {
         val lines = cfg.readLines().toMutableList()
@@ -216,6 +215,8 @@ fun launchInRetroArch(context: Context, game: Game, resume: Resume = Resume.TITL
     ))
     // RetroArch rewrites its config when it closes: the RetroAchievements account goes back in every time
     RetroAchievements.apply(context)
+    // The consoles' boot screens (their BIOS), on or off in Retro Ajustes
+    Bios.applyOptions(context)
     val intent = Intent(Intent.ACTION_MAIN)
         .setComponent(ComponentName(RETROARCH_PACKAGE, RETROARCH_ACTIVITY))
         .putExtra("ROM", game.file.absolutePath)
