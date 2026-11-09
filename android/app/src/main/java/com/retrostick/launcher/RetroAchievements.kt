@@ -23,6 +23,13 @@ object RetroAchievements {
 
     class Account(val user: String, val token: String)
 
+    /**
+     * Consoles whose core RetroAchievements accepts. Super Nintendo runs on Snes9x 2010 (the S805Y can't keep up with
+     * current Snes9x), which RetroAchievements doesn't support: its sets unlock a "Warning: Unsupported Core" and real
+     * ones may misfire, so achievements are off there (also in stick/retroarch/overrides/Snes9x 2010/Snes9x 2010.cfg).
+     */
+    fun supports(console: Console) = console.id != "snes"
+
     fun account(context: Context): Account? = runCatching {
         val j = JSONObject(File(context.filesDir, FILE).readText())
         Account(j.getString("user"), j.getString("token")).takeIf { it.user.isNotBlank() && it.token.isNotBlank() }

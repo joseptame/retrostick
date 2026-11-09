@@ -1057,7 +1057,7 @@ class MainActivity : Activity() {
                     compoundDrawablePadding = dp(2)
                 }
             }
-            if (currentGame != null && RetroAchievements.account(this) != null)
+            if (currentGame?.let { RetroAchievements.supports(it.console) } == true && RetroAchievements.account(this) != null)
                 addHint(Glyph.Pill(when (padStyle) { PadStyle.XBOX -> "RT"; PadStyle.NINTENDO -> "ZR"; else -> "R2" }), R.string.hint_achievements)
             addHint(Glyph.Pill(when (padStyle) { PadStyle.XBOX -> "LT"; PadStyle.NINTENDO -> "ZL"; else -> "L2" }), R.string.hint_search)
             addHint(Glyph.Pill(when (padStyle) { PadStyle.XBOX -> "Menu"; PadStyle.NINTENDO -> "+"; else -> "Options" }), R.string.hint_view)
@@ -1680,7 +1680,7 @@ class MainActivity : Activity() {
      * "earned/total", "…" while asking, "—" when it has none; null = no column (no account, or in Drive).
      */
     private fun achievementsText(game: Game, onStick: Boolean): String? {
-        if (!onStick || RetroAchievements.account(this) == null) return null
+        if (!onStick || !RetroAchievements.supports(game.console) || RetroAchievements.account(this) == null) return null
         RetroAchievements.request(this, game)
         val p = RetroAchievements.cached(game)
         return when {
@@ -1707,7 +1707,7 @@ class MainActivity : Activity() {
     /** The selected game's achievements (only games on the stick: RetroArch earns them). */
     private fun openAchievements() {
         val game = currentGame
-        if (settingsTab || game == null) return
+        if (settingsTab || game == null || !RetroAchievements.supports(game.console)) return
         if (RetroAchievements.account(this) == null) {
             keySound = Sounds.Sound.ERROR
             Toast.makeText(this, "RetroAchievements no está activado", Toast.LENGTH_SHORT).show()
