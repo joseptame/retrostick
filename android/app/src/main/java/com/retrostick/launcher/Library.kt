@@ -212,6 +212,17 @@ fun launchInRetroArch(context: Context, game: Game, resume: Resume = Resume.TITL
         "input_save_state_btn" to "100",
         "input_load_state_btn" to "101",
         "input_toggle_fast_forward_btn" to "103",
+        // A clean start: no RetroAchievements summary (game name + "1 de 124 logros"), login or "not identified"
+        // messages, nor RetroArch's remap / override / controller ones. Unlocks and quick save / load still show.
+        "cheevos_visibility_summary" to "2",
+        "cheevos_visibility_account" to "false",
+        "cheevos_verbose_enable" to "false",
+        "notification_show_remap_load" to "false",
+        "notification_show_config_override_load" to "false",
+        "notification_show_autoconfig" to "false",
+        "notification_show_set_initial_disk" to "false",
+        // Nor the loading band across the middle (RetroArch logo + the game's name)
+        "menu_show_load_content_animation" to "false",
     ))
     // RetroArch rewrites its config when it closes: the RetroAchievements account goes back in every time
     RetroAchievements.apply(context)
