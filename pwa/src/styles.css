@@ -899,3 +899,6 @@ img.art-wide { object-fit: contain !important; z-index: 1; }
 .ra-landing-form input { padding: 14px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 16px; }
 .ra-landing-form .cta { height: 48px; width: 100%; }
 .ra-landing-done .cta { margin-top: 10px; }
+.ra-landing-steps { text-align: left; align-self: stretch; margin: 8px 0 0; padding: 12px 14px 12px 32px; border-radius: 14px; background: rgba(255, 255, 255, 0.04); font-size: 14px; color: var(--text); line-height: 1.5; }
+.ra-landing-steps li + li { margin-top: 6px; }
+p.ra-landing-steps { padding-left: 14px; color: var(--muted); }

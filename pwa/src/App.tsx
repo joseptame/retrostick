@@ -64,7 +64,7 @@ export default function App() {
 function Main({ onSignOut }: { onSignOut: () => void }) {
   const [tab, setTab] = useState<Tab>('coleccion')
   // …/?ra=1: the TV's QR (Retro Ajustes → Mis logros) opens the RetroAchievements login page (RaLanding)
-  const [raLanding, setRaLanding] = useState(() => new URL(location.href).searchParams.has('ra'))
+  const [raLanding] = useState(() => new URL(location.href).searchParams.has('ra'))
   const [library, setLib] = useState<Library | null>(cachedLibrary())
   const [folders, setFolders] = useState<Folders | null>(null)
   const [online, setOnline] = useState(navigator.onLine)
@@ -194,19 +194,11 @@ function Main({ onSignOut }: { onSignOut: () => void }) {
   }
   const game = selected ? library?.games.find((g) => g.key === selected) : undefined
 
+  // The TV's QR page stands alone: it never goes on into the app (no tabs, no way out to them)
   if (raLanding) {
     return (
       <div className="app">
-        <RaLanding
-          state={state}
-          onClose={() => {
-            setRaLanding(false)
-            history.replaceState(null, '', '/')
-            setTab('coleccion')
-            window.scrollTo({ top: 0 })
-          }}
-        />
-        {toast && <div className="toast">{toast}</div>}
+        <RaLanding state={state} />
       </div>
     )
   }
