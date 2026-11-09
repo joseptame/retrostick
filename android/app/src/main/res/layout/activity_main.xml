@@ -186,6 +186,11 @@
                     <TextView android:id="@+id/timePlayed" style="@style/InfoValue" />
                 </LinearLayout>
 
+                <LinearLayout android:id="@+id/achievementsColumn" style="@style/InfoColumn">
+                    <TextView style="@style/InfoKey" android:text="@string/achievements" />
+                    <TextView android:id="@+id/achievements" style="@style/InfoValue" />
+                </LinearLayout>
+
                 <LinearLayout style="@style/InfoColumn">
                     <TextView style="@style/InfoKey" android:text="@string/saved_game" />
                     <TextView android:id="@+id/saveState" style="@style/InfoValue" />

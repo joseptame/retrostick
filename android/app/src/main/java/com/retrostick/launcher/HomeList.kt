@@ -36,6 +36,8 @@ class HomeList(private val ctx: Context, private val covers: CoverLoader) {
     class Sheet(
         val title: String, val consoleId: String, val consoleName: String, val coverGame: Game?,
         val last: String, val time: String, val save: String, val saveOk: Boolean,
+        /** "earned/total" of RetroAchievements; null = no "Logros" column */
+        val achievements: String?,
         val playLabel: String, val languages: List<String>, val finished: String?,
         val manual: Boolean, val manualGlyph: String, val inDrive: Boolean,
         /** Confirm button: the PlayStation cross icon, or a letter ("A", "OK") for other controllers */
@@ -65,7 +67,7 @@ class HomeList(private val ctx: Context, private val covers: CoverLoader) {
     private val title = text(24f, R.color.text).apply { typeface = font(R.font.inter_extrabold); maxLines = 2; ellipsize = TextUtils.TruncateAt.END }
     private val meta = text(11.5f, R.color.brand_accent).apply { typeface = font(R.font.inter_semibold) }
     private val langs = text(10f, R.color.text_2)
-    private val statLast = stat(); private val statTime = stat(); private val statSave = stat()
+    private val statLast = stat(); private val statTime = stat(); private val statAch = stat(); private val statSave = stat()
     private val desc = text(11f, R.color.text_2).apply { setLineSpacing(0f, 1.3f); maxLines = 3; ellipsize = TextUtils.TruncateAt.END }
     /** Pulsing bars while IGDB answers (description + thumbnails) */
     private val loading = LoadingBars(ctx, lines = 3, thumbs = 4)
@@ -96,6 +98,7 @@ class HomeList(private val ctx: Context, private val covers: CoverLoader) {
         val stats = LinearLayout(ctx).apply {
             addView(statLast.first, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(24) })
             addView(statTime.first, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(24) })
+            addView(statAch.first, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(24) })
             addView(statSave.first)
         }
         val infoCol = LinearLayout(ctx).apply {
@@ -174,7 +177,7 @@ class HomeList(private val ctx: Context, private val covers: CoverLoader) {
             title.text = "Descubre más juegos"
             meta.text = "RetroShop"
             langs.text = ""
-            listOf(statLast, statTime, statSave).forEach { it.first.visibility = View.GONE }
+            listOf(statLast, statTime, statAch, statSave).forEach { it.first.visibility = View.GONE }
             desc.text = "Abre la tienda para buscar y descargar juegos directamente al stick con el mando."
             setPlay("Abrir la tienda", true, "", true)
             manualBtn.visibility = View.GONE
@@ -189,6 +192,8 @@ class HomeList(private val ctx: Context, private val covers: CoverLoader) {
         title.text = sheet.title
         statLast.second.text = sheet.last
         statTime.second.text = sheet.time
+        statAch.first.visibility = if (sheet.achievements != null) View.VISIBLE else View.GONE
+        statAch.second.text = sheet.achievements
         statSave.second.text = sheet.save
         statSave.second.setTextColor(ctx.getColor(if (sheet.saveOk) R.color.ok else R.color.text))
         setPlay(sheet.playLabel, sheet.playCross, sheet.playLetter, mediaFocus < 0)
@@ -381,6 +386,7 @@ class HomeList(private val ctx: Context, private val covers: CoverLoader) {
     fun setStatLabels() {
         (statLast.first.tag as TextView).text = "ÚLTIMA PARTIDA"
         (statTime.first.tag as TextView).text = "TIEMPO JUGADO"
+        (statAch.first.tag as TextView).text = "LOGROS"
         (statSave.first.tag as TextView).text = "PARTIDA GUARDADA"
     }
 

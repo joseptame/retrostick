@@ -34,6 +34,7 @@
 
     <string name="last_played">Última partida</string>
     <string name="time_played">Tiempo jugado</string>
+    <string name="achievements">Logros</string>
     <string name="saved_game">Partida guardada</string>
     <string name="continue_game">Continuar partida</string>
     <string name="play">Jugar</string>

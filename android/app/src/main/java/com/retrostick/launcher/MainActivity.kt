@@ -721,11 +721,6 @@ class MainActivity : Activity() {
         val info = entry?.info
         val known = entry != null || Fichas.failed(game.title, game.console.id)
         if (entry == null || entry.stale) requestFicha(game.title, game.console.id)
-        // Achievements earned (RetroAchievements), for games on the stick
-        val ra = if (drive == null && RetroAchievements.account(this) != null) {
-            RetroAchievements.request(this, game)
-            RetroAchievements.cached(game)
-        } else null
         findViewById<TextView>(R.id.gameMeta).text =
             listOfNotNull(
                 info?.rating?.let { "★ " + String.format("%.1f", it).replace('.', ',') },
@@ -735,7 +730,6 @@ class MainActivity : Activity() {
                 console.name.takeIf { info == null }, game.region,
                 if (drive != null) getString(R.string.in_drive_meta) else null,
                 game.finished?.let { "🏆 Terminado" },
-                ra?.let { "🏆 ${it.earned}/${it.total} logros" },
             ).joinToString("  ·  ")
         gameDesc.text = when {
             info?.description != null -> info.description
@@ -748,6 +742,9 @@ class MainActivity : Activity() {
         bindCoverMedia(game.key, info)
         findViewById<TextView>(R.id.lastPlayed).text = formatWhen(game.lastPlayed)
         findViewById<TextView>(R.id.timePlayed).text = formatDuration(game.runtimeSeconds)
+        val achievements = achievementsText(game, onStick = drive == null)
+        findViewById<View>(R.id.achievementsColumn).visibility = if (achievements != null) View.VISIBLE else View.GONE
+        findViewById<TextView>(R.id.achievements).text = achievements
         findViewById<TextView>(R.id.saveState).apply {
             val backedUp = game.hasProgress && driveAuth.isConnected && DriveSync.isBackedUp(this@MainActivity, game)
             setText(when {
@@ -1615,6 +1612,7 @@ class MainActivity : Activity() {
         return HomeList.Sheet(
             title = game.title, consoleId = game.console.id, consoleName = game.console.name, coverGame = game,
             last = formatWhen(game.lastPlayed), time = formatDuration(game.runtimeSeconds), save = save, saveOk = backedUp,
+            achievements = achievementsText(game, onStick = !inDrive),
             playLabel = when { inDrive -> "Ver ficha y pasar al stick"; game.hasProgress -> getString(R.string.continue_game); else -> getString(R.string.play) },
             languages = Languages.of(game.file.name),
             finished = game.finished?.let { "Terminado el ${date.format(it.at)} · ${formatDuration(it.seconds)}" },
@@ -1622,6 +1620,21 @@ class MainActivity : Activity() {
             playCross = padStyle == PadStyle.PLAYSTATION,
             playLetter = when (padStyle) { PadStyle.XBOX, PadStyle.NINTENDO -> "A"; PadStyle.REMOTE -> "OK"; else -> "" },
         )
+    }
+
+    /**
+     * "Logros" column of the ficha (RetroAchievements, only games on the stick: RetroArch earns them):
+     * "earned/total", "…" while asking, "—" when it has none; null = no column (no account, or in Drive).
+     */
+    private fun achievementsText(game: Game, onStick: Boolean): String? {
+        if (!onStick || RetroAchievements.account(this) == null) return null
+        RetroAchievements.request(this, game)
+        val p = RetroAchievements.cached(game)
+        return when {
+            p != null -> "${p.earned}/${p.total}"
+            RetroAchievements.known(game) -> "—"
+            else -> "…"
+        }
     }
 
     /** The button that opens the manual, as this controller labels it. */
