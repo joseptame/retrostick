@@ -37,6 +37,8 @@ class RaLoginActivity : Activity() {
     private lateinit var qr: ImageView
     private lateinit var qrNote: TextView
     private var busy = false
+    /** Confirm went down in this screen (its release then opens the keyboard on the field) */
+    private var confirmDown = false
     private val before by lazy { RetroAchievements.account(this)?.let { it.user + "|" + it.token } }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -183,8 +185,10 @@ class RaLoginActivity : Activity() {
             KeyEvent.KEYCODE_BUTTON_A, KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
                 val focused = currentFocus
                 if (focused is EditText) {
-                    // Pressing a field opens the keyboard on it
-                    if (event.action == KeyEvent.ACTION_UP) openKeyboard(focused)
+                    // Pressing a field opens the keyboard on it. Only a press made here: the release of the button
+                    // that opened this screen (on the Mis logros card) also arrives, and must not open it.
+                    if (event.action == KeyEvent.ACTION_DOWN) confirmDown = true
+                    else if (event.action == KeyEvent.ACTION_UP && confirmDown) { confirmDown = false; openKeyboard(focused) }
                     return true
                 }
                 return super.dispatchKeyEvent(KeyEvent(event.downTime, event.eventTime, event.action, KeyEvent.KEYCODE_DPAD_CENTER, event.repeatCount))
