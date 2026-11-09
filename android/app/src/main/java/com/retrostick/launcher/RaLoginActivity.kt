@@ -180,8 +180,24 @@ class RaLoginActivity : Activity() {
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.action == KeyEvent.ACTION_DOWN && StickStatus.isGamepad(event.device)) followPad(event)
         when (StickStatus.standardKey(event.device, event.keyCode)) {
-            KeyEvent.KEYCODE_BUTTON_A -> {
+            KeyEvent.KEYCODE_BUTTON_A, KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
+                val focused = currentFocus
+                if (focused is EditText) {
+                    // Pressing a field opens the keyboard on it
+                    if (event.action == KeyEvent.ACTION_UP) openKeyboard(focused)
+                    return true
+                }
                 return super.dispatchKeyEvent(KeyEvent(event.downTime, event.eventTime, event.action, KeyEvent.KEYCODE_DPAD_CENTER, event.repeatCount))
+            }
+            // ▲ ▼ between user, password and the button (a single-line field would keep the arrows for its cursor)
+            KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN -> {
+                if (event.action == KeyEvent.ACTION_DOWN) {
+                    val order = listOf<View>(user, password, enter)
+                    val i = order.indexOf(currentFocus).coerceAtLeast(0)
+                    val next = i + if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN) 1 else -1
+                    if (next in order.indices) { order[next].requestFocus(); Sounds.play(Sounds.Sound.MOVE) }
+                }
+                return true
             }
             KeyEvent.KEYCODE_BUTTON_B -> {
                 if (event.action == KeyEvent.ACTION_UP) { Sounds.play(Sounds.Sound.BACK); finish() }
@@ -191,8 +207,16 @@ class RaLoginActivity : Activity() {
         return super.dispatchKeyEvent(event)
     }
 
+    private fun openKeyboard(field: EditText) {
+        field.requestFocus()
+        field.setSelection(field.text.length)
+        getSystemService(android.view.inputmethod.InputMethodManager::class.java).showSoftInput(field, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+    }
+
     private fun field(hint: String, password: Boolean) = EditText(this).apply {
         this.hint = hint
+        // The keyboard only opens when the field is pressed (confirm on it), never just by focusing it
+        showSoftInputOnFocus = false
         setSingleLine()
         setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
         setTextColor(getColor(R.color.text)); setHintTextColor(getColor(R.color.text_3))
