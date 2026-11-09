@@ -234,6 +234,33 @@ async function uploadOnce(
 }
 
 /**
+ * RetroAchievements account of the stick: Retro/Config/ra.json, {"user", "token"} (never the password). The stick
+ * copies it into RetroArch at each sync; without it, achievements are off.
+ */
+export async function raAccount(folders: Folders): Promise<{ user: string } | null> {
+  const config = await childFolder(folders.root, 'Config')
+  const file = (await listFolder(config)).find((f) => f.name === 'ra.json')
+  if (!file) return null
+  const j = await readJson<{ user?: string }>(file.id).catch(() => null)
+  return j?.user ? { user: j.user } : null
+}
+
+/** A new ra.json (the old one goes to the Drive bin: the stick must find just one). */
+export async function saveRaAccount(folders: Folders, user: string, token: string): Promise<void> {
+  const config = await childFolder(folders.root, 'Config')
+  const old = (await listFolder(config)).filter((f) => f.name === 'ra.json')
+  const body = new Blob([JSON.stringify({ user, token })], { type: 'application/json' })
+  await uploadResumable(body, 'ra.json', config, () => {})
+  await Promise.all(old.map((f) => trashFile(f.id)))
+}
+
+/** Achievements off on the stick (its next sync takes the account out of RetroArch). */
+export async function removeRaAccount(folders: Folders): Promise<void> {
+  const config = await childFolder(folders.root, 'Config')
+  await Promise.all((await listFolder(config)).filter((f) => f.name === 'ra.json').map((f) => trashFile(f.id)))
+}
+
+/**
  * RetroShop pairing: leaves the stick's pass in Retro/Config/stick/pair-<code>.json, where the stick showing
  * that code (ShopActivity) picks it up and deletes it.
  */

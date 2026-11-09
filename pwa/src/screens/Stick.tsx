@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { AppState } from '../App'
 import { BiosSection } from '../components/BiosSection'
 import { PairSheet } from '../components/PairSheet'
+import { RaSection } from '../components/RaSection'
 import { Icon, type IconName } from '../components/icons'
 import { accountEmail } from '../lib/auth'
 import { formatAgo, formatBytes, formatWhen } from '../lib/format'
@@ -73,6 +74,8 @@ export function Stick({ state, onSignOut }: { state: AppState; onSignOut: () => 
         </button>
       </div>
       {pairing && <PairSheet state={state} onClose={() => setPairing(false)} />}
+
+      <RaSection state={state} />
 
       <BiosSection state={state} />
 

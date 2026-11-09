@@ -878,3 +878,9 @@ img.art-wide { object-fit: contain !important; z-index: 1; }
 .gs-langs span { color: var(--muted); margin-right: 3px; }
 .gs-langs b { font-weight: 600; padding: 3px 8px; border-radius: 8px; background: var(--surface-2); color: var(--soft); }
 .gs-langs b.es { background: rgba(74, 222, 128, 0.16); color: var(--ok); }
+
+/* Stick → RetroAchievements login */
+.ra-login { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 16px; background: rgba(255, 255, 255, 0.045); border: 1px solid rgba(255, 255, 255, 0.07); }
+.ra-login input { padding: 13px 14px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 16px; }
+.ra-login .cta { height: 46px; }
+.ra-note { font-size: 12px; color: var(--muted); line-height: 1.4; }

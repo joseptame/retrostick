@@ -148,7 +148,38 @@ async function profile(user: string, key: string): Promise<Response> {
   })
 }
 
+/**
+ * POST ?login=1 {user, password}: RetroAchievements' login for the phone app (Stick → RetroAchievements). Only
+ * the user and the token it gives come back (they go to Retro/Config/ra.json); the password is passed on to
+ * RetroAchievements and never kept nor logged.
+ */
+async function login(request: Request): Promise<Response> {
+  if (request.method !== 'POST') return json({ error: 'Usa POST.' }, 405)
+  const body = (await request.json().catch(() => null)) as { user?: string; password?: string } | null
+  const user = body?.user?.trim()
+  const password = body?.password
+  if (!user || !password) return json({ error: 'Faltan el usuario y la contraseña.' }, 400)
+  const res = await fetch('https://retroachievements.org/dorequest.php', {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded', 'User-Agent': 'RetroStick/1.0 (+https://retrostick.vercel.app)' },
+    body: new URLSearchParams({ r: 'login2', u: user, p: password }),
+  })
+  const r = (await res.json().catch(() => null)) as Any
+  if (!r?.Success || !r.Token) {
+    const why = `${r?.Error ?? ''}`
+    return json({ error: /password|credential|invalid/i.test(why) || res.status === 401 ? 'Usuario o contraseña incorrectos.' : why || `RetroAchievements respondió ${res.status}` }, 401)
+  }
+  return json({ user: r.User ?? user, token: r.Token })
+}
+
 export default async function handler(request: Request): Promise<Response> {
+  if (new URL(request.url).searchParams.get('login')) {
+    try {
+      return await login(request)
+    } catch (e) {
+      return json({ error: e instanceof Error ? e.message : String(e) }, 502)
+    }
+  }
   const key = process.env.RA_API_KEY?.replace(/^["']|["']$/g, '')
   if (!key) return json({ error: 'RetroAchievements no está configurado (falta RA_API_KEY).' }, 503)
   const url = new URL(request.url)
