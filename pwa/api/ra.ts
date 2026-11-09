@@ -141,6 +141,7 @@ async function profile(user: string, key: string): Promise<Response> {
       points: a.Points ?? 0,
       badge: a.BadgeURL ? `${MEDIA}${a.BadgeURL}` : null,
       game: a.GameTitle,
+      gameId: a.GameID ?? null,
       console: a.ConsoleName,
       date: a.Date,
     })),
@@ -164,10 +165,14 @@ export default async function handler(request: Request): Promise<Response> {
   const title = url.searchParams.get('title')?.trim() ?? ''
   const md5 = url.searchParams.get('md5')
   const user = url.searchParams.get('user')?.trim()
-  if (!consoleId || !title) return json({ error: 'Faltan console y title.' }, 400)
+  // ?id=…: a game by its RetroAchievements id (Mis logros → a game the stick may no longer have)
+  const byId = Number(url.searchParams.get('id')) || 0
+  if (!byId && (!consoleId || !title)) return json({ error: 'Faltan console y title.' }, 400)
 
   try {
-    const match = findGame(await gameList(consoleId, key), title, md5)
+    const match = byId
+      ? { game: { ID: byId, Title: '' } as ListGame, supported: true }
+      : findGame(await gameList(consoleId, key), title, md5)
     if (!match) return json({ found: false })
     const game = match.game
     const info = (await get(
