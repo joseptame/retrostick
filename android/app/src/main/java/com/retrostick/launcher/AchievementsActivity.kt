@@ -191,12 +191,13 @@ class AchievementsActivity : Activity() {
         addView(LinearLayout(this@AchievementsActivity).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.END
-            addView(text(11.5f, R.color.brand_accent).apply { text = "${a.points} pts"; typeface = font(R.font.inter_bold) })
+            addView(text(11.5f, R.color.brand_accent).apply { text = "${a.points} pts"; typeface = font(R.font.inter_bold); gravity = Gravity.END },
+                LinearLayout.LayoutParams(-1, -2))
             addView(text(9.5f, if (got) R.color.ok else R.color.text_3).apply {
                 text = if (got) "✓ Conseguido ${formatDate(a.earned!!)}" else rarityText(a.rarity)
-                typeface = font(R.font.inter_semibold)
-            })
-        })
+                typeface = font(R.font.inter_semibold); gravity = Gravity.END
+            }, LinearLayout.LayoutParams(-1, -2))
+        }, LinearLayout.LayoutParams(dp(170), -2))
     }
 
     /** PS5-like rarity: share of the game's players who have it. */
