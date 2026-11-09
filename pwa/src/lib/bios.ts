@@ -25,6 +25,8 @@ export const BIOS: BiosEntry[] = [
       '924e392ed05558ffdb115408c263dccf',
       '8dd7d5296a650fac7319bce665a6a53c',
       '1e68c231d0896b7eadcad1d7d8e76129',
+      // SCPH-7502 (v4.1 E), checked on the stick
+      'b9d9a0286c33dc6b7237bb13cd46fdee',
     ],
     shows: 'Los logos de Sony y PlayStation (y mejor compatibilidad)',
   },

@@ -23,6 +23,8 @@ object Bios {
         Entry("PlayStation", "scph5502.bin", setOf(
             "32736f17079d0b2b7024407c39bd3050", "490f666e1afb15b7362b406ed1cea246", "924e392ed05558ffdb115408c263dccf",
             "8dd7d5296a650fac7319bce665a6a53c", "1e68c231d0896b7eadcad1d7d8e76129",
+            // SCPH-7502 (v4.1 E), checked on the stick: Sony and PlayStation logos, then the game
+            "b9d9a0286c33dc6b7237bb13cd46fdee",
         )),
         Entry("Master System", "bios_E.sms", setOf("840481177270d5642a14ca71ee72844c")),
         Entry("Mega Drive", "bios_MD.bin", setOf("45e298905a08f9cfb38fd504cd6dbc84")),
