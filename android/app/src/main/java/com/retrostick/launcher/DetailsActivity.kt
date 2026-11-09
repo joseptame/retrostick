@@ -20,7 +20,6 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import java.io.File
-import java.net.URLEncoder
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -164,7 +163,7 @@ class DetailsActivity : Activity() {
         finishedAction = actionView(finishedLabel(), R.drawable.ic_trophy)
         val actionList = mutableListOf(Action(finishedAction) { toggleFinished() })
         if (Manuals.find(this, game.console, game.baseName) != null) actionList += Action(actionView("Manual", null)) { openManual() }
-        actionList += Action(actionView("Borrar…", null, danger = true)) { confirmRemove() }
+        actionList += Action(actionView("Borrar…", R.drawable.ic_trash, danger = true)) { confirmRemove() }
         actions = actionList
         val actionRow = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; actions.forEach { addView(it.view, LinearLayout.LayoutParams(-2, dp(32)).apply { marginEnd = dp(7) }) } }
         val hints = text(9.5f, R.color.chip_text).apply {
@@ -197,16 +196,15 @@ class DetailsActivity : Activity() {
         val thumb = state?.let { File(it.path + ".png") }?.takeIf { it.isFile }
         when {
             thumb != null -> image.setImageBitmap(BitmapFactory.decodeFile(thumb.path))
-            titleScreen -> {
-                // libretro-thumbnails' title screen of this release (by its No-Intro name), the cover if there's none
-                val enc = { s: String -> URLEncoder.encode(s, "UTF-8").replace("+", "%20") }
-                val direct = "https://thumbnails.libretro.com/${enc(game.console.thumbnailSystem.replace('_', ' '))}/Named_Titles/${enc(game.baseName)}.png"
-                covers.loadUrl("https://wsrv.nl/?url=${enc(direct)}&w=480&output=webp&q=82", dp(200)) { b ->
-                    if (b != null) image.setImageBitmap(b) else dimCover(image)
-                }
-            }
-            else -> dimCover(image)
+            // From the title screen = a fresh start: the game's cover, at full strength
+            titleScreen -> covers.load(game, dp(200)) { b -> image.setImageBitmap(b ?: logoCover(this, game.console, dp(200))) }
+            else -> Unit
         }
+        // A save without its picture (made before they were kept) or no save: a dark card that says so
+        val empty = if (thumb == null && !titleScreen) text(9.5f, R.color.text_3).apply {
+            text = if (state != null) "Sin captura\nse hará la próxima vez que se guarde" else "Sin guardado"
+            gravity = Gravity.CENTER; setLineSpacing(0f, 1.2f)
+        } else null
         if (!enabled) image.alpha = 0.35f
         val badge = state?.let {
             text(8f, R.color.text).apply {
@@ -216,6 +214,7 @@ class DetailsActivity : Activity() {
         }
         val top = FrameLayout(this).apply {
             addView(image, FrameLayout.LayoutParams(-1, -1))
+            empty?.let { addView(it, FrameLayout.LayoutParams(-1, -1)) }
             badge?.let { addView(it, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.END).apply { topMargin = dp(7); rightMargin = dp(7) }) }
         }
         val label = text(12.5f, if (enabled) R.color.text else R.color.text_2).apply {
@@ -234,10 +233,6 @@ class DetailsActivity : Activity() {
             })
         }
         return Card(view, enabled, resume)
-    }
-
-    private fun dimCover(image: ImageView) {
-        covers.load(game, dp(200)) { b -> image.setImageBitmap(b); image.imageAlpha = 90 }
     }
 
     private fun tile(label: String, value: String, hint: String? = null, progress: Int? = null) = LinearLayout(this).apply {
@@ -309,7 +304,7 @@ class DetailsActivity : Activity() {
         actions.forEachIndexed { i, a ->
             val sel = row == 1 && i == col
             val danger = a.view.tag == true
-            a.view.background = round(if (sel) Color.WHITE else Color.parseColor(if (danger) "#00000000" else "#12FFFFFF"), 7)
+            a.view.background = round(if (sel) Color.WHITE else Color.parseColor(if (danger) "#24F87171" else "#12FFFFFF"), 7)
             val color = if (sel) getColor(R.color.button_text) else getColor(if (danger) R.color.danger_text else R.color.text)
             a.view.setTextColor(color)
             a.view.compoundDrawablesRelative[0]?.setTint(color)
