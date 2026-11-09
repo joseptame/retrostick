@@ -1,6 +1,7 @@
 /**
  * The pairing QR the stick shows in RetroShop, as a matrix it draws itself (no image library on the stick).
- * Public (excluded in middleware.ts), but it only ever encodes this site's own pairing link for a code.
+ * Public (excluded in middleware.ts), but it only ever encodes this site's own links: pairing for a code, or the
+ * RetroAchievements login (?ra=1).
  *
  *   GET /api/qr?code=ABCD2345  →  { size, rows: ["1010…", …], url }
  */
@@ -11,8 +12,10 @@ export const config = { runtime: 'edge' }
 export default function handler(request: Request): Response {
   const url = new URL(request.url)
   const code = url.searchParams.get('code') ?? ''
-  if (!/^[A-Z0-9]{8}$/.test(code)) return new Response('Código inválido', { status: 400 })
-  const link = `${url.origin}/?vincular=${code}`
+  // ?ra=1: the RetroAchievements login of the app (Retro Ajustes → Mis logros → Iniciar sesión con el móvil)
+  const ra = url.searchParams.has('ra')
+  if (!ra && !/^[A-Z0-9]{8}$/.test(code)) return new Response('Código inválido', { status: 400 })
+  const link = ra ? `${url.origin}/?ra=1` : `${url.origin}/?vincular=${code}`
   const qr = qrcode(0, 'M')
   qr.addData(link)
   qr.make()

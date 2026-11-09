@@ -61,7 +61,8 @@ export default function App() {
 }
 
 function Main({ onSignOut }: { onSignOut: () => void }) {
-  const [tab, setTab] = useState<Tab>('coleccion')
+  // …/?ra=1: the TV's "Iniciar sesión con el móvil" QR (Retro Ajustes → Mis logros) opens Stick → RetroAchievements
+  const [tab, setTab] = useState<Tab>(() => (new URL(location.href).searchParams.has('ra') ? 'stick' : 'coleccion'))
   const [library, setLib] = useState<Library | null>(cachedLibrary())
   const [folders, setFolders] = useState<Folders | null>(null)
   const [online, setOnline] = useState(navigator.onLine)
