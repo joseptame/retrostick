@@ -44,18 +44,18 @@ class RaLoginActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         before
-        val title = text(24f, R.color.text).apply { typeface = font(R.font.inter_extrabold); text = "Mis logros" }
-        val sub = text(11f, R.color.text_2).apply { text = "Inicia sesión en RetroAchievements para ganar logros en tus juegos." }
+        val title = text(24f, R.color.text).apply { typeface = font(R.font.inter_extrabold); text = "Inicia sesión en RetroAchievements" }
+        val sub = text(11f, R.color.text_2).apply { text = "Mis logros · Para ganar logros en tus juegos. Usa tu cuenta de RetroAchievements (retroachievements.org), no la de RetroStick ni la de Google." }
 
-        user = field("Usuario", password = false)
-        password = field("Contraseña", password = true)
+        user = field("Usuario de RetroAchievements", password = false)
+        password = field("Contraseña de RetroAchievements", password = true)
         // The keyboard's Enter: from the user on to the password (keyboard still open), from the password log in
         user.imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_NEXT
         password.imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_GO
         user.setOnEditorActionListener { _, _, _ -> openKeyboard(password); true }
         password.setOnEditorActionListener { _, _, _ -> hideKeyboard(); login(); true }
         enter = Button(this).apply {
-            text = "Iniciar sesión"; isAllCaps = false; typeface = font(R.font.inter_bold)
+            text = ENTER_LABEL; isAllCaps = false; typeface = font(R.font.inter_bold)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
             setOnClickListener { login() }
             onFocusChangeListener = View.OnFocusChangeListener { _, _ -> styleButton() }
@@ -63,12 +63,12 @@ class RaLoginActivity : Activity() {
         styleButton()
         error = text(10.5f, R.color.danger_text).apply { visibility = View.GONE }
         val note = text(9.5f, R.color.text_3).apply {
-            text = "La contraseña solo se usa para pedir el acceso a RetroAchievements: no se guarda ni en el stick ni en Drive."
+            text = "¿No tienes cuenta? Créala gratis en retroachievements.org. La contraseña solo se usa para pedir el acceso a RetroAchievements: no se guarda ni en el stick ni en Drive."
             setLineSpacing(0f, 1.2f)
         }
         val left = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            addView(section("Con usuario y contraseña"))
+            addView(section("Con tu cuenta de RetroAchievements"))
             addView(user, LinearLayout.LayoutParams(-1, dp(44)).apply { topMargin = dp(10) })
             addView(password, LinearLayout.LayoutParams(-1, dp(44)).apply { topMargin = dp(10) })
             addView(enter, LinearLayout.LayoutParams(-1, dp(42)).apply { topMargin = dp(14) })
@@ -80,7 +80,7 @@ class RaLoginActivity : Activity() {
         qrNote = text(10.5f, R.color.text_2).apply {
             gravity = Gravity.CENTER; setLineSpacing(0f, 1.2f)
             text = if (DriveAuth(this@RaLoginActivity).isConnected)
-                "Escanéalo con la cámara del móvil: se abre la app RetroStick.\nEntra allí y la tele lo recogerá sola."
+                "Escanéalo con la cámara del móvil e inicia sesión en RetroAchievements allí.\nLa tele lo recogerá sola."
             else "Para entrar con el móvil, conecta antes Google Drive\n(Retro Ajustes → Sincronizar ahora)."
         }
         val right = LinearLayout(this).apply {
@@ -162,7 +162,7 @@ class RaLoginActivity : Activity() {
             main.post {
                 if (isDestroyed) return@post
                 busy = false
-                enter.text = "Iniciar sesión"
+                enter.text = ENTER_LABEL
                 r.onSuccess { done(it) }.onFailure { Sounds.play(Sounds.Sound.ERROR); showError(it.message ?: "No se pudo iniciar sesión.") }
             }
         }
@@ -293,5 +293,6 @@ class RaLoginActivity : Activity() {
 
     companion object {
         private const val POLL_MS = 5000L
+        private const val ENTER_LABEL = "Entrar en RetroAchievements"
     }
 }

@@ -73,8 +73,11 @@ export function RaLanding({ state }: { state: AppState }) {
           <span className="ra-landing-ico">
             <Icon name="sparkle" />
           </span>
-          <h1>Logros en la tele</h1>
-          <p>Inicia sesión en RetroAchievements para ganar logros en los juegos del stick.</p>
+          <h1>Inicia sesión en RetroAchievements</h1>
+          <p>
+            Para ganar logros en los juegos del stick. Usa tu cuenta de <b>RetroAchievements</b> (retroachievements.org),
+            no la de RetroStick ni la de Google.
+          </p>
           <form
             className="ra-landing-form"
             onSubmit={(e) => {
@@ -85,7 +88,7 @@ export function RaLanding({ state }: { state: AppState }) {
             <input
               value={user}
               onChange={(e) => setUser(e.target.value)}
-              placeholder="Usuario"
+              placeholder="Usuario de RetroAchievements"
               autoComplete="username"
               autoCapitalize="none"
               autoCorrect="off"
@@ -94,21 +97,22 @@ export function RaLanding({ state }: { state: AppState }) {
             <input
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Contraseña"
+              placeholder="Contraseña de RetroAchievements"
               type="password"
               autoComplete="current-password"
               aria-label="Contraseña de RetroAchievements"
             />
             {error && <p className="pair-error">{error}</p>}
             <button className="cta" type="submit" disabled={!ready || busy || !user.trim() || !password}>
-              {!ready ? 'Conectando con Drive…' : busy ? 'Entrando…' : 'Iniciar sesión'}
+              {!ready ? 'Conectando con Drive…' : busy ? 'Entrando…' : 'Entrar en RetroAchievements'}
             </button>
             <button className="cta ghost" type="button" disabled={busy} onClick={() => setResult('cancelled')}>
               Cancelar
             </button>
           </form>
           <small className="ra-note">
-            La contraseña solo se usa para pedir el acceso a RetroAchievements: no se guarda ni en Drive ni en el stick.
+            ¿No tienes cuenta? Créala gratis en retroachievements.org. La contraseña solo se usa para pedir el acceso a
+            RetroAchievements: no se guarda ni en Drive ni en el stick.
           </small>
         </section>
       )}
