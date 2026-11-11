@@ -95,12 +95,17 @@
     <string name="update_failed">No se pudo descargar: %1$s</string>
     <string name="set_shop">RetroShop</string>
     <string name="set_sounds">Sonidos</string>
-    <string name="set_view">Vista del inicio</string>
+    <string name="set_view">Inicio</string>
     <string name="set_boot">Pantallas de inicio</string>
     <string name="set_trophies">Mis logros</string>
     <string name="trophies_off">RetroAchievements no está activado</string>
     <string name="hint_search">Buscar</string>
     <string name="hint_view">Vista</string>
+    <string name="hint_settings">Retro Ajustes</string>
+    <string name="hint_remove_recent">Quitar de la lista</string>
+    <string name="settings_chip">⚙  Retro Ajustes</string>
+    <string name="shelf_title_recent">Seguir jugando · tus últimos juegos</string>
+    <string name="empty_recent">Aún no has jugado a nada. Elige una consola con L1 / R1 y empieza un juego: aparecerá aquí.</string>
     <string name="hint_manual">Manual</string>
     <string name="set_shop_sub">Juegos con el mando</string>
 </resources>

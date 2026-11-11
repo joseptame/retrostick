@@ -42,7 +42,7 @@ import java.util.concurrent.Executors
 private const val SETTINGS_COLUMNS = 5
 /** Index of the "Sonidos" card in Retro Ajustes (the last one). */
 private const val SOUNDS_SETTING = 11
-/** Index of the "Vista del inicio" card (after Sonidos). */
+/** Index of the "Inicio" card (after Sonidos): view, «Seguir jugando» and which consoles show as tabs. */
 private const val VIEW_SETTING = 12
 /** Index of the "Pantallas de inicio" card (the consoles' boot screens, from the user's BIOS). */
 private const val BOOT_SETTING = 13
@@ -72,7 +72,8 @@ private val HANDLED_KEYS = setOf(
 
 class MainActivity : Activity() {
 
-    private enum class Zone { TABS, CONTENT }
+    /** GEAR: the «Retro Ajustes» button in the top bar (▲ from the tabs). */
+    private enum class Zone { GEAR, TABS, CONTENT }
 
     private class Setting(val icon: String, val title: String, var subtitle: String, val action: () -> Unit)
 
@@ -103,15 +104,22 @@ class MainActivity : Activity() {
     private val main = Handler(Looper.getMainLooper())
 
     private var games: Map<String, List<Game>> = emptyMap()
-    /** 0 until CONSOLES.size = consoles, then Retro Ajustes. */
+    /**
+     * The tabs of the home screen: «Seguir jugando» (unless hidden) and the consoles shown, as chosen in
+     * Retro Ajustes → Inicio. Retro Ajustes isn't a tab any more: it opens with Options / + or the top bar's button.
+     */
+    private var homeTabs: List<Console> = emptyList()
+    /** 0 until homeTabs.size = the tabs; homeTabs.size = Retro Ajustes (not in the row). */
     private var tab = 0
         set(value) {
             field = value
-            if (value < CONSOLES.size) lastConsoleTab = value
+            homeTabs.getOrNull(value)?.takeIf { it != RECENT }?.let { lastConsole = it }
         }
-    /** Last console tab visited: RetroShop opens on that console. */
-    private var lastConsoleTab = 0
-    private val selected = IntArray(CONSOLES.size)
+    /** Last console visited: RetroShop opens on it (also from «Seguir jugando» and Retro Ajustes). */
+    private var lastConsole = CONSOLES[0]
+    /** The tab Retro Ajustes was opened from: B / Options go back to it. */
+    private var tabBeforeSettings = 0
+    private val selected = IntArray(CONSOLES.size + 1)
     private var settingIndex = 0
     private var zone = Zone.CONTENT
     private var initialTabChosen = false
@@ -121,12 +129,13 @@ class MainActivity : Activity() {
     private var splashBarDone = false
     private var libraryLoaded = false
 
-    private val tabCount = CONSOLES.size + 1
-    private val settingsTab get() = tab == CONSOLES.size
-    private val consoleGames get() = if (settingsTab) emptyList() else games[CONSOLES[tab].id].orEmpty()
-    /** Per console: selection in the Drive row (below the stick's) and whether that row has the focus. */
-    private val driveSel = IntArray(CONSOLES.size)
-    private val inDrive = BooleanArray(CONSOLES.size)
+    private val settingsTab get() = tab == homeTabs.size
+    private val tabConsole get() = homeTabs.getOrElse(tab) { lastConsole }
+    private val recentTab get() = !settingsTab && homeTabs.getOrNull(tab) == RECENT
+    private val consoleGames get() = if (settingsTab) emptyList() else games[tabConsole.id].orEmpty()
+    /** Per tab: selection in the Drive row (below the stick's) and whether that row has the focus. */
+    private val driveSel = IntArray(CONSOLES.size + 1)
+    private val inDrive = BooleanArray(CONSOLES.size + 1)
     private val driveRow get() = !settingsTab && inDrive[tab] && driveItems.isNotEmpty()
     private val currentGame get() = if (driveRow) null else consoleGames.getOrNull(selected.getOrElse(tab) { 0 })
     /** Games of this tab's console in the Drive collection and not on the stick (row below the stick's). */
@@ -144,7 +153,7 @@ class MainActivity : Activity() {
             reload()
         } else {
             val before = driveItems.map { it.key }
-            val now = if (settingsTab) emptyList() else DriveCollection.items(this, CONSOLES[tab]).map { it.key }
+            val now = if (settingsTab) emptyList() else driveFor(tabConsole).map { it.key }
             if (before != now) { buildDriveRow(); render() } else renderDriveBadges()
         }
     }
@@ -337,6 +346,7 @@ class MainActivity : Activity() {
         Manuals.addListener { render() }
         Manuals.load(this)
 
+        homeTabs = computeHomeTabs()
         buildTabs()
         buildSettings()
         // Only on a cold start (boot, reinstall), not when coming back from a game.
@@ -479,12 +489,17 @@ class MainActivity : Activity() {
             val scanned = library.scan()
             main.post {
                 // Keep the selection on the same game; one just passed from Drive gets selected on the stick's row
-                val keepKeys = CONSOLES.indices.map { i -> games[CONSOLES[i].id]?.getOrNull(selected[i])?.key }
-                val keepDrive = CONSOLES.indices.map { i -> DriveCollection.items(this, CONSOLES[i]).getOrNull(driveSel[i])?.baseName }
-                games = scanned
-                CONSOLES.forEachIndexed { i, c ->
+                val keepKeys = homeTabs.indices.map { i -> games[homeTabs[i].id]?.getOrNull(selected[i])?.key }
+                val keepDrive = homeTabs.indices.map { i -> driveFor(homeTabs[i]).getOrNull(driveSel[i])?.baseName }
+                // «Seguir jugando»: the last games played, every console together
+                // (minus the ones taken out of the list, until they're played again)
+                val removed = recentRemoved()
+                games = scanned + (RECENT.id to scanned.values.flatten()
+                    .filter { it.lastPlayed > 0 && it.lastPlayed > (removed[it.key] ?: 0L) }
+                    .sortedByDescending { it.lastPlayed }.take(RECENT_COUNT))
+                homeTabs.forEachIndexed { i, c ->
                     val list = games[c.id].orEmpty()
-                    val drive = DriveCollection.items(this, c)
+                    val drive = driveFor(c)
                     val passed = if (inDrive[i]) list.indexOfFirst { it.baseName == keepDrive[i] } else -1
                     if (passed >= 0) inDrive[i] = false
                     selected[i] = passed.takeIf { it >= 0 } ?: list.indexOfFirst { it.key == keepKeys[i] }.takeIf { it >= 0 }
@@ -505,15 +520,119 @@ class MainActivity : Activity() {
         }
     }
 
-    /** Start on the console of the most recently played game, else the first one with games. */
+    /**
+     * Start on «Seguir jugando» (its first game is the last one played); without that tab, on the console of the
+     * last game played with that game selected; else the first console with games.
+     */
     private fun chooseInitialTab() {
         initialTabChosen = true
-        val recent = games.values.flatten().filter { it.lastPlayed > 0 }.maxByOrNull { it.lastPlayed }
+        val recent = games[RECENT.id].orEmpty().firstOrNull()
+        val recentIndex = homeTabs.indexOf(RECENT)
+        val consoleIndex = recent?.let { homeTabs.indexOf(it.console) } ?: -1
         tab = when {
-            recent != null -> CONSOLES.indexOf(recent.console)
-            else -> CONSOLES.indexOfFirst { games[it.id].orEmpty().isNotEmpty() }.coerceAtLeast(0)
+            recentIndex >= 0 && recent != null -> recentIndex
+            consoleIndex >= 0 -> consoleIndex
+            else -> homeTabs.indexOfFirst { it != RECENT && games[it.id].orEmpty().isNotEmpty() }.coerceAtLeast(0)
         }
-        selected[tab] = 0
+        selected[tab] = if (recent != null && tab == consoleIndex) games[recent.console.id].orEmpty().indexOf(recent).coerceAtLeast(0) else 0
+    }
+
+    /** The tabs as chosen in Retro Ajustes → Inicio: «Seguir jugando» first, then the consoles not hidden (at least one). */
+    private fun computeHomeTabs(): List<Console> {
+        val hidden = homePrefs.getStringSet("hiddenConsoles", emptySet()).orEmpty()
+        val consoles = CONSOLES.filter { it.id !in hidden }.ifEmpty { CONSOLES }
+        return listOfNotNull(RECENT.takeIf { homePrefs.getBoolean("recentTab", true) }) + consoles
+    }
+
+    /** Applies a new choice of tabs: the row is rebuilt and every tab starts on its first game. */
+    private fun applyHomeTabs() {
+        val inSettings = settingsTab
+        val before = homeTabs.getOrNull(if (inSettings) tabBeforeSettings else tab)
+        homeTabs = computeHomeTabs()
+        selected.fill(0); driveSel.fill(0); inDrive.fill(false)
+        // Back to the tab you were on; if it's gone, the console of the last game played (as on start)
+        val last = games[RECENT.id].orEmpty().firstOrNull()
+        tabBeforeSettings = homeTabs.indexOf(before).takeIf { it >= 0 }
+            ?: last?.let { homeTabs.indexOf(it.console) }?.takeIf { it >= 0 }
+            ?: 0
+        if (last != null && homeTabs.getOrNull(tabBeforeSettings) == last.console)
+            selected[tabBeforeSettings] = games[last.console.id].orEmpty().indexOf(last).coerceAtLeast(0)
+        tab = if (inSettings) homeTabs.size else tabBeforeSettings
+        buildTabs()
+        updateTabCounts()
+        buildShelf()
+    }
+
+    /** Games taken out of «Seguir jugando» (key → their last session then): they come back when played again. */
+    private fun recentRemoved(): Map<String, Long> =
+        homePrefs.getStringSet("recentRemoved", emptySet()).orEmpty().mapNotNull { e ->
+            val cut = e.lastIndexOf('|')
+            if (cut < 0) null else e.substring(0, cut) to (e.substring(cut + 1).toLongOrNull() ?: 0L)
+        }.toMap()
+
+    /** «Quitar de la lista» in «Seguir jugando»: nothing is deleted, the game just leaves this list until played again. */
+    private fun removeFromRecent() {
+        val game = currentGame ?: return
+        keySound = Sounds.Sound.BACK
+        val kept = recentRemoved().filterKeys { it != game.key }.map { "${it.key}|${it.value}" }.toSet()
+        homePrefs.edit().putStringSet("recentRemoved", kept + "${game.key}|${game.lastPlayed}").apply()
+        Toast.makeText(this, "${game.title} ya no sale en Seguir jugando (vuelve si lo juegas)", Toast.LENGTH_SHORT).show()
+        reload()
+    }
+
+    /** The Drive row of a tab: the console's games in the Drive collection («Seguir jugando» has none). */
+    private fun driveFor(console: Console) = if (console == RECENT) emptyList() else DriveCollection.items(this, console)
+
+    private fun openSettings() {
+        if (settingsTab) return
+        tabBeforeSettings = tab
+        mediaFocus = -1
+        tab = homeTabs.size
+        zone = Zone.CONTENT
+        keySound = Sounds.Sound.OPEN
+        buildShelf()
+    }
+
+    private fun closeSettings() {
+        tab = tabBeforeSettings.coerceIn(0, maxOf(0, homeTabs.size - 1))
+        zone = Zone.CONTENT
+        buildShelf()
+    }
+
+    /** Retro Ajustes → Inicio: the view (covers / list), «Seguir jugando» and which consoles show as tabs. */
+    private fun showHomeSetup() {
+        val labels = arrayOf("Seguir jugando") + CONSOLES.map { it.name }.toTypedArray()
+        val hidden = homePrefs.getStringSet("hiddenConsoles", emptySet()).orEmpty()
+        val checked = booleanArrayOf(homePrefs.getBoolean("recentTab", true)) + CONSOLES.map { it.id !in hidden }.toBooleanArray()
+        AlertDialog.Builder(this, R.style.Dialog_RetroStick)
+            .setTitle("Inicio · qué pestañas se ven")
+            .setMultiChoiceItems(labels, checked) { _, which, on -> checked[which] = on }
+            .setPositiveButton("Guardar") { _, _ ->
+                if (checked.drop(1).none { it }) {
+                    Toast.makeText(this, "Deja al menos una consola", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                homePrefs.edit()
+                    .putBoolean("recentTab", checked[0])
+                    .putStringSet("hiddenConsoles", CONSOLES.filterIndexed { i, _ -> !checked[i + 1] }.map { it.id }.toSet())
+                    .apply()
+                applyHomeTabs()
+                settings[VIEW_SETTING].subtitle = homeLabel()
+                render()
+            }
+            .setNeutralButton(if (listMode) "Ver en carátulas" else "Ver en lista") { _, _ ->
+                toggleView()
+                settings[VIEW_SETTING].subtitle = homeLabel()
+                render()
+            }
+            .setNegativeButton("Cerrar", null)
+            .showForPad()
+    }
+
+    /** "Carátulas · 10 pestañas" */
+    private fun homeLabel(): String {
+        val n = homeTabs.size
+        return (if (listMode) "Lista" else "Carátulas") + " · " + (if (n == 1) "1 pestaña" else "$n pestañas")
     }
 
     private fun writeStatusJson() {
@@ -524,23 +643,19 @@ class MainActivity : Activity() {
     // ---- Tabs ----
 
     private fun buildTabs() {
-        CONSOLES.forEach { console ->
+        tabs.removeAllViews()
+        tabViews.clear()
+        homeTabs.forEach { console ->
             val v = layoutInflater.inflate(R.layout.item_tab, tabs, false)
             v.findViewById<ImageView>(R.id.tabLogo).setImageResource(console.logo)
             v.findViewById<TextView>(R.id.tabName).text = console.name
             tabs.addView(v)
             tabViews += v
         }
-        val v = layoutInflater.inflate(R.layout.item_tab, tabs, false)
-        v.findViewById<ImageView>(R.id.tabLogo).setImageResource(R.drawable.ic_settings)
-        v.findViewById<TextView>(R.id.tabName).setText(R.string.settings_tab)
-        v.findViewById<TextView>(R.id.tabCount).setText(R.string.settings_tab_sub)
-        tabs.addView(v)
-        tabViews += v
     }
 
     private fun updateTabCounts() {
-        CONSOLES.forEachIndexed { i, c ->
+        homeTabs.forEachIndexed { i, c ->
             val n = games[c.id].orEmpty().size
             tabViews[i].findViewById<TextView>(R.id.tabCount).text = if (n == 1) "1 juego" else "$n juegos"
         }
@@ -550,7 +665,7 @@ class MainActivity : Activity() {
         tabViews.forEachIndexed { i, v ->
             val sel = i == tab
             v.layoutParams = (v.layoutParams as LinearLayout.LayoutParams).apply {
-                // Ten tabs (nine consoles + Retro Ajustes) in the 880 dp row
+                // Up to ten tabs («Seguir jugando» + nine consoles) in the 880 dp row
                 width = dp(if (sel) 118 else 77)
                 height = dp(if (sel) 80 else 66)
             }
@@ -566,7 +681,7 @@ class MainActivity : Activity() {
             logo.layoutParams = logo.layoutParams.apply { height = dp(if (sel) 22 else 17) }
             logo.maxWidth = dp(if (sel) 98 else 57)
             // Unselected logos are white (filter: brightness(0) invert(1)); the selected one keeps its colours.
-            val console = CONSOLES.getOrNull(i)
+            val console = homeTabs.getOrNull(i)
             when {
                 console == null || sel -> {
                     console?.let { logo.setImageResource(it.logo) }
@@ -590,6 +705,18 @@ class MainActivity : Activity() {
             v.findViewById<TextView>(R.id.tabCount)
                 .setTextColor(getColor(if (sel) R.color.tab_count_sel else R.color.tab_count))
         }
+    }
+
+    /** The top bar's «Retro Ajustes» button: lit while Retro Ajustes is open, outlined when it has the focus (▲ from the tabs). */
+    private fun renderGear() {
+        val chip = findViewById<TextView>(R.id.settingsChip)
+        val focus = zone == Zone.GEAR
+        chip.background = GradientDrawable().apply {
+            cornerRadius = dp(9).toFloat()
+            setColor(Color.parseColor(if (settingsTab || focus) "#7B5CFF" else "#14FFFFFF"))
+            if (focus) setStroke(dp(2), Color.WHITE)
+        }
+        chip.alpha = if (settingsTab || focus) 1f else 0.85f
     }
 
     // ---- Shelf ----
@@ -617,9 +744,10 @@ class MainActivity : Activity() {
             coverRow.addView(v)
             coverViews += v
         }
+        if (recentTab) { buildDriveRow(); return }
         // «Añadir juegos» of this console: its logo, its cartridge or disc and RetroShop's count (ShopCard)
         val add = layoutInflater.inflate(R.layout.item_cover, coverRow, false)
-        val console = CONSOLES[tab]
+        val console = tabConsole
         add.findViewById<FrameLayout>(R.id.coverInner).apply {
             background = ShopCard.background(console, dp(8).toFloat())
             clipToOutline = true
@@ -637,13 +765,13 @@ class MainActivity : Activity() {
     private fun buildDriveRow() {
         driveCovers.removeAllViews()
         driveViews.clear()
-        driveItems = if (settingsTab) emptyList() else DriveCollection.items(this, CONSOLES[tab])
+        driveItems = if (settingsTab) emptyList() else driveFor(tabConsole)
         driveInfo.clear()
         driveBadges.clear()
         val show = if (driveItems.isEmpty()) View.GONE else View.VISIBLE
         driveTitle.visibility = show
         driveScroll.visibility = show
-        if (!settingsTab) driveTitle.text = getString(R.string.shelf_title_drive, CONSOLES[tab].name)
+        if (!settingsTab) driveTitle.text = getString(R.string.shelf_title_drive, tabConsole.name)
         driveItems.forEach { item ->
             val v = layoutInflater.inflate(R.layout.item_cover, driveCovers, false)
             val probe = item.probe()
@@ -712,11 +840,12 @@ class MainActivity : Activity() {
         settingsGrid.visibility = if (settingsTab) View.VISIBLE else View.GONE
         if (settingsTab) return
 
-        val console = CONSOLES[tab]
-        shelfTitle.text = getString(R.string.shelf_title, console.name)
+        val console = tabConsole
+        shelfTitle.text = if (recentTab) getString(R.string.shelf_title_recent) else getString(R.string.shelf_title, console.name)
         if (game == null) {
             emptyText.text = when {
                 !hasStorage -> getString(R.string.need_storage)
+                recentTab -> getString(R.string.empty_recent)
                 consoleGames.isEmpty() -> getString(R.string.empty_console, console.name)
                 else -> getString(R.string.shop_from_shelf, console.name)
             }
@@ -733,7 +862,7 @@ class MainActivity : Activity() {
                 info?.year?.toString(),
                 info?.genres?.take(2)?.joinToString(", ")?.takeIf { it.isNotEmpty() },
                 info?.players?.takeIf { it >= 2 }?.let { "$PLAYERS Hasta $it" },
-                console.name.takeIf { info == null }, game.region,
+                game.console.name.takeIf { info == null || recentTab }, game.region,
                 if (drive != null) getString(R.string.in_drive_meta) else null,
                 game.finished?.let { "$TROPHY Terminado" },
             ).joinToString("  ·  ")) }
@@ -895,7 +1024,7 @@ class MainActivity : Activity() {
             },
             Setting("🛒", getString(R.string.set_shop), getString(R.string.set_shop_sub)) {
                 // Opens on the console of the tab you came from (the first one from Retro Ajustes).
-                val from = CONSOLES.getOrNull(lastConsoleTab)?.id
+                val from = lastConsole.id
                 open(Intent(this, ShopActivity::class.java).putExtra(ShopActivity.EXTRA_CONSOLE, from))
             },
             Setting("⬆️", getString(R.string.set_update), "") {
@@ -922,7 +1051,7 @@ class MainActivity : Activity() {
                 // Heard at the new volume (nothing when switched off)
                 keySound = Sounds.Sound.OPEN
             },
-            Setting("🗂️", getString(R.string.set_view), viewLabel()) { toggleView() },
+            Setting("🏠", getString(R.string.set_view), homeLabel()) { showHomeSetup() },
             Setting("✨", getString(R.string.set_boot), bootLabel()) { showBootScreens() },
             Setting("🏆", getString(R.string.set_trophies), trophiesLabel()) {
                 // Signed in: straight to Mis logros (signing out is in there); else the login screen (keyboard or QR)
@@ -982,7 +1111,7 @@ class MainActivity : Activity() {
         }
         settings[8].subtitle = if (connected) driveAuth.email ?: getString(R.string.drive_connected) else getString(R.string.drive_not_connected)
         settings[SOUNDS_SETTING].subtitle = Sounds.level.label
-        settings[VIEW_SETTING].subtitle = viewLabel()
+        settings[VIEW_SETTING].subtitle = homeLabel()
         settings[BOOT_SETTING].subtitle = bootLabel()
         settings[RA_SETTING].subtitle = trophiesLabel()
         settings[10].subtitle = Updater.available?.let { getString(R.string.update_available_sub, it.versionName) }
@@ -1039,7 +1168,11 @@ class MainActivity : Activity() {
         hints.removeAllViews()
         val g = glyphs(padStyle)
         when {
-            settingsTab -> addHint(g.confirm, R.string.hint_open)
+            settingsTab -> {
+                addHint(g.confirm, R.string.hint_open)
+                g.back?.let { addHint(it, R.string.hint_back) }
+            }
+            zone == Zone.GEAR -> addHint(g.confirm, R.string.hint_open)
             !listMode && mediaFocus >= 0 -> {
                 addHint(g.confirm, R.string.hint_open)
                 g.back?.let { addHint(it, R.string.hint_back) }
@@ -1052,11 +1185,11 @@ class MainActivity : Activity() {
             currentGame != null -> {
                 addHint(g.confirm, R.string.hint_play)
                 g.back?.let { addHint(it, R.string.hint_back) }
-                g.top?.let { addHint(it, R.string.hint_favorite) }
+                g.top?.let { addHint(it, if (recentTab) R.string.hint_remove_recent else R.string.hint_favorite) }
                 g.left?.let { addHint(it, R.string.hint_details) }
             }
         }
-        addHint(g.shoulders, if (padStyle == PadStyle.REMOTE) R.string.hint_consoles else R.string.hint_switch)
+        if (!settingsTab) addHint(g.shoulders, if (padStyle == PadStyle.REMOTE) R.string.hint_consoles else R.string.hint_switch)
         if (!settingsTab && padStyle != PadStyle.REMOTE) {
             // The button that opens the manual, drawn (the word "Create" read like "crear")
             if (manualPill.visibility == View.VISIBLE || (listMode && homeList.view.visibility == View.VISIBLE && currentManual() != null)) {
@@ -1070,7 +1203,7 @@ class MainActivity : Activity() {
             if (currentGame?.let { RetroAchievements.supports(it.console) } == true && RetroAchievements.account(this) != null)
                 addHint(Glyph.Pill(when (padStyle) { PadStyle.XBOX -> "RT"; PadStyle.NINTENDO -> "ZR"; else -> "R2" }), R.string.hint_achievements)
             addHint(Glyph.Pill(when (padStyle) { PadStyle.XBOX -> "LT"; PadStyle.NINTENDO -> "ZL"; else -> "L2" }), R.string.hint_search)
-            addHint(Glyph.Pill(when (padStyle) { PadStyle.XBOX -> "Menu"; PadStyle.NINTENDO -> "+"; else -> "Options" }), R.string.hint_view)
+            addHint(Glyph.Pill(when (padStyle) { PadStyle.XBOX -> "Menu"; PadStyle.NINTENDO -> "+"; else -> "Options" }), R.string.hint_settings)
         }
     }
 
@@ -1175,11 +1308,12 @@ class MainActivity : Activity() {
 
     private fun handleKey(code: Int) {
         when (code) {
-            KeyEvent.KEYCODE_BUTTON_START -> { toggleView(); render(); return }
+            // Options / + opens Retro Ajustes, and closes it again
+            KeyEvent.KEYCODE_BUTTON_START -> { if (settingsTab) closeSettings() else openSettings(); render(); return }
             // Search in the selected console only
             KeyEvent.KEYCODE_BUTTON_L2 -> {
                 if (settingsTab) return
-                homeSearch.scope = "Juegos de ${CONSOLES[tab].name} en el stick y en tu Drive"
+                homeSearch.scope = if (recentTab) "Todos tus juegos del stick y de tu Drive" else "Juegos de ${tabConsole.name} en el stick y en tu Drive"
                 homeSearch.view.bringToFront()
                 homeSearch.open(); keySound = Sounds.Sound.OPEN; return
             }
@@ -1188,6 +1322,16 @@ class MainActivity : Activity() {
         }
         if (listMode && !settingsTab && zone == Zone.CONTENT && handleListKey(code)) { render(); return }
         if (!listMode && !settingsTab && zone == Zone.CONTENT && handleCoverMediaKey(code)) { render(); return }
+        if (zone == Zone.GEAR) {
+            when (code) {
+                KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_BUTTON_B -> zone = Zone.TABS
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_BUTTON_A -> openSettings()
+                KeyEvent.KEYCODE_BUTTON_L1 -> { zone = Zone.TABS; switchTab(-1) }
+                KeyEvent.KEYCODE_BUTTON_R1 -> { zone = Zone.TABS; switchTab(1) }
+            }
+            render()
+            return
+        }
         val tabsZone = zone == Zone.TABS
         when (code) {
             KeyEvent.KEYCODE_BUTTON_L1 -> switchTab(-1)
@@ -1203,7 +1347,7 @@ class MainActivity : Activity() {
                 else -> moveGame(1)
             }
             KeyEvent.KEYCODE_DPAD_UP -> when {
-                tabsZone -> Unit
+                tabsZone -> zone = Zone.GEAR
                 settingsTab && settingIndex >= SETTINGS_COLUMNS -> settingIndex -= SETTINGS_COLUMNS
                 driveRow -> inDrive[tab] = false
                 else -> zone = Zone.TABS
@@ -1219,25 +1363,29 @@ class MainActivity : Activity() {
                 settingsTab -> { keySound = Sounds.Sound.OPEN; settings[settingIndex].action() }
                 else -> play()
             }
-            // The home screen never closes: Back only leaves the tab row.
-            KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_BUTTON_B -> zone = Zone.CONTENT
-            KeyEvent.KEYCODE_BUTTON_Y -> toggleFavorite()
+            // The home screen never closes: Back leaves Retro Ajustes or the tab row.
+            KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_BUTTON_B -> if (settingsTab) closeSettings() else zone = Zone.CONTENT
+            // In «Seguir jugando» the favourite button takes the game out of the list instead
+            KeyEvent.KEYCODE_BUTTON_Y -> if (recentTab) removeFromRecent() else toggleFavorite()
             KeyEvent.KEYCODE_BUTTON_X -> showDetails()
         }
         render()
     }
 
+    /** L1 / R1 and ◀ ▶ on the row go through the tabs (from Retro Ajustes, starting at the tab it was opened from). */
     private fun switchTab(delta: Int) {
         mediaFocus = -1
-        tab = (tab + delta + tabCount) % tabCount
+        val n = homeTabs.size
+        val from = if (settingsTab) tabBeforeSettings else tab
+        tab = ((from + delta) % n + n) % n
         buildShelf()
     }
 
     private fun moveGame(delta: Int) {
         mediaFocus = -1
         if (driveRow) driveSel[tab] = (driveSel[tab] + delta).coerceIn(0, driveItems.size - 1)
-        // Games, then the "Añade juegos desde RetroShop" card (index == number of games)
-        else selected[tab] = (selected[tab] + delta).coerceIn(0, consoleGames.size)
+        // Games, then the "Añade juegos desde RetroShop" card (index == number of games; «Seguir jugando» has none)
+        else selected[tab] = (selected[tab] + delta).coerceIn(0, if (recentTab) maxOf(0, consoleGames.size - 1) else consoleGames.size)
     }
 
     // ---- Google Drive sign-in (code typed on the phone) ----
@@ -1396,9 +1544,9 @@ class MainActivity : Activity() {
 
     /** RetroShop on the console of the current tab (the "Añade juegos" card). */
     private fun openShop() {
-        if (settingsTab) return
+        if (settingsTab || recentTab) return
         keySound = Sounds.Sound.OPEN
-        open(Intent(this, ShopActivity::class.java).putExtra(ShopActivity.EXTRA_CONSOLE, CONSOLES[tab].id))
+        open(Intent(this, ShopActivity::class.java).putExtra(ShopActivity.EXTRA_CONSOLE, tabConsole.id))
     }
 
     private fun toggleFavorite() {
@@ -1419,6 +1567,7 @@ class MainActivity : Activity() {
     }
 
     private fun render() {
+        renderGear()
         renderTabs()
         renderContent()
         renderShelf()
@@ -1469,13 +1618,11 @@ class MainActivity : Activity() {
             .showForPad()
     }
 
-    private fun viewLabel() = (if (listMode) "Lista" else "Carátulas") + " · Options la cambia"
-
     private fun toggleView() {
         listMode = !listMode
         mediaFocus = -1
         if (::homeList.isInitialized) homeList.leaveMedia()
-        if (settings.size > VIEW_SETTING) settings[VIEW_SETTING].subtitle = viewLabel()
+        if (settings.size > VIEW_SETTING) settings[VIEW_SETTING].subtitle = homeLabel()
         keySound = Sounds.Sound.TAB
     }
 
@@ -1488,7 +1635,7 @@ class MainActivity : Activity() {
             out += HomeList.Entry.Header("En tu Drive · no están en el stick")
             driveItems.forEach { out += HomeList.Entry.Drive(it, it.probe()) }
         }
-        out += HomeList.Entry.Add(CONSOLES[tab])
+        if (!recentTab) out += HomeList.Entry.Add(tabConsole)
         return out
     }
 
@@ -1535,7 +1682,7 @@ class MainActivity : Activity() {
     /** The trailer / a screenshot of the selected game, full screen (RetroShop's ficha opens straight on it). */
     private fun openMedia(index: Int) {
         val intent = Intent(this, ShopActivity::class.java)
-            .putExtra(ShopActivity.EXTRA_CONSOLE, CONSOLES[tab].id)
+            .putExtra(ShopActivity.EXTRA_CONSOLE, (currentGame?.console ?: currentDrive?.console ?: tabConsole).id)
             .putExtra(ShopActivity.EXTRA_MEDIA, index)
         val game = currentGame
         val drive = currentDrive
@@ -1563,14 +1710,15 @@ class MainActivity : Activity() {
         emptyText.visibility = View.GONE
         val entries = listEntries()
         val idx = listIndex(entries)
-        val console = CONSOLES[tab]
+        val console = tabConsole
         val sheet = when (val e = entries[idx]) {
             is HomeList.Entry.Stick -> sheetFor(e.game, inDrive = false)
             is HomeList.Entry.Drive -> sheetFor(driveInfo.getOrPut(e.item.key) { e.probe.also { library.describe(it) } }, inDrive = true)
             else -> null
         }
         val n = consoleGames.size
-        homeList.bind("${console.name} · en el stick · $n ${if (n == 1) "juego" else "juegos"}", entries, idx, zone == Zone.CONTENT, sheet)
+        val title = if (recentTab) getString(R.string.shelf_title_recent) else "${console.name} · en el stick · $n ${if (n == 1) "juego" else "juegos"}"
+        homeList.bind(title, entries, idx, zone == Zone.CONTENT, sheet)
     }
 
     private fun sheetFor(game: Game, inDrive: Boolean): HomeList.Sheet {
@@ -1657,7 +1805,8 @@ class MainActivity : Activity() {
 
     private fun searchCandidates(): List<HomeSearch.Hit> {
         val out = mutableListOf<HomeSearch.Hit>()
-        CONSOLES.filter { !settingsTab && it == CONSOLES[tab] }.forEach { c ->
+        // «Seguir jugando» searches every console shown; a console tab, only its own
+        homeTabs.filter { !settingsTab && it != RECENT && (recentTab || it == tabConsole) }.forEach { c ->
             games[c.id].orEmpty().forEach { g -> out += HomeSearch.Hit(g.title, c, g, null, g) }
             DriveCollection.items(this, c).forEach { d -> out += HomeSearch.Hit(d.title, c, null, d, d.probe()) }
         }
@@ -1666,7 +1815,7 @@ class MainActivity : Activity() {
 
     /** A search result: its tab, selected (on the stick or in the Drive row / section). */
     private fun pickSearch(hit: HomeSearch.Hit) {
-        val i = CONSOLES.indexOf(hit.console)
+        val i = homeTabs.indexOf(hit.console)
         if (i < 0) return
         tab = i
         zone = Zone.CONTENT

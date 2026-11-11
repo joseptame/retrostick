@@ -13,6 +13,15 @@ const val RETROARCH_PACKAGE = "com.retroarch.ra32"
 private const val RETROARCH_ACTIVITY = "com.retroarch.browser.retroactivity.RetroActivityFuture"
 internal const val RETROARCH_CFG = "$SDCARD/Android/data/$RETROARCH_PACKAGE/files/retroarch.cfg"
 
+/**
+ * «Seguir jugando», the first tab of the home screen (Retro Ajustes → Inicio can hide it): the last games played,
+ * from every console. A pseudo-console so the tab reuses the shelf and the game panel; it has no games of its own,
+ * no RetroShop and no Drive row. Each of its games keeps its real console.
+ */
+val RECENT = Console("recent", "Seguir jugando", R.drawable.ic_resume, emptySet(), "", "")
+/** How many games the «Seguir jugando» tab shows. */
+const val RECENT_COUNT = 12
+
 data class Console(
     val id: String,
     val name: String,

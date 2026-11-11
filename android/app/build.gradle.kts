@@ -22,8 +22,8 @@ android {
         minSdk = 26
         // Sideloaded on Android 9: targeting 28 keeps legacy external storage access.
         targetSdk = 28
-        versionCode = 62
-        versionName = "1.20.1"
+        versionCode = 63
+        versionName = "1.21.0"
         buildConfigField("String", "OAUTH_CLIENT_ID", "\"${oauthValue("retrostick.clientId", "RETROSTICK_CLIENT_ID")}\"")
         // RetroShop: the webapp whose catalog it shows (paired by QR, see api/pair.ts).
         buildConfigField("String", "WEBAPP_URL", "\"https://retrostick.vercel.app\"")
