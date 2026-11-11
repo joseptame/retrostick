@@ -75,7 +75,7 @@ class StorageActivity : Activity() {
         }
         loading = LoadingBars(this, lines = 5)
         val hints = text(10.5f, R.color.chip_text)
-        setHints(hints, "▲ ▼ Moverse      [X]  Marcar      [OPT]  Quitar los marcados      [O]  Volver")
+        setHints(hints, "▲ ▼ Moverse      [X]  Marcar      [OPT]  Borrar los marcados      [O]  Volver")
 
         setContentView(FrameLayout(this).apply {
             setBackgroundResource(R.drawable.bg_screen)
@@ -159,7 +159,7 @@ class StorageActivity : Activity() {
         }
         val auth = DriveAuth(this)
         listTitle.text = if (auth.isConfigured && auth.isConnected)
-            "Juegos que más espacio liberan · al quitarlos se quedan en tu colección de Drive, y las partidas también"
+            "Juegos que más espacio liberan · al borrarlos eliges si se quedan en tu colección de Drive; las partidas no se tocan"
         else "Juegos que más espacio liberan · sin Drive conectado se borran del stick (las partidas se quedan)"
     }
 
@@ -203,7 +203,7 @@ class StorageActivity : Activity() {
         rowViews.getOrNull(selected)?.let { v -> scroll.post { scroll.smoothScrollTo(0, (v.top - scroll.height / 2 + v.height / 2).coerceAtLeast(0)) } }
         val chosen = list.filter { it.game.key in marked }
         action.visibility = if (chosen.isEmpty()) View.INVISIBLE else View.VISIBLE
-        action.text = "Quitar ${chosen.size} ${if (chosen.size == 1) "juego" else "juegos"} · libera ${size(chosen.sumOf { it.bytes })}"
+        action.text = "Borrar ${chosen.size} ${if (chosen.size == 1) "juego" else "juegos"} · libera ${size(chosen.sumOf { it.bytes })}"
     }
 
     private fun ago(ms: Long): String {
@@ -226,30 +226,49 @@ class StorageActivity : Activity() {
         val withDrive = auth.isConfigured && auth.isConnected
         val names = chosen.take(6).joinToString("\n") { "·  ${it.game.title} (${size(it.bytes)})" } +
             if (chosen.size > 6) "\n·  y ${chosen.size - 6} más" else ""
-        val where = if (withDrive) "Se quedan en tu colección de Drive: desde el inicio los puedes volver a pasar al stick."
-            else "Drive no está conectado: se borran del stick. Puedes volver a bajarlos de RetroShop."
+        val count = "${chosen.size} ${if (chosen.size == 1) "juego" else "juegos"}"
+        if (!withDrive) {
+            AlertDialog.Builder(this, R.style.Dialog_RetroStick)
+                .setTitle("Borrar $count del stick")
+                .setMessage("$names\n\nDrive no está conectado: se borran del stick. Puedes volver a bajarlos de RetroShop. Las partidas guardadas no se tocan.")
+                .setPositiveButton("Borrar") { _, _ -> remove(chosen, alsoDrive = false) }
+                .setNegativeButton("Cancelar", null)
+                .showForPad()
+            return
+        }
+        // As in Detalles: off the stick only (kept in the Drive collection) or also from Drive (its bin, 30 days)
         AlertDialog.Builder(this, R.style.Dialog_RetroStick)
-            .setTitle("Quitar ${chosen.size} ${if (chosen.size == 1) "juego" else "juegos"} del stick")
-            .setMessage("$names\n\n$where Las partidas guardadas no se tocan.")
-            .setPositiveButton("Quitar") { _, _ -> remove(chosen) }
+            .setTitle("Borrar $count · ${size(chosen.sumOf { it.bytes })}")
+            .setItems(arrayOf(
+                "Quitar solo del stick (se quedan en tu colección de Drive)",
+                "Borrar también de Drive (van a la papelera de Drive)",
+            )) { _, which ->
+                if (which == 0) remove(chosen, alsoDrive = false)
+                else AlertDialog.Builder(this, R.style.Dialog_RetroStick)
+                    .setTitle("Borrar $count del stick y de Drive")
+                    .setMessage("$names\n\nVan a la papelera de Drive (se pueden recuperar durante 30 días). Las partidas guardadas no se tocan.")
+                    .setPositiveButton("Borrar") { _, _ -> remove(chosen, alsoDrive = true) }
+                    .setNegativeButton("Cancelar", null)
+                    .showForPad()
+            }
             .setNegativeButton("Cancelar", null)
             .showForPad()
     }
 
-    private fun remove(chosen: List<Row>) {
+    private fun remove(chosen: List<Row>, alsoDrive: Boolean) {
         busy = true
-        Toast.makeText(this, "Quitando ${chosen.size} ${if (chosen.size == 1) "juego" else "juegos"}…", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "Borrando ${chosen.size} ${if (chosen.size == 1) "juego" else "juegos"}…", Toast.LENGTH_SHORT).show()
         val app = applicationContext
         var left = chosen.size
         val errors = mutableListOf<String>()
         chosen.forEach { r ->
-            DriveSync.removeGame(this, r.game, alsoDrive = false) { error ->
+            DriveSync.removeGame(this, r.game, alsoDrive) { error ->
                 if (error != null) errors += "${r.game.title}: $error" else Fichas.forget(app, r.game)
                 if (--left == 0) {
                     busy = false
                     Sounds.play(if (errors.isEmpty()) Sounds.Sound.BACK else Sounds.Sound.ERROR)
                     Toast.makeText(app, if (errors.isEmpty()) "Hecho: ${size(chosen.sumOf { it.bytes })} libres más"
-                        else "No se pudo quitar ${errors.joinToString("; ")}", Toast.LENGTH_LONG).show()
+                        else "No se pudo borrar ${errors.joinToString("; ")}", Toast.LENGTH_LONG).show()
                     DriveCollection.refresh(app, force = true)
                     marked.clear()
                     if (!isDestroyed) load()
