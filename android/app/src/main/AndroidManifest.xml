@@ -61,6 +61,16 @@
             android:exported="false"
             android:screenOrientation="landscape" />
         <activity
+            android:name=".ButtonsActivity"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|uiMode"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+        <activity
+            android:name=".StorageActivity"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|uiMode"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+        <activity
             android:name=".DetailsActivity"
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|uiMode"
             android:exported="false"

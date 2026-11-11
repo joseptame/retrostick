@@ -36,6 +36,7 @@ import android.widget.TextView
 import android.widget.Toast
 import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Date
 import java.util.Locale
 import java.util.concurrent.Executors
 
@@ -216,6 +217,8 @@ class MainActivity : Activity() {
         refreshStatus()
         // Games or saves may have changed on the stick
         if (DriveSync.phase != DriveSync.Phase.SYNCING) {
+            // The stick's copy: offered once on a new stick, then once a week
+            if (DriveSync.phase != DriveSync.Phase.ERROR) checkBackups()
             reload()
             offerUpdate()
             // The phone may have added or sent games to the collection
@@ -1011,8 +1014,11 @@ class MainActivity : Activity() {
             Setting("⚙️", getString(R.string.set_android), getString(R.string.set_android_sub)) {
                 open(Intent(Settings.ACTION_SETTINGS))
             },
-            Setting("💾", getString(R.string.set_space), "") { open(Intent(Settings.ACTION_INTERNAL_STORAGE_SETTINGS)) },
-            Setting("🕹️", getString(R.string.set_controllers), "") { open(Intent(CONNECT_INPUT)) },
+            Setting("💾", getString(R.string.set_space), "") { open(Intent(this, StorageActivity::class.java)) },
+            // What each button does in each console (ButtonsActivity); opens on the console of the tab you came from
+            Setting("🕹️", getString(R.string.set_controllers), "") {
+                open(Intent(this, ButtonsActivity::class.java).putExtra("console", lastConsole.id))
+            },
             Setting("👾", getString(R.string.set_retroarch), getString(R.string.set_retroarch_sub)) {
                 launchIntent(RETROARCH_PACKAGE)?.let(::open) ?: toast(R.string.retroarch_missing)
             },
@@ -1020,7 +1026,7 @@ class MainActivity : Activity() {
                 launchIntent(FLAUNCHER_PACKAGE)?.let(::open) ?: toast(R.string.app_missing)
             },
             Setting("☁️", getString(R.string.set_account), "") {
-                if (driveAuth.isConnected) confirmDisconnect() else startDriveLogin()
+                if (driveAuth.isConnected) showDriveMenu() else startDriveLogin()
             },
             Setting("🛒", getString(R.string.set_shop), getString(R.string.set_shop_sub)) {
                 // Opens on the console of the tab you came from (the first one from Retro Ajustes).
@@ -1117,7 +1123,7 @@ class MainActivity : Activity() {
         settings[10].subtitle = Updater.available?.let { getString(R.string.update_available_sub, it.versionName) }
             ?: getString(R.string.update_current, BuildConfig.VERSION_NAME)
         settings[2].subtitle = net?.let { "Conectado por $it" } ?: getString(R.string.offline)
-        settings[5].subtitle = if (pads.isEmpty()) "Ninguno" else pads.joinToString(", ")
+        settings[5].subtitle = if (pads.isEmpty()) "Qué hace cada botón" else pads.joinToString(", ") { StickStatus.shortControllerName(it) } + " · por consola"
         if (hasStorage) {
             io.execute {
                 val free = StickStatus.freeBytes()
@@ -1493,6 +1499,91 @@ class MainActivity : Activity() {
             main.post {
                 result.onSuccess { open(Updater.installIntent(this)) }
                     .onFailure { Toast.makeText(this, getString(R.string.update_failed, it.message ?: ""), Toast.LENGTH_LONG).show() }
+            }
+        }
+    }
+
+    /** Cuenta de Drive, connected: the stick's copy (Backup) or disconnecting. */
+    private fun showDriveMenu() {
+        AlertDialog.Builder(this, R.style.Dialog_RetroStick)
+            .setTitle(driveAuth.email ?: getString(R.string.set_account))
+            .setItems(arrayOf("Copia del stick…", "Desconectar Drive")) { _, which -> if (which == 0) showBackup() else confirmDisconnect() }
+            .setNegativeButton(R.string.cancel, null)
+            .showForPad()
+    }
+
+    private val backupDate get() = SimpleDateFormat("d MMM yyyy, HH:mm", Locale("es", "ES"))
+
+    /** Copia del stick: when the last one was made, what it keeps, make one now or bring one back. */
+    private fun showBackup() {
+        val last = Backup.lastAt(this)
+        val text = (if (last > 0) "Última copia: ${backupDate.format(Date(last))}." else "Aún no hay ninguna copia de este stick.") +
+            "\n\nGuarda en tu Drive (Retro/Copias) todo lo que no son juegos ni partidas: las pestañas y la vista del inicio, " +
+            "favoritos, sonidos, botones de cada consola, ajustes de RetroArch y de cada núcleo, y los mandos. " +
+            "Se hace sola una vez a la semana y se guardan las 4 últimas.\n\n" +
+            "Las partidas, los juegos terminados, la cuenta de RetroAchievements y las BIOS ya van a Drive aparte."
+        AlertDialog.Builder(this, R.style.Dialog_RetroStick)
+            .setTitle("Copia del stick")
+            .setMessage(text)
+            .setPositiveButton("Hacer copia ahora") { _, _ ->
+                toast(R.string.syncing)
+                DriveSync.runExclusive {
+                    val r = runCatching { Backup.makeNow(this) }
+                    main.post {
+                        Toast.makeText(this, r.exceptionOrNull()?.let { "No se pudo hacer la copia: ${it.message}" } ?: "Copia del stick guardada en Drive", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+            .setNeutralButton("Restaurar…") { _, _ -> chooseBackup() }
+            .setNegativeButton("Cerrar", null)
+            .showForPad()
+    }
+
+    /** The copies in Drive, newest first: one brings everything back. */
+    private fun chooseBackup() {
+        io.execute {
+            val copies = runCatching { Backup.list(this) }.getOrElse { emptyList() }
+            main.post {
+                if (copies.isEmpty()) { Toast.makeText(this, "No hay copias del stick en Drive", Toast.LENGTH_LONG).show(); return@post }
+                AlertDialog.Builder(this, R.style.Dialog_RetroStick)
+                    .setTitle("Restaurar una copia")
+                    .setItems(copies.map { backupDate.format(Date(it.at)) + "  ·  " + Formatter.formatShortFileSize(this, it.size) }.toTypedArray()) { _, which ->
+                        confirmRestore(copies[which])
+                    }
+                    .setNegativeButton(R.string.cancel, null)
+                    .showForPad()
+            }
+        }
+    }
+
+    private fun confirmRestore(copy: Backup.Copy, newStick: Boolean = false) {
+        AlertDialog.Builder(this, R.style.Dialog_RetroStick)
+            .setTitle(if (newStick) "¿Restaurar la configuración de tu RetroStick?" else "Restaurar la copia")
+            .setMessage("Copia del ${backupDate.format(Date(copy.at))}. Vuelven las pestañas, favoritos, sonidos, botones y ajustes de " +
+                "RetroArch que tenía el stick entonces. Los juegos y las partidas no se tocan.")
+            .setPositiveButton("Restaurar") { _, _ ->
+                DriveSync.runExclusive {
+                    val r = runCatching { Backup.restore(this, copy) }
+                    main.post {
+                        Toast.makeText(this, r.exceptionOrNull()?.let { "No se pudo restaurar: ${it.message}" } ?: "Configuración restaurada", Toast.LENGTH_LONG).show()
+                        if (r.isSuccess) recreate()
+                    }
+                }
+            }
+            .setNegativeButton(if (newStick) "Ahora no" else getString(R.string.cancel)) { _, _ -> if (newStick) Backup.answered(this) }
+            .showForPad()
+    }
+
+    /** Once, after the first sync of a new or reset stick: a copy in Drive is offered; then the weekly copies start. */
+    private var backupChecked = false
+    private fun checkBackups() {
+        if (backupChecked || !driveAuth.isConnected) return
+        backupChecked = true
+        io.execute {
+            val offer = Backup.shouldOffer(this)
+            main.post {
+                if (offer != null && !isDestroyed) confirmRestore(offer, newStick = true)
+                else Backup.maybeWeekly(this)
             }
         }
     }

@@ -76,7 +76,7 @@
     <string name="set_android">Ajustes de Android</string>
     <string name="set_android_sub">Configuración del stick</string>
     <string name="set_space">Espacio</string>
-    <string name="set_controllers">Mandos conectados</string>
+    <string name="set_controllers">Botones</string>
     <string name="set_retroarch">RetroArch</string>
     <string name="set_retroarch_sub">Menú y ajustes del emulador</string>
     <string name="set_other_apps">Otras apps</string>
