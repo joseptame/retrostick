@@ -48,7 +48,7 @@ val CONSOLES = listOf(
     // Mupen64Plus-Next (GLES2 build): full speed on the stick with its threaded renderer (core options in
     // stick/retroarch/core-options/Mupen64Plus-Next). Big-endian .z64 is the No-Intro format; .n64/.v64 also run.
     Console("n64", "Nintendo 64", R.drawable.logo_n64, setOf("z64", "n64", "v64"),
-        "mupen64plus_next_gles2_libretro_android.so", "Nintendo_-_Nintendo_64", whiteWhenSelected = true),
+        "mupen64plus_next_gles2_libretro_android.so", "Nintendo_-_Nintendo_64"),
     // .bin tracks are reached through their .cue; discs listed in a .m3u are hidden behind it.
     Console("psx", "PlayStation", R.drawable.logo_psx, setOf("m3u", "cue", "chd", "pbp"),
         "pcsx_rearmed_libretro_android.so", "Sony_-_PlayStation"),

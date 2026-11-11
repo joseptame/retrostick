@@ -153,17 +153,7 @@ class ConsoleMediaView(context: Context, private val console: Console) : View(co
                 canvas.drawRoundRect(RectF(28f, 42f, 100f, 86f), 2f, 2f, p)
                 p.shader = null
             }
-            // Wider than tall, rounded shoulders, grip ridges down both sides, a big label on top
-            "n64" -> cartridge(canvas, 6f, 14f, 116f, 92f, floatArrayOf(12f, 12f, 3f, 3f), 0xFF55555E, 0xFF34343B) {
-                p.shader = null; p.color = 0x40000000
-                for (i in 0 until 5) {
-                    val y = 62f + i * 8f
-                    canvas.drawRect(10f, y, 18f, y + 3f, p)
-                    canvas.drawRect(110f, y, 118f, y + 3f, p)
-                }
-                label(canvas, 22f, 22f, 84f, 54f, LinearGradient(22f, 22f, 106f, 76f,
-                    intArrayOf(0xFFE53E3E.toInt(), 0xFF2FB45A.toInt(), 0xFF3A6BD9.toInt()), floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP), 0xFF6E6E78)
-            }
+            "n64" -> n64Cartridge(canvas)
             "psx" -> disc(canvas)
             else -> cartridge(canvas, 4f, 8f, 120f, 104f, floatArrayOf(4f, 4f, 4f, 4f), 0xFF9D9AA6, 0xFF7D7A86) {}
         }
@@ -194,6 +184,61 @@ class ConsoleMediaView(context: Context, private val console: Console) : View(co
         p.style = Paint.Style.STROKE; p.strokeWidth = 3f; p.color = border.toInt()
         c.drawRoundRect(RectF(x + 1.5f, y + 1.5f, x + w - 1.5f, y + h - 1.5f), 2f, 2f, p)
         p.style = Paint.Style.FILL
+    }
+
+    /**
+     * The N64 cartridge (option C10, https://claude.ai/artifact/Y9c1f1Sfo3TBe1zJTeLM2d): light grey, one continuous arch
+     * across the top, the centre panel set apart from the side wings by a fine double line, the label as a big rounded
+     * window, and a rounded notch at the bottom outer corner of each wing.
+     */
+    private fun n64Cartridge(c: Canvas) {
+        val body = Path().apply {
+            moveTo(2f, 33f)
+            quadTo(2f, 31.5f, 3.5f, 31.2f)
+            quadTo(64f, 7f, 124.5f, 31.2f)
+            quadTo(126f, 31.5f, 126f, 33f)
+            lineTo(126f, 100f)
+            quadTo(126f, 102f, 124f, 102f)
+            lineTo(4f, 102f)
+            quadTo(2f, 102f, 2f, 100f)
+            close()
+        }
+        c.save(); c.translate(0f, 5f); c.drawPath(body, shadow); c.restore()
+        p.shader = LinearGradient(0f, 20f, 0f, 102f, 0xFFACACB3.toInt(), 0xFF8F8F97.toInt(), Shader.TileMode.CLAMP)
+        c.drawPath(body, p)
+        p.shader = null
+        p.style = Paint.Style.STROKE
+        // Fine double line between the centre panel and each wing
+        p.strokeWidth = 0.8f; p.color = 0x40000000
+        for (x in floatArrayOf(25.6f, 27f, 101f, 102.4f)) c.drawLine(x, 24.4f, x, 102f, p)
+        p.strokeWidth = 0.6f; p.color = 0x22FFFFFF
+        for (x in floatArrayOf(26.3f, 101.7f)) c.drawLine(x, 24.4f, x, 102f, p)
+        // Rounded notch at the bottom outer corner of each wing
+        p.strokeWidth = 1f; p.color = 0x48000000
+        c.drawPath(Path().apply {
+            moveTo(2f, 78f); lineTo(5f, 78f); quadTo(9.8f, 78f, 9.8f, 83f); lineTo(9.8f, 102f)
+            moveTo(126f, 78f); lineTo(123f, 78f); quadTo(118.2f, 78f, 118.2f, 83f); lineTo(118.2f, 102f)
+        }, p)
+        // The label window: its dark rim, then the label in the N64 colours
+        val label = Path().apply {
+            moveTo(39f, 29.5f)
+            quadTo(64f, 25f, 89f, 29.5f)
+            quadTo(95.6f, 30.5f, 95.6f, 37f)
+            lineTo(95.6f, 91f)
+            quadTo(95.6f, 96.6f, 90f, 96.6f)
+            lineTo(38f, 96.6f)
+            quadTo(32.4f, 96.6f, 32.4f, 91f)
+            lineTo(32.4f, 37f)
+            quadTo(32.4f, 30.5f, 39f, 29.5f)
+            close()
+        }
+        p.strokeWidth = 3f; p.color = 0x55000000
+        c.drawPath(label, p)
+        p.style = Paint.Style.FILL
+        p.shader = LinearGradient(32.4f, 25f, 95.6f, 96.6f,
+            intArrayOf(0xFFE53E3E.toInt(), 0xFFF2B632.toInt(), 0xFF2FB45A.toInt(), 0xFF3A6BD9.toInt()), floatArrayOf(0f, 0.35f, 0.65f, 1f), Shader.TileMode.CLAMP)
+        c.drawPath(label, p)
+        p.shader = null
     }
 
     private fun disc(c: Canvas) {
