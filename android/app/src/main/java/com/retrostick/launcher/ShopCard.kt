@@ -71,11 +71,13 @@ object ShopCard {
     fun shelfContent(context: Context, console: Console): View {
         val s = style(console)
         fun dp(v: Number) = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v.toFloat(), context.resources.displayMetrics).toInt()
-        // White, like the unselected tabs: the colour logos (Game Boy Color's dark letters) get lost on the card's colour
+        // White, like the unselected tabs: the colour logos (Game Boy Color's dark letters) get lost on the card's colour.
+        // Nintendo 64's letters are white already, so its N and 64 keep their colours.
         val logo = ImageView(context).apply {
             adjustViewBounds = true
             scaleType = ImageView.ScaleType.FIT_START
-            if (console.logoWhite != null) setImageResource(console.logoWhite)
+            if (console.colourOnCard) setImageResource(console.logo)
+            else if (console.logoWhite != null) setImageResource(console.logoWhite)
             else { setImageResource(console.logo); setColorFilter(Color.WHITE) }
             alpha = 0.92f
         }
