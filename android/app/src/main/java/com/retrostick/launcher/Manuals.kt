@@ -19,7 +19,7 @@ object Manuals {
     private val COLLECTIONS = mapOf(
         "nes" to "NESManuals", "snes" to "SNESManuals", "gb" to "NintendoGameBoyManuals",
         "gbc" to "NintendoGameBoyColorManuals", "gba" to "NintendoGameBoyAdvanceManuals", "psx" to "SonyPlaystationManuals",
-        "md" to "SEGAGenesisMegaDriveManuals", "sms" to "SEGAMasterSystemManuals",
+        "md" to "SEGAGenesisMegaDriveManuals", "sms" to "SEGAMasterSystemManuals", "n64" to "N64Manuals",
     )
     private const val WEEK = 7 * 24 * 3600_000L
 
@@ -115,7 +115,7 @@ object Manuals {
                 val cache = File(app.filesDir, "manuals-index.json")
                 var json = runCatching { JSONObject(cache.readText()) }.getOrNull()
                 if (json != null) publish(json)
-                // Stale, or a console added since (Mega Drive, Master System…)
+                // Stale, or a console added since (Mega Drive, Master System, Nintendo 64…)
                 if (json == null || System.currentTimeMillis() - json.optLong("at") > WEEK || COLLECTIONS.keys.any { !json.has(it) }) {
                     val fresh = JSONObject().put("at", System.currentTimeMillis())
                     for ((console, id) in COLLECTIONS) {

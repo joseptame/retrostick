@@ -13,7 +13,7 @@ import { looseKey } from '../src/lib/names.ts'
 
 const API = 'https://api.igdb.com/v4'
 const PAGE = 500
-const CONSOLES: Record<string, number[]> = { nes: [18, 99], snes: [19, 58], gb: [33], gbc: [22], gba: [24], md: [29], sms: [64], psx: [7] }
+const CONSOLES: Record<string, number[]> = { nes: [18, 99], snes: [19, 58], gb: [33], gbc: [22], gba: [24], md: [29], sms: [64], n64: [4], psx: [7] }
 
 function env(name: string): string {
   if (process.env[name]) return process.env[name]!

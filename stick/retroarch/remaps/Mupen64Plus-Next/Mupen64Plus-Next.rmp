@@ -1,0 +1,10 @@
+# Nintendo 64 (Mupen64Plus-Next), 2026-11-11, as the user plays it on the Pro Controller: A = A, B = B, left stick =
+# the N64 stick, D-pad = D-pad, right stick = C buttons, + = Start, L1 / R1 = L / R, ZL = Z.
+# The core reads N64 A from RetroPad B and N64 B from RetroPad Y; the Pro's B arrives as RetroPad A (its RetroStick
+# profile), so RetroPad A is sent as Y (1). Y keeps B too. DualSense: Cross = A, Circle (and Square) = B.
+input_player1_btn_a = "1"
+# R2 held turns the face buttons into C buttons in this core: easy to press by mistake, so it does nothing.
+input_player1_btn_r2 = "-1"
+# Player 2 (a second pad): same layout
+input_player2_btn_a = "1"
+input_player2_btn_r2 = "-1"

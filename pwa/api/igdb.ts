@@ -88,7 +88,7 @@ function json(body: unknown, status = 200, cacheDays = 0): Response {
 }
 
 const CONSOLE_NAMES: Record<string, string> = {
-  nes: 'NES', snes: 'Super Nintendo', gb: 'Game Boy', gbc: 'Game Boy Color', gba: 'Game Boy Advance', md: 'Mega Drive', sms: 'Master System', psx: 'PlayStation',
+  nes: 'NES', snes: 'Super Nintendo', gb: 'Game Boy', gbc: 'Game Boy Color', gba: 'Game Boy Advance', md: 'Mega Drive', sms: 'Master System', n64: 'Nintendo 64', psx: 'PlayStation',
 }
 /** The article must be about this console's version ("PlayStation", not "PlayStation 2"). */
 const CONSOLE_TEXT: Record<string, RegExp> = {
@@ -99,6 +99,7 @@ const CONSOLE_TEXT: Record<string, RegExp> = {
   gba: /Game Boy Advance/,
   md: /Mega Drive|Genesis/,
   sms: /Master System|Mark III/,
+  n64: /Nintendo 64|N64/,
   psx: /PlayStation(?!\s?[2-5]|\s?Portable|\s?Vita)/,
 }
 const looseKey = (s: string) => s.toLowerCase().normalize('NFD').replace(/[^a-z0-9]/g, '')
@@ -181,7 +182,7 @@ async function spanishDescription(game: IgdbGame, consoleId: string | null): Pro
 const LIBRETRO: Record<string, string> = {
   nes: 'Nintendo - Nintendo Entertainment System', snes: 'Nintendo - Super Nintendo Entertainment System',
   gb: 'Nintendo - Game Boy', gbc: 'Nintendo - Game Boy Color', gba: 'Nintendo - Game Boy Advance',
-  md: 'Sega - Mega Drive - Genesis', sms: 'Sega - Master System - Mark III', psx: 'Sony - PlayStation',
+  md: 'Sega - Mega Drive - Genesis', sms: 'Sega - Master System - Mark III', n64: 'Nintendo - Nintendo 64', psx: 'Sony - PlayStation',
 }
 const snapIndex = new Map<string, { at: number; names: string[] }>()
 
@@ -226,7 +227,7 @@ async function consoleShots(console: string, title: string): Promise<string[]> {
 }
 
 /** IGDB platform ids per console (as in scripts/build-igdb.ts); GBC sets also hold Game Boy games. */
-const PLATFORMS: Record<string, number[]> = { gb: [33], gbc: [22, 33], gba: [24], nes: [18, 99], snes: [19, 58], md: [29], sms: [64], psx: [7] }
+const PLATFORMS: Record<string, number[]> = { gb: [33], gbc: [22, 33], gba: [24], nes: [18, 99], snes: [19, 58], md: [29], sms: [64], n64: [4], psx: [7] }
 
 export default async function handler(request: Request): Promise<Response> {
   const id = process.env.IGDB_CLIENT_ID

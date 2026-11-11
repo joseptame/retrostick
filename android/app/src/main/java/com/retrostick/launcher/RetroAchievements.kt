@@ -253,6 +253,7 @@ object RetroAchievements {
     private val CORE_DIRS = mapOf(
         "fceumm" to "FCEUmm", "snes9x2010" to "Snes9x 2010", "gambatte" to "Gambatte", "mgba" to "mGBA",
         "genesis_plus_gx" to "Genesis Plus GX", "pcsx_rearmed" to "PCSX-ReARMed",
+        "mupen64plus_next_gles2" to "Mupen64Plus-Next",
     )
     private const val MARK = "# RetroStick: achievements off"
 
@@ -280,7 +281,8 @@ object RetroAchievements {
 
     /**
      * The ROM's hash as RetroAchievements computes it for cartridges (NES without its 16-byte header, SNES
-     * without a 512-byte copier header, the rest whole), kept per file. PlayStation discs: none (found by title).
+     * without a 512-byte copier header, Nintendo 64 in big-endian .z64 byte order, the rest whole), kept per
+     * file. Read in pieces: N64 ROMs reach 64 MB. PlayStation discs: none (found by title).
      */
     private fun romMd5(context: Context, game: Game): String? {
         if (game.console.id == "psx") return null
@@ -289,16 +291,59 @@ object RetroAchievements {
         val prefs = context.getSharedPreferences("ra_md5", Context.MODE_PRIVATE)
         val k = "${f.path}|${f.length()}|${f.lastModified()}"
         prefs.getString(k, null)?.let { return it }
-        val bytes = f.readBytes()
-        val skip = when {
-            game.console.id == "nes" && bytes.size > 16 && bytes[0] == 0x4E.toByte() && bytes[1] == 0x45.toByte() &&
-                bytes[2] == 0x53.toByte() && bytes[3] == 0x1A.toByte() -> 16
-            game.console.id == "snes" && bytes.size % 1024 == 512 -> 512
-            else -> 0
+        val md = MessageDigest.getInstance("MD5")
+        f.inputStream().buffered(1 shl 16).use { input ->
+            val head = ByteArray(16)
+            val n = readFully(input, head, 0, head.size)
+            val skip = when {
+                game.console.id == "nes" && n == 16 && head[0] == 0x4E.toByte() && head[1] == 0x45.toByte() &&
+                    head[2] == 0x53.toByte() && head[3] == 0x1A.toByte() -> 16
+                game.console.id == "snes" && f.length() % 1024 == 512L -> 512
+                else -> 0
+            }
+            // N64 dumps come in three byte orders; the first word tells which (z64 80 37 12 40, v64 37 80 40 12, n64 40 12 37 80)
+            val swap = when {
+                game.console.id != "n64" || n < 4 -> 0
+                head[0] == 0x37.toByte() && head[1] == 0x80.toByte() -> 2
+                head[0] == 0x40.toByte() && head[1] == 0x12.toByte() -> 4
+                else -> 0
+            }
+            val buf = ByteArray(1 shl 16)
+            System.arraycopy(head, 0, buf, 0, n)
+            var len = n + readFully(input, buf, n, buf.size - n)
+            var first = true
+            while (len > 0) {
+                if (swap != 0) swapBytes(buf, len, swap)
+                val from = if (first) minOf(skip, len) else 0
+                md.update(buf, from, len - from)
+                first = false
+                len = readFully(input, buf, 0, buf.size)
+            }
         }
-        val md = MessageDigest.getInstance("MD5").apply { update(bytes, skip, bytes.size - skip) }
         val hex = md.digest().joinToString("") { "%02x".format(it) }
         prefs.edit().putString(k, hex).apply()
         return hex
+    }
+
+    /** Reads until [len] bytes or the end (InputStream.readNBytes needs Android 13; the stick runs 9). */
+    private fun readFully(input: java.io.InputStream, b: ByteArray, off: Int, len: Int): Int {
+        var got = 0
+        while (got < len) {
+            val r = input.read(b, off + got, len - got)
+            if (r < 0) break
+            got += r
+        }
+        return got
+    }
+
+    /** Reverses each group of [width] bytes (2: .v64 halfwords, 4: .n64 words) to the .z64 order. */
+    private fun swapBytes(b: ByteArray, len: Int, width: Int) {
+        var i = 0
+        while (i + width <= len) {
+            var a = i
+            var z = i + width - 1
+            while (a < z) { val t = b[a]; b[a] = b[z]; b[z] = t; a++; z-- }
+            i += width
+        }
     }
 }

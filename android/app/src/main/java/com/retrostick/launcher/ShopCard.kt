@@ -38,6 +38,7 @@ object ShopCard {
         "gba" -> Style(0xFF1D2160.toInt(), 0xFF12143A.toInt(), 0xFF5B6BFF.toInt())
         "md" -> Style(0xFF2A1414.toInt(), 0xFF140D10.toInt(), 0xFFE53E3E.toInt())
         "sms" -> Style(0xFF2A1418.toInt(), 0xFF120C10.toInt(), 0xFFFF3B3B.toInt())
+        "n64" -> Style(0xFF16281E.toInt(), 0xFF0E1614.toInt(), 0xFF2FB45A.toInt())
         "psx" -> Style(0xFF22252C.toInt(), 0xFF121418.toInt(), 0xFF3A8EE0.toInt())
         else -> Style(0xFF2A2346.toInt(), 0xFF16122C.toInt(), 0xFF9D8CFF.toInt())
     }
@@ -110,7 +111,7 @@ object ShopCard {
 
 /**
  * Each console's cartridge or disc, drawn (no images): NES and Super Nintendo cartridges, the Game Boy / Color /
- * Advance ones, Mega Drive and Master System, the PlayStation disc. Simplified shapes, not replicas.
+ * Advance ones, Mega Drive and Master System, Nintendo 64, the PlayStation disc. Simplified shapes, not replicas.
  * Drawn in a 128×120 box scaled to fit the view, centred.
  */
 class ConsoleMediaView(context: Context, private val console: Console) : View(context) {
@@ -151,6 +152,17 @@ class ConsoleMediaView(context: Context, private val console: Console) : View(co
                 p.shader = LinearGradient(28f, 42f, 100f, 86f, 0xFF3FBF6A.toInt(), 0xFF1D6E3A.toInt(), Shader.TileMode.CLAMP)
                 canvas.drawRoundRect(RectF(28f, 42f, 100f, 86f), 2f, 2f, p)
                 p.shader = null
+            }
+            // Wider than tall, rounded shoulders, grip ridges down both sides, a big label on top
+            "n64" -> cartridge(canvas, 6f, 14f, 116f, 92f, floatArrayOf(12f, 12f, 3f, 3f), 0xFF55555E, 0xFF34343B) {
+                p.shader = null; p.color = 0x40000000
+                for (i in 0 until 5) {
+                    val y = 62f + i * 8f
+                    canvas.drawRect(10f, y, 18f, y + 3f, p)
+                    canvas.drawRect(110f, y, 118f, y + 3f, p)
+                }
+                label(canvas, 22f, 22f, 84f, 54f, LinearGradient(22f, 22f, 106f, 76f,
+                    intArrayOf(0xFFE53E3E.toInt(), 0xFF2FB45A.toInt(), 0xFF3A6BD9.toInt()), floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP), 0xFF6E6E78)
             }
             "psx" -> disc(canvas)
             else -> cartridge(canvas, 4f, 8f, 120f, 104f, floatArrayOf(4f, 4f, 4f, 4f), 0xFF9D9AA6, 0xFF7D7A86) {}

@@ -550,8 +550,8 @@ class MainActivity : Activity() {
         tabViews.forEachIndexed { i, v ->
             val sel = i == tab
             v.layoutParams = (v.layoutParams as LinearLayout.LayoutParams).apply {
-                // Nine tabs (seven consoles + Retro Ajustes) in the 880 dp row
-                width = dp(if (sel) 122 else 88)
+                // Ten tabs (nine consoles + Retro Ajustes) in the 880 dp row
+                width = dp(if (sel) 118 else 77)
                 height = dp(if (sel) 80 else 66)
             }
             v.setBackgroundResource(when {
@@ -564,7 +564,7 @@ class MainActivity : Activity() {
 
             val logo = v.findViewById<ImageView>(R.id.tabLogo)
             logo.layoutParams = logo.layoutParams.apply { height = dp(if (sel) 22 else 17) }
-            logo.maxWidth = dp(if (sel) 100 else 70)
+            logo.maxWidth = dp(if (sel) 98 else 57)
             // Unselected logos are white (filter: brightness(0) invert(1)); the selected one keeps its colours.
             val console = CONSOLES.getOrNull(i)
             when {

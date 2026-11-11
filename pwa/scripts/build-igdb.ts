@@ -24,6 +24,7 @@ const CONSOLES = [
   { id: 'snes', platform: 19 },
   { id: 'md', platform: 29 },
   { id: 'sms', platform: 64 },
+  { id: 'n64', platform: 4 },
   { id: 'psx', platform: 7 },
 ]
 

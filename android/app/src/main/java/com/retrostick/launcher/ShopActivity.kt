@@ -245,14 +245,15 @@ class ShopActivity : Activity() {
         CONSOLES.forEach { c ->
             val v = LinearLayout(this).apply {
                 gravity = Gravity.CENTER
-                setPadding(dp(12), 0, dp(12), 0)
+                setPadding(dp(10), 0, dp(10), 0)
                 addView(ImageView(this@ShopActivity).apply {
                     setImageResource(c.logo)
                     adjustViewBounds = true
-                    maxWidth = dp(80)
+                    maxWidth = dp(70)
                 }, LinearLayout.LayoutParams(-2, dp(15)))
             }
-            tabs.addView(v, LinearLayout.LayoutParams(dp(100), dp(36)).apply { marginEnd = dp(7) })
+            // Nine consoles in the 880 dp row
+            tabs.addView(v, LinearLayout.LayoutParams(dp(90), dp(36)).apply { marginEnd = dp(7) })
             tabViews += v
         }
 

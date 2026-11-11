@@ -20,6 +20,7 @@ const consoles = [
   { id: 'snes', dat: `${DB}/no-intro/Nintendo%20-%20Super%20Nintendo%20Entertainment%20System.dat`, thumbs: 'Nintendo_-_Super_Nintendo_Entertainment_System' },
   { id: 'md', dat: `${DB}/no-intro/Sega%20-%20Mega%20Drive%20-%20Genesis.dat`, thumbs: 'Sega_-_Mega_Drive_-_Genesis' },
   { id: 'sms', dat: `${DB}/no-intro/Sega%20-%20Master%20System%20-%20Mark%20III.dat`, thumbs: 'Sega_-_Master_System_-_Mark_III' },
+  { id: 'n64', dat: `${DB}/no-intro/Nintendo%20-%20Nintendo%2064.dat`, thumbs: 'Nintendo_-_Nintendo_64' },
   // Redump: discs are identified by name only (hashing a CD image in the browser is too slow).
   { id: 'psx', dat: `${DB}/redump/Sony%20-%20PlayStation.dat`, thumbs: 'Sony_-_PlayStation' },
 ]

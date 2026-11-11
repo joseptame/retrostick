@@ -125,7 +125,8 @@ done
 step "Listo. Pasos manuales pendientes en la TV (RetroArch):"
 cat <<EOF
   1. Menú principal > Actualizador en línea > Descargar núcleos:
-     Gambatte, mGBA y PCSX ReARMed.
+     FCEUmm, Snes9x 2010, Gambatte, mGBA, Genesis Plus GX, PCSX ReARMed y
+     Mupen64Plus-Next (Nintendo 64: la versión GLES2, mupen64plus_next_gles2).
   2. Actualizador en línea > Actualizar archivos de información de núcleos.
   3. Actualizador en línea > Actualizar perfiles de mando (OBLIGATORIO: la carpeta
      de autoconfig se ha movido a $SD/RetroArch/autoconfig). Después, vuelve a

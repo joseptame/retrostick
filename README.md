@@ -190,6 +190,7 @@ El launcher declara `android.intent.category.HOME`, así que el stick arranca en
 | Game Boy Advance | mGBA (alternativa: gpSP si algún juego va lento) | `/ROMs/gba` |
 | Mega Drive | Genesis Plus GX (se instala desde el Actualizador en línea de RetroArch) | `/ROMs/md` |
 | Master System | Genesis Plus GX | `/ROMs/sms` |
+| Nintendo 64 | Mupen64Plus-Next, versión GLES2 (`mupen64plus_next_gles2`, se instala desde el Actualizador en línea). Con el renderizado en un hilo aparte va a velocidad completa en el stick (Mario Kart 64 a 60 FPS, Super Mario 64 a 50, comprobado el 2026-11-11); ajustes en `stick/retroarch/core-options/Mupen64Plus-Next/` | `/ROMs/n64` (`.z64`, también `.n64` / `.v64`) |
 | PlayStation | PCSX ReARMed | `/ROMs/psx` |
 
 ### 6.2 `stick/retroarch/retroarch.overrides.cfg`
@@ -270,7 +271,7 @@ Marcos propios que imitan cada consola (diseño en `docs/maquetas/marcos.html`; 
 |---|---|---|
 | Game Boy / Color | 960×864 (×6, píxeles perfectos) | `config/Gambatte/gb.cfg`, `gbc.cfg` |
 | Game Boy Advance | 1440×960 (×6, píxeles perfectos) | `config/mGBA/gba.cfg` |
-| NES / Super Nintendo / Mega Drive / Master System / PlayStation | 1440×1080 (toda la altura, 4:3) | `config/FCEUmm/nes.cfg`, `config/Snes9x 2010/snes.cfg`, `config/Genesis Plus GX/{md,sms}.cfg`, `config/PCSX-ReARMed/psx.cfg` |
+| NES / Super Nintendo / Mega Drive / Master System / Nintendo 64 / PlayStation | 1440×1080 (toda la altura, 4:3) | `config/FCEUmm/nes.cfg`, `config/Snes9x 2010/snes.cfg`, `config/Genesis Plus GX/{md,sms}.cfg`, `config/Mupen64Plus-Next/n64.cfg`, `config/PCSX-ReARMed/psx.cfg` |
 
 - Son *overrides* de carpeta de contenido: RetroArch carga `config/<Núcleo>/<nombre de la carpeta>.cfg` después del
   del núcleo, así GB y GBC (los dos con Gambatte) llevan marcos distintos.
