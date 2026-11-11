@@ -172,6 +172,45 @@ object DriveCollection {
         }
     }
 
+    /**
+     * «Borrar de Drive» in the ficha of a game that is only in the collection: the game and the discs / tracks its
+     * .m3u or .cue lists go to Drive's bin (recoverable for 30 days). Saves aren't touched. [done] gets null or
+     * the error, on the main thread.
+     */
+    fun trash(context: Context, item: Item, done: (String?) -> Unit) {
+        val app = context.applicationContext
+        DriveSync.runExclusive {
+            val error = try {
+                val c = item.console
+                val drive = DriveClient(DriveAuth(app))
+                val collection = DriveSync.folderId(app, drive, "Retro/Coleccion/${c.id}")
+                val files = drive.list(collection).filter { !it.isFolder }.associateBy { it.name }
+                val queue = ArrayDeque(listOf(item.name))
+                val seen = mutableSetOf<String>()
+                while (queue.isNotEmpty()) {
+                    val name = queue.removeFirst()
+                    if (!seen.add(name)) continue
+                    val remote = files[name] ?: continue
+                    // A playlist or cue sheet is read first: the discs and tracks it lists go with it
+                    if (name.substringAfterLast('.').lowercase() in setOf("m3u", "cue")) {
+                        val tmp = File(app.cacheDir, "trash-$name")
+                        runCatching { drive.download(remote.id, tmp); references(tmp).forEach { queue.addLast(it) } }
+                        tmp.delete()
+                    }
+                    drive.trash(remote.id)
+                }
+                listing = listing + (c.id to listing[c.id].orEmpty().filterKeys { it !in seen })
+                saveCache(app)
+                null
+            } catch (e: Exception) {
+                Log.w("RetroStick", "Trash ${item.name} failed", e)
+                e.message ?: e.toString()
+            }
+            notifyListeners()
+            main.post { done(error) }
+        }
+    }
+
     /** Files a .m3u (discs) or .cue (tracks) points to, by name. */
     private fun references(file: File): List<String> = when (file.extension.lowercase()) {
         "m3u" -> file.readLines().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("#") }

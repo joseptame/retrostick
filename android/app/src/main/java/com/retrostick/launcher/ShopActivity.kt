@@ -1021,6 +1021,7 @@ class ShopActivity : Activity() {
                 PLAY -> R.drawable.ic_shop_play
                 OWNED -> R.drawable.ic_shop_check
                 RETRY -> R.drawable.ic_shop_retry
+                DELETE_DRIVE -> R.drawable.ic_trash
                 else -> null
             }
             b.icon(icon, 15, b.currentTextColor)
@@ -1048,8 +1049,36 @@ class ShopActivity : Activity() {
         }
     }
 
-    /** [Descargar…, Volver] (the trailer plays from the bottom row) */
-    private fun fichaLabels(first: String) = listOf(first, BACK)
+    /**
+     * [Descargar…, Volver] (the trailer plays from the bottom row); a game only in the Drive collection also gets
+     * «Borrar de Drive» while it isn't being passed to the stick.
+     */
+    private fun fichaLabels(first: String): List<String> {
+        val item = driveItem
+        val s = item?.let { DriveCollection.jobFor(it)?.state }
+        return if (item != null && s != DriveCollection.State.RUNNING && s != DriveCollection.State.DONE) listOf(first, DELETE_DRIVE, BACK)
+        else listOf(first, BACK)
+    }
+
+    /** «Borrar de Drive»: after a confirmation, the game goes to Drive's bin and the ficha closes. */
+    private fun confirmDeleteFromDrive() {
+        val item = driveItem ?: return
+        android.app.AlertDialog.Builder(this, R.style.Dialog_RetroStick)
+            .setTitle("Borrar ${item.title} de Drive")
+            .setMessage("Va a la papelera de Drive (se puede recuperar durante 30 días). Las partidas guardadas no se tocan.")
+            .setPositiveButton("Borrar") { _, _ ->
+                android.widget.Toast.makeText(this, "Borrando ${item.title} de Drive…", android.widget.Toast.LENGTH_SHORT).show()
+                val app = applicationContext
+                DriveCollection.trash(this, item) { error ->
+                    Sounds.play(if (error != null) Sounds.Sound.ERROR else Sounds.Sound.BACK)
+                    android.widget.Toast.makeText(app, error?.let { "No se pudo borrar ${item.title}: $it" } ?: "${item.title} borrado de Drive",
+                        android.widget.Toast.LENGTH_LONG).show()
+                    if (error == null && !isDestroyed) finish()
+                }
+            }
+            .setNegativeButton("Cancelar", null)
+            .showForPad()
+    }
 
     private fun fichaKey(code: Int) {
         if (trailer != null) {
@@ -1074,6 +1103,7 @@ class ShopActivity : Activity() {
                 }
                 when (labels.getOrNull(fichaButton)) {
                     BACK -> return closeFicha()
+                    DELETE_DRIVE -> return confirmDeleteFromDrive()
                     else -> download(g)
                 }
             }
@@ -1278,6 +1308,7 @@ class ShopActivity : Activity() {
         private const val OWNED = "En el stick"
         private const val RETRY = "Reintentar"
         private const val BACK = "Volver"
+        private const val DELETE_DRIVE = "Borrar de Drive"
         private const val KB_DELETE = "⌫"
         private const val KB_SPACE = "espacio"
         private const val KB_DONE = "buscar"
