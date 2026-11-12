@@ -245,12 +245,26 @@ class ConsoleMediaView(context: Context, private val console: Console) : View(co
         p.shader = null
     }
 
-    /** A Neo Geo AES cartridge, seen from the front: tall and black, with the big label. (First version: to refine.) */
+    /**
+     * The Neo Geo MVS (arcade) cartridge, option K3 (https://claude.ai/artifact/Qwh5XGuqGxcDmCmow5ChZK): low and wide,
+     * black, the label on the upper part (a black band with a gold strip across its top) and grip ribs along the bottom.
+     */
     private fun neoGeoCartridge(c: Canvas) {
-        cartridge(c, 22f, 2f, 84f, 116f, floatArrayOf(4f, 4f, 4f, 4f), 0xFF2A2A2E, 0xFF141416, stroke = 0x26FFFFFF) {
-            label(c, 30f, 12f, 68f, 82f, LinearGradient(30f, 12f, 98f, 94f, 0xFFE5B53A.toInt(), 0xFFB8452C.toInt(), Shader.TileMode.CLAMP), 0x33FFFFFF)
-            p.shader = null; p.color = 0x40FFFFFF
-            c.drawRect(36f, 102f, 92f, 105f, p)
+        cartridge(c, 6f, 20f, 116f, 80f, floatArrayOf(5f, 5f, 5f, 5f), 0xFF3A3A40, 0xFF18181C, stroke = 0x22FFFFFF) {
+            val r = RectF(16f, 27f, 112f, 73f)
+            c.save()
+            c.clipRect(r)
+            p.shader = LinearGradient(16f, 27f, 112f, 73f, intArrayOf(0xFFE5B53A.toInt(), 0xFFD0502E.toInt(), 0xFF5A1A3A.toInt()),
+                floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
+            c.drawRect(r, p)
+            p.shader = null
+            p.color = 0xFF111111.toInt(); c.drawRect(16f, 27f, 112f, 27f + 46f * 0.16f, p)
+            p.color = 0xFFE5B53A.toInt(); c.drawRoundRect(RectF(20f, 29.3f, 20f + 96f * 0.45f, 32.1f), 1f, 1f, p)
+            c.restore()
+            p.style = Paint.Style.STROKE; p.strokeWidth = 2f; p.color = 0x66000000
+            c.drawRoundRect(r, 3f, 3f, p); p.style = Paint.Style.FILL
+            p.color = 0x55000000
+            for (i in 0 until 26) { val x = 14f + i * 3.9f; c.drawRoundRect(RectF(x, 80f, x + 2.2f, 92f), 1f, 1f, p) }
         }
     }
 

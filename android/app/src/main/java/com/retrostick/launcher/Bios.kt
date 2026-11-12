@@ -66,11 +66,15 @@ object Bios {
         java.util.zip.ZipFile(f).use { z -> z.entries().asSequence().map { "%08x".format(it.crc) }.toSet() }
     }.getOrDefault(emptySet())
 
-    /** A good zip BIOS also where its core looks for it (Neo Geo: next to the games); a bad or missing one, nowhere. */
+    /**
+     * A good zip BIOS also where its core looks for it (Neo Geo: next to the games); a bad one, nowhere. When Drive
+     * has none, a copy put there by hand stays.
+     */
     private fun placeCopies(e: Entry) {
         if (e.copies.isEmpty()) return
         val src = File(SYSTEM_DIR, e.file)
-        val ok = src.isFile && zipCrcs(src).containsAll(e.zipCrcs)
+        if (!src.isFile) return
+        val ok = zipCrcs(src).containsAll(e.zipCrcs)
         for (c in e.copies) runCatching {
             when {
                 !ok -> if (c.isFile) c.delete()
