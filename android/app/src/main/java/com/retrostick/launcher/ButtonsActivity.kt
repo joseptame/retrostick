@@ -178,6 +178,7 @@ class ButtonsActivity : Activity() {
         note.text = (if (custom) "Botones cambiados por ti. «Restablecer» vuelve a los de RetroStick." else "Botones de RetroStick para ${console.name}.") + extra
         padView.highlight = selected
         padView.labels = pads.map(::label)
+        padView.nintendo = style == PadStyle.NINTENDO
         padView.invalidate()
         setHints(if (custom) "▲ ▼ Botón      [X]  Cambiar      [L1R1]  Consola      [TRI]  Restablecer      [O]  Volver"
             else "▲ ▼ Botón      [X]  Cambiar      [L1R1]  Consola      [O]  Volver")
@@ -260,6 +261,8 @@ class ButtonsActivity : Activity() {
     private class PadDrawing(context: Context) : View(context) {
         var highlight = 0
         var labels = listOf<String>()
+        /** Nintendo pads: A on the right and B at the bottom (the rows keep their roles: A confirms like ✕). */
+        var nintendo = false
         private val p = Paint(Paint.ANTI_ALIAS_FLAG)
         private val lit = Color.parseColor("#7B5CFF")
 
@@ -285,8 +288,11 @@ class ButtonsActivity : Activity() {
             c.drawRoundRect(RectF(64f, 72f, 82f, 122f), 4f, 4f, p); c.drawRoundRect(RectF(48f, 88f, 98f, 106f), 4f, 4f, p)
             p.color = Color.parseColor("#1B1B20"); c.drawCircle(122f, 140f, 22f, p); c.drawCircle(208f, 140f, 22f, p)
             p.color = Color.parseColor("#3A3A44"); c.drawCircle(122f, 140f, 15f, p); c.drawCircle(208f, 140f, 15f, p)
-            // Face buttons: south 0, east 1, west 2, north 3
-            val face = listOf(Triple(0, 258f, 112f), Triple(1, 282f, 88f), Triple(2, 234f, 88f), Triple(3, 258f, 64f))
+            // Face buttons where they physically are. Rows: 0 = confirm (✕ / A), 1 = back (○ / B), 2 = □ / Y, 3 = △ / X.
+            // PlayStation and Xbox: confirm at the bottom, back on the right; Nintendo: A on the right, B at the bottom.
+            val south = 258f to 112f; val east = 282f to 88f; val west = 234f to 88f; val north = 258f to 64f
+            val places = if (nintendo) listOf(east, south, west, north) else listOf(south, east, west, north)
+            val face = places.mapIndexed { i, (x, y) -> Triple(i, x, y) }
             p.textAlign = Paint.Align.CENTER; p.textSize = 13f; p.typeface = android.graphics.Typeface.DEFAULT_BOLD
             face.forEach { (i, x, y) ->
                 fill(highlight == i, "#3A3A44"); c.drawCircle(x, y, 13f, p)
