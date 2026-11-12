@@ -256,6 +256,18 @@ fun launchInRetroArch(context: Context, game: Game, resume: Resume = Resume.TITL
     RetroAchievements.applyGame(game)
     // The consoles' boot screens (their BIOS), on or off in Retro Ajustes
     Bios.applyOptions(context)
+    // PlayStation: more than two players needs the Multitap (and a game that supports it). On only when 3+ pads are
+    // connected: some one / two player games don't find their pad with a Multitap plugged in.
+    if (game.console.id == "psx") {
+        val pads = StickStatus.controllers().size
+        val multitap = when {
+            pads >= 5 -> "ports 1 and 2"
+            pads >= 3 -> "port 1"
+            else -> "disabled"
+        }
+        val opt = File("$SDCARD/RetroArch/config/PCSX-ReARMed/PCSX-ReARMed.opt")
+        if (opt.isFile) writeRetroArchCfg(mapOf("pcsx_rearmed_multitap" to multitap), opt)
+    }
     val intent = Intent(Intent.ACTION_MAIN)
         .setComponent(ComponentName(RETROARCH_PACKAGE, RETROARCH_ACTIVITY))
         .putExtra("ROM", game.file.absolutePath)
