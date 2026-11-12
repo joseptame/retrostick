@@ -47,7 +47,10 @@ class ButtonsActivity : Activity() {
         "gba" to listOf(8 to "A", 0 to "B", 10 to "L", 11 to "R", 3 to "Start", 2 to "Select"),
         "md" to listOf(1 to "A", 0 to "B", 8 to "C", 10 to "X", 9 to "Y", 11 to "Z", 3 to "Start", 2 to "Mode"),
         "sms" to listOf(0 to "1", 8 to "2", 3 to "Pause"),
-        "n64" to listOf(0 to "A", 1 to "B", 12 to "Z", 10 to "L", 11 to "R", 3 to "Start"),
+        // C buttons: the core reads them from the right stick, so a button sends a right-stick direction
+        // (RetroArch remap ids 20-23: right stick X+, X-, Y+, Y-)
+        "n64" to listOf(0 to "A", 1 to "B", 12 to "Z", 10 to "L", 11 to "R", 3 to "Start",
+            23 to "C-Arriba", 22 to "C-Abajo", 21 to "C-Izquierda", 20 to "C-Derecha"),
         "psx" to listOf(0 to "✕", 8 to "○", 1 to "□", 9 to "△", 10 to "L1", 11 to "R1", 12 to "L2", 13 to "R2", 3 to "Start", 2 to "Select"),
     )
 
@@ -171,7 +174,7 @@ class ButtonsActivity : Activity() {
             }, LinearLayout.LayoutParams(-1, dp(29)))
         }
         val extra = when (console.id) {
-            "n64" -> " El stick derecho son los botones C."
+            "n64" -> " El stick derecho son siempre los botones C, y también puedes poner cada botón C en otro botón."
             "psx" -> " Los sticks funcionan en los juegos analógicos."
             else -> " El stick izquierdo mueve como la cruceta."
         }
