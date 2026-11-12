@@ -146,7 +146,8 @@ Step 'Listo. Pasos manuales pendientes en la TV (RetroArch):'
 Write-Host @"
   1. Menu principal > Actualizador en linea > Descargar nucleos:
      FCEUmm, Snes9x 2010, Gambatte, mGBA, Genesis Plus GX, PCSX ReARMed y
-     Mupen64Plus-Next (Nintendo 64: la version GLES2, mupen64plus_next_gles2).
+     Mupen64Plus-Next (Nintendo 64: la version GLES2, mupen64plus_next_gles2),
+     y FinalBurn Neo (Neo Geo).
   2. Actualizador en linea > Actualizar archivos de informacion de nucleos.
   3. Actualizador en linea > Actualizar perfiles de mando (OBLIGATORIO: la carpeta
      de autoconfig se ha movido a $Sd/RetroArch/autoconfig). Despues, vuelve a

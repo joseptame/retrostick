@@ -79,25 +79,25 @@ Home = PS, Captura = panel táctil. Así valen tal cual los atajos (− + L / R 
 
 ## Botones en cada consola (DualSense)
 
-| | NES (FCEUmm) | Super Nintendo (Snes9x 2010) | Game Boy / Color (Gambatte) | Game Boy Advance (mGBA) | Mega Drive / Master System (Genesis Plus GX) | Nintendo 64 (Mupen64Plus-Next) | PlayStation (PCSX ReARMed) |
-|---|---|---|---|---|---|---|---|
-| ✕ | B | B | A | A | B / 1 | A | ✕ |
-| ○ | A | A | A | A | C / 2 | B | ○ |
-| □ | B | Y | B | B | A / — | B | □ |
-| △ | A | X | B | B | — | — | △ |
-| Options | Start | Start | Start | Start | Start / Pause | Start | Start |
-| Create | Select | Select | Select | Select | Mode / — | — | Select |
-| Cruceta y stick izquierdo | Moverse | Moverse | Moverse | Moverse | Moverse | Cruceta / stick analógico | Cruceta / stick |
-| Stick derecho | — | — | — | — | — | **Botones C** | — |
-| L1 | — | L | — | L | — | L | L1 |
-| R1 | — | R | — | R | — | R | R1 |
-| L2 | — | — | — | — | — | **Z** | L2 |
-| R2 | — | — | — | — | — | — | R2 |
-| Create + L1 | **Guardado rápido** | **Guardado rápido** | **Guardado rápido** | **Guardado rápido** | **Guardado rápido** | **Guardado rápido** | **Guardado rápido** |
-| Create + R1 | **Cargar el guardado rápido** | **Cargar el guardado rápido** | **Cargar el guardado rápido** | **Cargar el guardado rápido** | **Cargar el guardado rápido** | **Cargar el guardado rápido** | **Cargar el guardado rápido** |
-| Create + R2 | **Avance rápido x2** (activar/desactivar) | **Avance rápido x2** (activar/desactivar) | **Avance rápido x2** (activar/desactivar) | **Avance rápido x2** (activar/desactivar) | **Avance rápido x2** (activar/desactivar) | **Avance rápido x2** (activar/desactivar) | **Avance rápido x2** (activar/desactivar) |
-| PS | Menú de RetroArch | Menú de RetroArch | Menú de RetroArch | Menú de RetroArch | Menú de RetroArch | Menú de RetroArch | Menú de RetroArch |
-| Panel táctil (clic) | **Quitar / poner el marco** | **Quitar / poner el marco** | **Quitar / poner el marco** | **Quitar / poner el marco** | **Quitar / poner el marco** | **Quitar / poner el marco** | **Quitar / poner el marco** |
+| | NES (FCEUmm) | Super Nintendo (Snes9x 2010) | Game Boy / Color (Gambatte) | Game Boy Advance (mGBA) | Mega Drive / Master System (Genesis Plus GX) | Nintendo 64 (Mupen64Plus-Next) | Neo Geo (FinalBurn Neo) | PlayStation (PCSX ReARMed) |
+|---|---|---|---|---|---|---|---|---|
+| ✕ | B | B | A | A | B / 1 | A | A | ✕ |
+| ○ | A | A | A | A | C / 2 | B | B | ○ |
+| □ | B | Y | B | B | A / — | B | C | □ |
+| △ | A | X | B | B | — | — | D | △ |
+| Options | Start | Start | Start | Start | Start / Pause | Start | Start | Start |
+| Create | Select | Select | Select | Select | Mode / — | — | — | Select |
+| Cruceta y stick izquierdo | Moverse | Moverse | Moverse | Moverse | Moverse | Cruceta / stick analógico | Moverse | Cruceta / stick |
+| Stick derecho | — | — | — | — | — | **Botones C** | — | — |
+| L1 | — | L | — | L | — | L | — | L1 |
+| R1 | — | R | — | R | — | R | — | R1 |
+| L2 | — | — | — | — | — | **Z** | — | L2 |
+| R2 | — | — | — | — | — | — | — | R2 |
+| Create + L1 | **Guardado rápido** | **Guardado rápido** | **Guardado rápido** | **Guardado rápido** | **Guardado rápido** | **Guardado rápido** | **Guardado rápido** | **Guardado rápido** |
+| Create + R1 | **Cargar el guardado rápido** | **Cargar el guardado rápido** | **Cargar el guardado rápido** | **Cargar el guardado rápido** | **Cargar el guardado rápido** | **Cargar el guardado rápido** | **Cargar el guardado rápido** | **Cargar el guardado rápido** |
+| Create + R2 | **Avance rápido x2** (activar/desactivar) | **Avance rápido x2** (activar/desactivar) | **Avance rápido x2** (activar/desactivar) | **Avance rápido x2** (activar/desactivar) | **Avance rápido x2** (activar/desactivar) | **Avance rápido x2** (activar/desactivar) | **Avance rápido x2** (activar/desactivar) | **Avance rápido x2** (activar/desactivar) |
+| PS | Menú de RetroArch | Menú de RetroArch | Menú de RetroArch | Menú de RetroArch | Menú de RetroArch | Menú de RetroArch | Menú de RetroArch | Menú de RetroArch |
+| Panel táctil (clic) | **Quitar / poner el marco** | **Quitar / poner el marco** | **Quitar / poner el marco** | **Quitar / poner el marco** | **Quitar / poner el marco** | **Quitar / poner el marco** | **Quitar / poner el marco** | **Quitar / poner el marco** |
 
 También abre el menú **Create + Options** (`input_menu_toggle_gamepad_combo = 4`).
 
