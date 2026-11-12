@@ -5,10 +5,19 @@
  *   POST   /api/users  { name, password }      → new user
  *   PATCH  /api/users  { name, password }      → new password (their sessions on phones end; the stick keeps working)
  *   DELETE /api/users?name=…                   → user gone (their sessions and stick end)
+ *
+ *   GET / POST / DELETE /api/users?invite      → the invitation code: { code } / a new one / none (no sign-ups)
+ * With an invitation code, anyone who has it creates their own account from the login page (middleware.ts, /__signup).
  */
 import {
-  dbConfigured, deleteUser, getUser, hashPassword, json, listUsers, normalizeName, putUser, USER_NAME, whoFromCookie,
+  dbConfigured, deleteUser, getUser, hashPassword, json, listUsers, normalizeName, putUser, redis, USER_NAME, whoFromCookie,
 } from './_users.js'
+
+/** 8 characters without look-alikes (no 0/O, 1/I/L), easy to dictate. */
+function newCode(): string {
+  const abc = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
+  return [...crypto.getRandomValues(new Uint8Array(8))].map((b) => abc[b % abc.length]).join('')
+}
 
 export const config = { runtime: 'edge' }
 
@@ -18,6 +27,19 @@ export default async function handler(request: Request): Promise<Response> {
   const who = await whoFromCookie(request)
   if (!who?.admin) return json({ error: 'Solo el administrador gestiona los usuarios' }, 403)
   if (!dbConfigured()) return json({ error: 'Falta la base de datos (UPSTASH_REDIS_REST_URL / _TOKEN en Vercel)' }, 503)
+
+  if (new URL(request.url).searchParams.has('invite')) {
+    if (request.method === 'POST') {
+      const code = newCode()
+      await redis('SET', 'invite', code)
+      return json({ code })
+    }
+    if (request.method === 'DELETE') {
+      await redis('DEL', 'invite')
+      return json({ code: null })
+    }
+    return json({ code: (await redis<string | null>('GET', 'invite')) ?? null })
+  }
 
   if (request.method === 'GET') {
     return json((await listUsers()).map((u) => ({ name: u.name, created: u.created })))

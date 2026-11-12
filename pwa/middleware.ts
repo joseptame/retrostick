@@ -70,11 +70,33 @@ async function getUser(name: string, fresh = false): Promise<StoredUser | null> 
   return user
 }
 
-async function checkPassword(user: StoredUser, password: string, secret: string): Promise<boolean> {
+async function pbkdf2(password: string, salt: string): Promise<string> {
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits'])
-  const bits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', hash: 'SHA-256', salt: new TextEncoder().encode(user.salt), iterations: 100_000 }, key, 256)
-  return same(hex(bits), user.hash, secret)
+  return hex(await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', hash: 'SHA-256', salt: new TextEncoder().encode(salt), iterations: 100_000 }, key, 256))
+}
+
+async function checkPassword(user: StoredUser, password: string, secret: string): Promise<boolean> {
+  return same(await pbkdf2(password, user.salt), user.hash, secret)
+}
+
+/**
+ * Sign-up with the admin's invitation code (api/users.ts?invite): a new user, or the reason it can't be created.
+ * SET … NX so two sign-ups with the same name can't overwrite each other.
+ */
+async function signUp(name: string, password: string, code: string, admin: string, secret: string): Promise<StoredUser | string> {
+  const invite = await redis<string | null>('GET', 'invite')
+  if (!invite) return 'Ahora mismo no se pueden crear cuentas. Pídele al administrador un código de invitación.'
+  if (!(await same(code.trim().toUpperCase(), invite, secret))) return 'El código de invitación no es correcto.'
+  if (!/^[a-z0-9._-]{2,32}$/.test(name)) return 'El usuario: de 2 a 32 letras, números, puntos, guiones o _ (sin espacios ni acentos).'
+  if (name === admin.trim().toLowerCase()) return 'Ese nombre de usuario ya existe.'
+  if (password.length < 8) return 'La contraseña necesita al menos 8 caracteres.'
+  const salt = hex(crypto.getRandomValues(new Uint8Array(16)))
+  const user = { name, salt, hash: await pbkdf2(password, salt), created: Date.now(), v: 1 }
+  if ((await redis<string | null>('SET', `user:${name}`, JSON.stringify(user), 'NX')) !== 'OK') return 'Ese nombre de usuario ya existe.'
+  await redis('SADD', 'users', name)
+  cache.set(name, { at: Date.now(), user })
+  return user
 }
 
 /** Too many failed logins from this connection (10 in 15 minutes). */
@@ -138,12 +160,14 @@ export default async function middleware(request: Request): Promise<Response> {
     })
   }
 
-  if (url.pathname === '/__login' && request.method === 'POST') {
+  if (url.pathname === '/__signup' && request.method === 'GET') {
+    return signupPage(null, url.searchParams.get('next') ?? '/')
+  }
+
+  if ((url.pathname === '/__login' || url.pathname === '/__signup') && request.method === 'POST') {
     const form = await request.formData()
     const next = String(form.get('next') ?? '/')
     const ip = clientIp(request)
-    // Too many failed attempts from this connection: locked out for 15 minutes
-    if (await lockedOut(ip)) return loginPage(false, next, true)
     const name = String(form.get('user') ?? '')
     const given = String(form.get('password') ?? '')
     // Back to the page that asked for the login (a pairing link keeps its ?vincular=…).
@@ -151,6 +175,22 @@ export default async function middleware(request: Request): Promise<Response> {
       status: 303,
       headers: { location: next.startsWith('/') && !next.startsWith('//') ? next : '/', 'set-cookie': setCookie(cookieValue) },
     })
+
+    if (url.pathname === '/__signup') {
+      if (!dbConfigured()) return signupPage('Las cuentas no están disponibles todavía.', next)
+      // A wrong invitation code counts as a failed login: guessing codes gets locked out like guessing passwords
+      if (await lockedOut(ip)) return signupPage('Demasiados intentos. Espera 15 minutos y vuelve a probar.', next)
+      const created = await signUp(name.trim().toLowerCase(), given, String(form.get('code') ?? ''), user, secret)
+        .catch(() => 'No se ha podido crear la cuenta. Prueba otra vez en un momento.')
+      if (typeof created === 'string') {
+        if (created.startsWith('El código')) await loginFailed(ip)
+        return signupPage(created, next, name)
+      }
+      return go(await userCookie(created, secret))
+    }
+
+    // Too many failed attempts from this connection: locked out for 15 minutes
+    if (await lockedOut(ip)) return loginPage(false, next, true)
     // The admin (Vercel's AUTH_USER / AUTH_PASSWORD), as before
     if ((await same(name, user, secret)) && (await same(given, password, secret))) return go(await adminCookie(secret, user))
     // A user from the database
@@ -170,7 +210,8 @@ export default async function middleware(request: Request): Promise<Response> {
 
 const escapeAttr = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')
 
-function loginPage(failed: boolean, next = '/', locked = false): Response {
+/** The login and sign-up pages share this shell (the app's dark look, no scripts). */
+function page(title: string, body: string, status: number): Response {
   const html = `<!doctype html>
 <html lang="es">
 <head>
@@ -180,7 +221,7 @@ function loginPage(failed: boolean, next = '/', locked = false): Response {
 <meta name="robots" content="noindex">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<title>RetroStick · Acceso</title>
+<title>RetroStick · ${title}</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{min-height:100vh;font-family:Inter,system-ui,sans-serif;color:#f2f0ff;display:flex;align-items:center;justify-content:center;
@@ -194,10 +235,20 @@ color:#f2f0ff;font-size:16px}
 input:focus{outline:2px solid #7c6cff;border-color:transparent}
 button{width:100%;margin-top:22px;padding:15px;border:0;border-radius:16px;background:#fff;color:#1b1446;font-weight:800;font-size:16px}
 .error{margin:0 0 4px;padding:11px 14px;border-radius:12px;background:rgba(248,113,113,.13);color:#fecaca;font-size:13px}
+.hint{display:block;margin-top:6px;font-size:12px;color:#8f88bd}
+.alt{display:block;margin-top:20px;text-align:center;font-size:14px;color:#a49ccf}
+.alt a{color:#c9c0ff;font-weight:700;text-decoration:none}
 </style>
 </head>
 <body>
-<form method="post" action="/__login">
+${body}
+</body>
+</html>`
+  return new Response(html, { status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } })
+}
+
+function loginPage(failed: boolean, next = '/', locked = false): Response {
+  return page('Acceso', `<form method="post" action="/__login">
 <input type="hidden" name="next" value="${escapeAttr(next)}">
 <div class="brand">Retro<span>Stick</span></div>
 <p>Acceso privado</p>
@@ -207,11 +258,27 @@ ${locked ? '<div class="error">Demasiados intentos. Espera 15 minutos y vuelve a
 <label for="password">Contraseña</label>
 <input id="password" name="password" type="password" autocomplete="current-password" required>
 <button type="submit">Entrar</button>
-</form>
-</body>
-</html>`
-  return new Response(html, {
-    status: failed ? 401 : 200,
-    headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' },
-  })
+<span class="alt">¿Tienes un código de invitación? <a href="/__signup?next=${encodeURIComponent(next)}">Crear cuenta</a></span>
+</form>`, failed ? 401 : 200)
+}
+
+function signupPage(error: string | null, next = '/', name = ''): Response {
+  return page('Crear cuenta', `<form method="post" action="/__signup">
+<input type="hidden" name="next" value="${escapeAttr(next)}">
+<div class="brand">Retro<span>Stick</span></div>
+<p>Crea tu cuenta. Luego conectarás tu propio Google Drive: tus juegos y partidas van allí.</p>
+${error ? `<div class="error">${escapeAttr(error)}</div>` : ''}
+<label for="code">Código de invitación</label>
+<input id="code" name="code" autocapitalize="characters" autocorrect="off" autocomplete="off" required>
+<span class="hint">Te lo da quien te ha invitado.</span>
+<label for="user">Usuario</label>
+<input id="user" name="user" value="${escapeAttr(name)}" autocomplete="username" autocapitalize="none" autocorrect="off"
+pattern="[A-Za-z0-9._\-]{2,32}" required>
+<span class="hint">Sin espacios ni acentos: pepe, ana.g, luis_23…</span>
+<label for="password">Contraseña</label>
+<input id="password" name="password" type="password" autocomplete="new-password" minlength="8" required>
+<span class="hint">8 caracteres o más.</span>
+<button type="submit">Crear cuenta</button>
+<span class="alt">¿Ya tienes cuenta? <a href="${escapeAttr(next)}">Entrar</a></span>
+</form>`, error ? 400 : 200)
 }

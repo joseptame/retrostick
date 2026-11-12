@@ -33,12 +33,16 @@ export function UsersSection({ state }: { state: AppState }) {
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [invite, setInvite] = useState<string | null | undefined>(undefined)
 
   const loadUsers = async () => setUsers(await call<UserRow[]>('/api/users').catch(() => []))
   useEffect(() => {
     void call<Me>('/api/me').then((m) => {
       setMe(m)
-      if (m.admin) void loadUsers()
+      if (m.admin) {
+        void loadUsers()
+        void call<{ code: string | null }>('/api/users?invite').then((r) => setInvite(r.code)).catch(() => setInvite(null))
+      }
     }).catch(() => setMe(null))
   }, [])
 
@@ -60,6 +64,10 @@ export function UsersSection({ state }: { state: AppState }) {
       setBusy(false)
     }
   }
+
+  const changeInvite = (method: 'POST' | 'DELETE') =>
+    void run(async () => setInvite((await call<{ code: string | null }>('/api/users?invite', { method })).code),
+      method === 'POST' ? 'Código de invitación nuevo: el anterior ya no sirve' : 'Altas cerradas: nadie más puede crearse una cuenta')
 
   if (!me) return null
   const date = (ms: number) => new Date(ms).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -115,6 +123,25 @@ export function UsersSection({ state }: { state: AppState }) {
             </span>
           </p>
           <div className="rows" style={{ marginTop: 10 }}>
+            <div className="row-card">
+              <span className="row-ico">
+                <Icon name="link" />
+              </span>
+              <div className="grow">
+                <b>{invite ? <>Código de invitación: <span style={{ letterSpacing: 2, color: '#c9c0ff' }}>{invite}</span></> : 'Altas cerradas'}</b>
+                <small>
+                  {invite
+                    ? `Quien lo tenga se crea su cuenta en ${location.host} → «Crear cuenta». Cámbialo cuando quieras: las cuentas ya creadas siguen.`
+                    : invite === undefined ? 'Cargando…' : 'Nadie puede crearse una cuenta. Crea un código para que tus amigos se den de alta solos.'}
+                </small>
+              </div>
+              {invite !== undefined && (
+                <button className="chip" disabled={busy} onClick={() => changeInvite('POST')}>{invite ? 'Nuevo' : 'Crear código'}</button>
+              )}
+              {invite && (
+                <button className="chip" style={{ marginLeft: 6 }} disabled={busy} onClick={() => changeInvite('DELETE')}>Cerrar</button>
+              )}
+            </div>
             {users === null && <div className="row-card"><div className="grow"><small>Cargando usuarios…</small></div></div>}
             {users?.map((u) => (
               <div key={u.name} className="row-card">
