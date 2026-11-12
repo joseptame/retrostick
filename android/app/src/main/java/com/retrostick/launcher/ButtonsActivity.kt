@@ -29,14 +29,23 @@ import java.io.File
  */
 class ButtonsActivity : Activity() {
 
-    /** A button of the pad, by its place (south = ✕ / A), and the RetroPad button RetroArch reads from it. */
-    private class Pad(val rp: String, val id: Int, val ps: String, val nintendo: String, val xbox: String)
+    /**
+     * A button of the pad, by its place (south = ✕ / A): [key] is its name in a RetroArch remap
+     * (input_playerN_<key>) and [id] what it sends unless remapped (RetroPad button, or 20-23 = right stick X+ X- Y+ Y-).
+     */
+    private class Pad(val key: String, val id: Int, val ps: String, val nintendo: String, val xbox: String)
 
-    private val pads = listOf(
-        Pad("b", 0, "✕", "A", "A"), Pad("a", 8, "○", "B", "B"), Pad("y", 1, "□", "Y", "X"), Pad("x", 9, "△", "X", "Y"),
-        Pad("l", 10, "L1", "L", "LB"), Pad("r", 11, "R1", "R", "RB"), Pad("l2", 12, "L2", "ZL", "LT"), Pad("r2", 13, "R2", "ZR", "RT"),
-        Pad("start", 3, "Options", "+", "Menu"),
+    private val buttons = listOf(
+        Pad("btn_b", 0, "✕", "A", "A"), Pad("btn_a", 8, "○", "B", "B"), Pad("btn_y", 1, "□", "Y", "X"), Pad("btn_x", 9, "△", "X", "Y"),
+        Pad("btn_l", 10, "L1", "L", "LB"), Pad("btn_r", 11, "R1", "R", "RB"), Pad("btn_l2", 12, "L2", "ZL", "LT"), Pad("btn_r2", 13, "R2", "ZR", "RT"),
+        Pad("btn_start", 3, "Options", "+", "Menu"),
     )
+    /** Nintendo 64: the right stick's four directions are the C buttons, remappable like any button. */
+    private val rightStick = listOf(
+        Pad("stk_r_y-", 23, "Stick dcho. ↑", "Stick dcho. ↑", "Stick dcho. ↑"), Pad("stk_r_y+", 22, "Stick dcho. ↓", "Stick dcho. ↓", "Stick dcho. ↓"),
+        Pad("stk_r_x-", 21, "Stick dcho. ←", "Stick dcho. ←", "Stick dcho. ←"), Pad("stk_r_x+", 20, "Stick dcho. →", "Stick dcho. →", "Stick dcho. →"),
+    )
+    private val pads get() = if (console.id == "n64") buttons + rightStick else buttons
 
     /** Each console's buttons as RetroPad ids (how its core reads them). */
     private val consoleButtons: Map<String, List<Pair<Int, String>>> = mapOf(
@@ -130,7 +139,8 @@ class ButtonsActivity : Activity() {
     private fun load() {
         custom = customFile(console).isFile
         val cfg = readCfg(if (custom) customFile(console) else coreFile(console))
-        mapping = IntArray(pads.size) { i -> cfg["input_player1_btn_${pads[i].rp}"]?.toIntOrNull() ?: pads[i].id }
+        mapping = IntArray(pads.size) { i -> cfg["input_player1_${pads[i].key}"]?.toIntOrNull() ?: pads[i].id }
+        selected = selected.coerceIn(0, pads.size - 1)
         render()
     }
 
@@ -166,17 +176,17 @@ class ButtonsActivity : Activity() {
                 gravity = Gravity.CENTER_VERTICAL
                 setPadding(dp(12), dp(5), dp(14), dp(5))
                 background = if (sel) GradientDrawable().apply { setColor(Color.parseColor("#5B3FD6")); cornerRadius = dp(9).toFloat(); setStroke(dp(2), Color.WHITE) } else null
-                addView(text(12.5f, R.color.text).apply { text = label(p); typeface = font(R.font.inter_bold) }, LinearLayout.LayoutParams(dp(90), -2))
+                addView(text(12.5f, R.color.text).apply { text = label(p); typeface = font(R.font.inter_bold) }, LinearLayout.LayoutParams(dp(120), -2))
                 addView(text(11f, R.color.text_2).apply { text = "→" }, LinearLayout.LayoutParams(0, -2, 1f))
                 addView(text(12.5f, R.color.text).apply {
                     text = buttonName(mapping[i]) + "  ·  ${console.name}"
                     typeface = font(R.font.inter_semibold); gravity = Gravity.END
                     if (mapping[i] == -1) setTextColor(getColor(R.color.text_2))
                 }, LinearLayout.LayoutParams(-2, -2))
-            }, LinearLayout.LayoutParams(-1, dp(29)))
+            }, LinearLayout.LayoutParams(-1, dp(if (pads.size > 9) 24 else 29)))
         }
         val extra = when (console.id) {
-            "n64" -> " El stick derecho son siempre los botones C, y también puedes poner cada botón C en otro botón."
+            "n64" -> " Las direcciones del stick derecho son los botones C: cámbialas como cualquier botón."
             "psx" -> " Los sticks funcionan en los juegos analógicos."
             else -> " El stick izquierdo mueve como la cruceta."
         }
@@ -209,7 +219,7 @@ class ButtonsActivity : Activity() {
         val c = console
         val cfg = readCfg(coreFile(c))
         pads.forEachIndexed { i, p ->
-            for (player in 1..2) cfg["input_player${player}_btn_${p.rp}"] = mapping[i].toString()
+            for (player in 1..2) cfg["input_player${player}_${p.key}"] = mapping[i].toString()
         }
         val ok = runCatching {
             remapDir(c).mkdirs()
@@ -292,7 +302,9 @@ class ButtonsActivity : Activity() {
             p.color = Color.parseColor("#3A3A44")
             c.drawRoundRect(RectF(64f, 72f, 82f, 122f), 4f, 4f, p); c.drawRoundRect(RectF(48f, 88f, 98f, 106f), 4f, 4f, p)
             p.color = Color.parseColor("#1B1B20"); c.drawCircle(122f, 140f, 22f, p); c.drawCircle(208f, 140f, 22f, p)
-            p.color = Color.parseColor("#3A3A44"); c.drawCircle(122f, 140f, 15f, p); c.drawCircle(208f, 140f, 15f, p)
+            p.color = Color.parseColor("#3A3A44"); c.drawCircle(122f, 140f, 15f, p)
+            // The right stick lights for its four directions (Nintendo 64 rows 9-12)
+            fill(highlight in 9..12, "#3A3A44"); c.drawCircle(208f, 140f, 15f, p)
             // Face buttons where they physically are. Rows: 0 = confirm (✕ / A), 1 = back (○ / B), 2 = □ / Y, 3 = △ / X.
             // PlayStation and Xbox: confirm at the bottom, back on the right; Nintendo: A on the right, B at the bottom.
             val south = 258f to 112f; val east = 282f to 88f; val west = 234f to 88f; val north = 258f to 64f
