@@ -253,7 +253,7 @@ object RetroAchievements {
     private val CORE_DIRS = mapOf(
         "fceumm" to "FCEUmm", "snes9x2010" to "Snes9x 2010", "gambatte" to "Gambatte", "mgba" to "mGBA",
         "genesis_plus_gx" to "Genesis Plus GX", "pcsx_rearmed" to "PCSX-ReARMed",
-        "mupen64plus_next_gles2" to "Mupen64Plus-Next",
+        "mupen64plus_next_gles2" to "Mupen64Plus-Next", "fbneo" to "FinalBurn Neo",
     )
     private const val MARK = "# RetroStick: achievements off"
 
@@ -286,6 +286,8 @@ object RetroAchievements {
      */
     private fun romMd5(context: Context, game: Game): String? {
         if (game.console.id == "psx") return null
+        // Arcade romsets (Neo Geo): RetroAchievements hashes the file's name, not its bytes ("mslug")
+        if (game.console.id == "neogeo") return MessageDigest.getInstance("MD5").digest(game.baseName.toByteArray()).joinToString("") { "%02x".format(it) }
         val f = game.file
         if (!f.isFile || f.length() > 64L * 1024 * 1024) return null
         val prefs = context.getSharedPreferences("ra_md5", Context.MODE_PRIVATE)

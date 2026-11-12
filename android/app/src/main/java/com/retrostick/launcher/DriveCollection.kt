@@ -17,7 +17,7 @@ import java.util.concurrent.Executors
 object DriveCollection {
     class Item(val console: Console, val name: String, val size: Long) {
         val baseName = name.substringBeforeLast('.')
-        val title = displayTitle(baseName)
+        val title = (if (console.id == "neogeo") NeoGeoNames.long(baseName)?.let(NeoGeoNames::romsetTitle) else null) ?: displayTitle(baseName)
         val key get() = "${console.id}/$name"
         /** A Game named like the file, for covers, saves and play time (kept on the stick). */
         fun probe() = Game(console, File(console.romDir, name))

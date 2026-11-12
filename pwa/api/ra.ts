@@ -15,7 +15,7 @@ declare const process: { env: Record<string, string | undefined> }
 const API = 'https://retroachievements.org/API'
 const MEDIA = 'https://media.retroachievements.org'
 /** RetroAchievements console ids */
-const CONSOLE_IDS: Record<string, number> = { md: 1, snes: 3, gb: 4, gba: 5, gbc: 6, nes: 7, sms: 11, n64: 2, psx: 12 }
+const CONSOLE_IDS: Record<string, number> = { md: 1, snes: 3, gb: 4, gba: 5, gbc: 6, nes: 7, sms: 11, n64: 2, neogeo: 27, psx: 12 }
 
 interface ListGame { Title: string; ID: number; NumAchievements: number; Hashes?: string[] }
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

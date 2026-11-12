@@ -9,7 +9,40 @@ export interface BiosEntry {
   file: string
   /** Known good dumps; the stick doesn't use any other (a bad PS1 one left games on a black screen) */
   md5: string[]
+  /**
+   * A zip BIOS (Neo Geo): its MD5 changes with the packing, so it is checked by the CRC32 of the files inside;
+   * all of these must be there (FinalBurn Neo's current dumps).
+   */
+  zipCrcs?: string[]
   shows: string
+}
+
+/** CRC32s of the files in a zip, from its central directory (no unzipping). */
+export async function zipCrcs(file: Blob): Promise<Set<string>> {
+  const buf = new DataView(await file.arrayBuffer())
+  const out = new Set<string>()
+  // End of central directory: signature 0x06054b50, within the last 64 KB
+  let eocd = -1
+  for (let i = buf.byteLength - 22; i >= Math.max(0, buf.byteLength - 65557); i--) {
+    if (buf.getUint32(i, true) === 0x06054b50) { eocd = i; break }
+  }
+  if (eocd < 0) return out
+  const count = buf.getUint16(eocd + 10, true)
+  let p = buf.getUint32(eocd + 16, true)
+  for (let n = 0; n < count && p + 46 <= buf.byteLength && buf.getUint32(p, true) === 0x02014b50; n++) {
+    out.add(buf.getUint32(p + 16, true).toString(16).padStart(8, '0'))
+    p += 46 + buf.getUint16(p + 28, true) + buf.getUint16(p + 30, true) + buf.getUint16(p + 32, true)
+  }
+  return out
+}
+
+/** Whether an uploaded BIOS is one the stick will use. */
+export async function isKnownBios(e: BiosEntry, file: Blob, md5: string | undefined): Promise<boolean> {
+  if (e.zipCrcs) {
+    const crcs = await zipCrcs(file)
+    return e.zipCrcs.every((c) => crcs.has(c))
+  }
+  return !!md5 && e.md5.includes(md5)
 }
 
 export const BIOS: BiosEntry[] = [
@@ -32,4 +65,11 @@ export const BIOS: BiosEntry[] = [
   },
   { console: 'Master System', file: 'bios_E.sms', md5: ['840481177270d5642a14ca71ee72844c'], shows: 'La pantalla de SEGA de la consola' },
   { console: 'Mega Drive', file: 'bios_MD.bin', md5: ['45e298905a08f9cfb38fd504cd6dbc84'], shows: 'El aviso «Produced by or under license from SEGA»' },
+  // Neo Geo: needed to play at all (FinalBurn Neo). 000-lo.lo, sfix.sfix, sm1.sm1 as FinalBurn Neo dumps them now
+  // (older sets carry e09e253c / 354029fc / 97cf998b and no game starts) and the European AES BIOS (neo-epo.bin).
+  {
+    console: 'Neo Geo', file: 'neogeo.zip', md5: [],
+    zipCrcs: ['5a86cff2', 'c2ea0cfd', '94416d67', 'd27a71f1'],
+    shows: 'Imprescindible: sin ella no arranca ningún juego de Neo Geo',
+  },
 ]

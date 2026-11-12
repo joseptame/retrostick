@@ -1,4 +1,4 @@
-export type ConsoleId = 'nes' | 'snes' | 'gb' | 'gbc' | 'gba' | 'md' | 'sms' | 'n64' | 'psx'
+export type ConsoleId = 'nes' | 'snes' | 'gb' | 'gbc' | 'gba' | 'md' | 'sms' | 'n64' | 'neogeo' | 'psx'
 
 export interface ConsoleInfo {
   id: ConsoleId
@@ -18,6 +18,7 @@ export const CONSOLES: ConsoleInfo[] = [
   { id: 'md', name: 'Mega Drive', short: 'MD', thumbs: 'Sega_-_Mega_Drive_-_Genesis' },
   { id: 'sms', name: 'Master System', short: 'SMS', thumbs: 'Sega_-_Master_System_-_Mark_III' },
   { id: 'n64', name: 'Nintendo 64', short: 'N64', thumbs: 'Nintendo_-_Nintendo_64' },
+  { id: 'neogeo', name: 'Neo Geo', short: 'NEO', thumbs: 'SNK_-_Neo_Geo' },
   { id: 'psx', name: 'PlayStation', short: 'PS1', thumbs: 'Sony_-_PlayStation' },
 ]
 
@@ -61,3 +62,10 @@ export function consoleForFile(fileName: string): ConsoleId | null {
 
 /** Cartridges are identified by hash; discs only by name (hashing a CD in the browser is too slow). */
 export const isCartridge = (id: ConsoleId) => id !== 'psx'
+
+/**
+ * Neo Geo games are FinalBurn Neo romsets: "mslug.zip", a zip named after the game's short name (the core needs
+ * that name). Not in BY_EXTENSION (a .zip could be anything): only a Neo Geo collection treats .zip as a game.
+ */
+export const isRomsetConsole = (id: ConsoleId) => id === 'neogeo'
+export const NEOGEO_BIOS = 'neogeo.zip'

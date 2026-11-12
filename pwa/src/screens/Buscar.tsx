@@ -515,6 +515,7 @@ const PLATFORM_LOOK: Record<ConsoleId, { from: string; to: string; glyph: string
   md: { from: '#1f2937', to: '#030712', glyph: 'MD' },
   sms: { from: '#b91c1c', to: '#1f2937', glyph: 'SMS' },
   n64: { from: '#15803d', to: '#14213d', glyph: 'N64' },
+  neogeo: { from: '#b91c1c', to: '#111827', glyph: 'NEO' },
   psx: { from: '#475569', to: '#0f172a', glyph: 'PS1' },
 }
 

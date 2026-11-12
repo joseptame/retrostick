@@ -49,7 +49,8 @@ export const DEFAULT_COLLECTIONS: Partial<Record<ConsoleId, string>> = {
   nes: 'No-Intro_NES',
   snes: 'bahamut-lagoon-japan-espanol',
   gb: 'gameboy_202401', gbc: 'gbc_20240311', gba: 'gba-pal', md: 'nointro.md', sms: 'nointro.ms-mkiii',
-  n64: 'recalbox-nointro-n64-1g1r-fr-retroninjasamurai', psx: 'chd_psx_eur' }
+  n64: 'recalbox-nointro-n64-1g1r-fr-retroninjasamurai',
+  neogeo: 'cylums-neo-geo-rom-collection', psx: 'chd_psx_eur' }
 const BY_CONSOLE = 'rs.collectionByConsole'
 
 function byConsole(): Partial<Record<ConsoleId, string>> {

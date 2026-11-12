@@ -21,6 +21,9 @@ const consoles = [
   { id: 'md', dat: `${DB}/no-intro/Sega%20-%20Mega%20Drive%20-%20Genesis.dat`, thumbs: 'Sega_-_Mega_Drive_-_Genesis' },
   { id: 'sms', dat: `${DB}/no-intro/Sega%20-%20Master%20System%20-%20Mark%20III.dat`, thumbs: 'Sega_-_Master_System_-_Mark_III' },
   { id: 'n64', dat: `${DB}/no-intro/Nintendo%20-%20Nintendo%2064.dat`, thumbs: 'Nintendo_-_Nintendo_64' },
+  // Neo Geo: libretro's list of the FinalBurn Neo games (each a "<short name>.neo" rom): long names, and `files`
+  // maps the short name (the romset's file name) to its long name.
+  { id: 'neogeo', dat: 'https://raw.githubusercontent.com/libretro/libretro-database/master/dat/SNK%20-%20Neo%20Geo.dat', thumbs: 'SNK_-_Neo_Geo' },
   // Redump: discs are identified by name only (hashing a CD image in the browser is too slow).
   { id: 'psx', dat: `${DB}/redump/Sony%20-%20PlayStation.dat`, thumbs: 'Sony_-_PlayStation' },
 ]
@@ -40,13 +43,14 @@ async function json(url: string): Promise<any> {
 
 /** clrmamepro DAT: game ( name "..." rom ( name "..." size N crc XXXXXXXX sha1 ... ) ) */
 function parseDat(dat: string) {
-  const games: { name: string; crc: string[]; sha1: string[] }[] = []
+  const games: { name: string; crc: string[]; sha1: string[]; files: string[] }[] = []
   for (const block of dat.split(/\ngame \(/).slice(1)) {
     const name = /^\s*name "((?:[^"\\]|\\.)*)"/m.exec(block)?.[1]
     if (!name) continue
     const crc = [...block.matchAll(/\bcrc ([0-9A-Fa-f]{8})\b/g)].map((m) => m[1].toLowerCase())
     const sha1 = [...block.matchAll(/\bsha1 ([0-9A-Fa-f]{40})\b/g)].map((m) => m[1].toLowerCase())
-    games.push({ name, crc, sha1 })
+    const files = [...block.matchAll(/rom \( name "([^"]+)"/g)].map((m) => m[1])
+    games.push({ name, crc, sha1, files })
   }
   return games
 }
@@ -76,7 +80,21 @@ for (const c of consoles) {
       g.crc.forEach((h) => (crc[h] = i))
     }
   })
-  const out = { generated: new Date().toISOString().slice(0, 10), names, sha1, crc, boxarts: await boxarts(c.thumbs) }
+  // Neo Geo: short name ("mslug", the romset's file name) → index of its long name. FinalBurn Neo's own list (its
+  // games from neogeo/*.cpp) adds the ones libretro's Neo Geo list lacks; a romset in neither isn't a Neo Geo game
+  // FinalBurn Neo knows (RetroShop leaves it out).
+  const files: Record<string, number> = {}
+  if (c.id === 'neogeo') {
+    games.forEach((g, i) => g.files.forEach((f) => (files[f.replace(/\.[^.]+$/, '').toLowerCase()] = i)))
+    const xml = await text(`${DB}/fbneo-split/FinalBurn%20Neo%20(ClrMame%20Pro%20XML,%20Arcade%20only).dat`)
+    for (const m of xml.matchAll(/<game name="([^"]+)"[^>]*sourcefile="neogeo\/[^"]*"[^>]*>\s*<description>([^<]*)<\/description>/g)) {
+      const short = m[1].toLowerCase()
+      if (files[short] !== undefined) continue
+      const name = m[2].replace(/&amp;/g, '&').replace(/&apos;/g, "'").replace(/&quot;/g, '"')
+      files[short] = names.push(name) - 1
+    }
+  }
+  const out = { generated: new Date().toISOString().slice(0, 10), names, sha1, crc, boxarts: await boxarts(c.thumbs), ...(c.id === 'neogeo' ? { files } : {}) }
   writeFileSync(`public/db/${c.id}.json`, JSON.stringify(out))
   console.log(`${c.id}: ${names.length} juegos, ${Object.keys(sha1).length} sha1, ${out.boxarts.length} portadas`)
 }

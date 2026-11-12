@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AppState } from '../App'
-import { BIOS, type BiosEntry } from '../lib/bios'
+import { BIOS, isKnownBios, type BiosEntry } from '../lib/bios'
 import { listFolder, trashFile, uploadResumable, type DriveFile } from '../lib/drive'
 import { Icon } from './icons'
 
@@ -39,7 +39,7 @@ export function BiosSection({ state }: { state: AppState }) {
       const old = (files ?? []).filter((f) => f.name === e.file)
       const up = await uploadResumable(file, e.file, folder, () => {})
       await Promise.all(old.map((f) => trashFile(f.id)))
-      const known = up.md5Checksum && e.md5.includes(up.md5Checksum)
+      const known = await isKnownBios(e, file, up.md5Checksum)
       state.notify(
         known
           ? `BIOS de ${e.console} subida. Llegará al stick en la próxima sincronización`
@@ -60,13 +60,14 @@ export function BiosSection({ state }: { state: AppState }) {
         <Icon name="sparkle" />
         <span>
           Antes de cada juego, la pantalla de inicio de su consola. Cada una necesita la BIOS de tu propia consola
-          (RetroStick no las descarga). NES y Super Nintendo no tenían.
+          (RetroStick no las descarga). NES y Super Nintendo no tenían. La de Neo Geo es imprescindible para jugar.
         </span>
       </p>
       <div className="rows" style={{ marginTop: 10 }}>
         {BIOS.map((e) => {
           const f = files?.find((x) => x.name === e.file)
-          const known = f?.md5Checksum ? e.md5.includes(f.md5Checksum) : false
+          // A zip BIOS is checked on upload (and again by the stick); once in Drive it counts as uploaded
+          const known = e.zipCrcs ? !!f : f?.md5Checksum ? e.md5.includes(f.md5Checksum) : false
           return (
             <button key={e.file} className="row-card row-btn" disabled={!folder || busy !== null} onClick={() => pick(e)}>
               <span className="row-ico">

@@ -51,13 +51,15 @@ class ButtonsActivity : Activity() {
         // (RetroArch remap ids 20-23: right stick X+, X-, Y+, Y-)
         "n64" to listOf(0 to "A", 1 to "B", 12 to "Z", 10 to "L", 11 to "R", 3 to "Start",
             23 to "C-Arriba", 22 to "C-Abajo", 21 to "C-Izquierda", 20 to "C-Derecha"),
+        // FinalBurn Neo's Neo Geo pad: A B at the bottom, C D at the top
+        "neogeo" to listOf(0 to "A", 8 to "B", 1 to "C", 9 to "D", 3 to "Start", 2 to "Select"),
         "psx" to listOf(0 to "✕", 8 to "○", 1 to "□", 9 to "△", 10 to "L1", 11 to "R1", 12 to "L2", 13 to "R2", 3 to "Start", 2 to "Select"),
     )
 
     /** RetroArch's config folder of each core (its name in the core info). */
     private val coreDirs = mapOf(
         "fceumm" to "FCEUmm", "snes9x2010" to "Snes9x 2010", "gambatte" to "Gambatte", "mgba" to "mGBA",
-        "genesis_plus_gx" to "Genesis Plus GX", "pcsx_rearmed" to "PCSX-ReARMed", "mupen64plus_next_gles2" to "Mupen64Plus-Next",
+        "genesis_plus_gx" to "Genesis Plus GX", "pcsx_rearmed" to "PCSX-ReARMed", "mupen64plus_next_gles2" to "Mupen64Plus-Next", "fbneo" to "FinalBurn Neo",
     )
 
     private var consoleIndex = 0

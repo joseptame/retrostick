@@ -16,13 +16,13 @@
  * Only reachable with the stick's pass (x-stick-token, see api/pair.ts and middleware.ts). Cached per console for a few hours.
  */
 import { configureArchive, groupDiscs, listItemFiles, type ArchiveEntry } from '../src/lib/archive.js'
-import { consoleForFile, CONSOLES, isCartridge, type ConsoleId } from '../src/lib/consoles.js'
+import { consoleForFile, CONSOLES, isCartridge, isRomsetConsole, type ConsoleId } from '../src/lib/consoles.js'
 import { configureData, fetchData } from '../src/lib/data.js'
 import { loadLookup } from '../src/lib/igdbdb.js'
 import { baseName, bestVariants, coverUrl, displayTitle, isDemo, looseKey, safeThumbName } from '../src/lib/names.js'
 import { DEFAULT_COLLECTIONS } from '../src/lib/recents.js'
 import { genreEs } from '../src/lib/genres.js'
-import { coverFor, loadDb } from '../src/lib/romdb.js'
+import { coverFor, loadDb, romsetName, romsetTitle } from '../src/lib/romdb.js'
 
 // Node.js, not edge: Vercel's edge adds a "Forwarded" header to outgoing requests and archive.org answers
 // those with 400. (Imports carry .js: Node resolves ES modules by exact file name.)
@@ -65,20 +65,34 @@ async function build(id: ConsoleId, collection: string): Promise<string> {
   const [{ entries, archive, title, restricted }, lookup, names] = await Promise.all([
     listItemFiles(collection, id),
     loadLookup(id),
-    isCartridge(id) ? namesIndex(id) : Promise.resolve(null),
+    isCartridge(id) && !isRomsetConsole(id) ? namesIndex(id) : Promise.resolve(null),
   ])
-  const list: ArchiveEntry[] = bestVariants(groupDiscs(entries).filter((e) => consoleForFile(e.name) === id && !isDemo(e.name)))
+  const romsets = isRomsetConsole(id)
+  const list: ArchiveEntry[] = romsets
+    ? entries
+    : bestVariants(groupDiscs(entries).filter((e) => consoleForFile(e.name) === id && !isDemo(e.name)))
+  // Neo Geo: each romset's long name ("mslug" → "Metal Slug - Super Vehicle-001"), for the title, ficha and box art
+  const allNames = romsets ? await Promise.all(list.map((e) => romsetName(id, baseName(e.name)))) : []
+  // Only the romsets FinalBurn Neo knows as Neo Geo games (others wouldn't start)
+  if (romsets) {
+    const known = list.map((e, i) => [e, allNames[i]] as const).filter(([, n]) => n != null)
+    list.splice(0, list.length, ...known.map(([e]) => e))
+  }
+  const longNames = romsets ? allNames.filter((n) => n != null) : []
   const genres: string[] = []
   const genreIndex = (g: string) => {
     let i = genres.indexOf(g)
     if (i < 0) i = genres.push(g) - 1
     return i
   }
-  const games: ShopGame[] = list.map((e) => {
+  const games: ShopGame[] = list.map((e, i) => {
     const base = baseName(e.name)
-    const info = lookup(base)
+    const long = longNames[i] ?? null
+    // Neo Geo: the file keeps its short name (n), the title comes from the long one ("A _ B (NGM-…)" → "A")
+    const title = long ? romsetTitle(long) : displayTitle(e.name)
+    const info = long ? (lookup(long) ?? lookup(title) ?? lookup(title.split(' - ')[0])) : lookup(base)
     const game: ShopGame = {
-      t: displayTitle(e.name),
+      t: title,
       f: e.name,
       s: e.size,
       // Already a No-Intro name (a "Rev 1"…): keep it; otherwise the best release of the same title.
@@ -93,11 +107,11 @@ async function build(id: ConsoleId, collection: string): Promise<string> {
     return game
   })
   // Box art picked here (same choice as the webapp), so the stick needn't look up libretro's index itself.
-  const covers = await Promise.all(list.map((e) => coverFor(id, e.name).catch(() => null)))
+  const covers = await Promise.all(list.map((e, i) => coverFor(id, longNames[i] ?? e.name).catch(() => null)))
   // No box art (pirate, homebrew…): libretro often still has the title screen under the exact No-Intro name.
   const thumbs = CONSOLES.find((c) => c.id === id)!.thumbs
   covers.forEach((c, i) => {
-    games[i].c = c ?? coverUrl(thumbs, safeThumbName(baseName(list[i].name)), 'Named_Titles')
+    games[i].c = c ?? coverUrl(thumbs, safeThumbName(longNames[i] ?? baseName(list[i].name)), 'Named_Titles')
   })
   const players = await fetchData<{ games: Record<string, number> }>(`db/players-${id}.json`).catch(() => null)
   if (players) for (const g of games) {

@@ -64,7 +64,7 @@ export function m3uName(discName: string): string {
   return discName.replace(/^.*\//, '').replace(DISC, '').replace(/\.[^.]+$/, '') + '.m3u'
 }
 
-import { consoleForFile, ROM_EXTENSION, type ConsoleId } from './consoles.js'
+import { consoleForFile, isRomsetConsole, NEOGEO_BIOS, ROM_EXTENSION, type ConsoleId } from './consoles.js'
 
 const METADATA = 'https://archive.org/metadata'
 
@@ -179,6 +179,13 @@ export async function listItemFiles(
   console?: ConsoleId,
 ): Promise<{ entries: ArchiveEntry[]; archive: string | null; title: string; restricted: boolean }> {
   const meta = await fetchMetadata(identifier)
+  // Neo Geo: every .zip is a game (its romset), except the BIOS and anything in a BIOS folder
+  if (console && isRomsetConsole(console)) {
+    const entries = meta.files
+      .filter((f) => /\.zip$/i.test(f.name) && !/(^|\/)bios[^/]*\//i.test(f.name) && f.name.split('/').pop()!.toLowerCase() !== NEOGEO_BIOS)
+      .map((f) => ({ name: f.name, size: Number(f.size ?? 0) }))
+    return { entries, archive: null, title: meta.title, restricted: meta.restricted }
+  }
   const ext = console && ROM_EXTENSION[console]
   const packs = meta.files.filter((f) => /\.(zip|7z)$/i.test(f.name) && !NOT_ROMS.test(f.name) && !isJunk(f.name))
   const loose = meta.files.filter((f) => consoleForFile(f.name) && !isJunk(f.name))

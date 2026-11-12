@@ -21,6 +21,8 @@ internal const val RETROARCH_CFG = "$SDCARD/Android/data/$RETROARCH_PACKAGE/file
 val RECENT = Console("recent", "Seguir jugando", R.drawable.ic_resume, emptySet(), "", "")
 /** How many games the «Seguir jugando» tab shows. */
 const val RECENT_COUNT = 12
+/** Neo Geo's BIOS, kept next to its games (Bios.kt): not a game. */
+const val NEOGEO_BIOS = "neogeo.zip"
 
 data class Console(
     val id: String,
@@ -60,6 +62,10 @@ val CONSOLES = listOf(
     // stick/retroarch/core-options/Mupen64Plus-Next). Big-endian .z64 is the No-Intro format; .n64/.v64 also run.
     Console("n64", "Nintendo 64", R.drawable.logo_n64, setOf("z64", "n64", "v64"),
         "mupen64plus_next_gles2_libretro_android.so", "Nintendo_-_Nintendo_64", colourOnCard = true),
+    // FinalBurn Neo, Neo Geo AES mode (core-options/FinalBurn Neo). Each game is a romset named by its short name
+    // ("mslug.zip"); NeoGeoNames gives its real name. neogeo.zip (the BIOS) sits in the same folder and isn't a game.
+    Console("neogeo", "Neo Geo", R.drawable.logo_neogeo, setOf("zip"),
+        "fbneo_libretro_android.so", "SNK_-_Neo_Geo", whiteWhenSelected = true),
     // .bin tracks are reached through their .cue; discs listed in a .m3u are hidden behind it.
     Console("psx", "PlayStation", R.drawable.logo_psx, setOf("m3u", "cue", "chd", "pbp"),
         "pcsx_rearmed_libretro_android.so", "Sony_-_PlayStation"),
@@ -68,7 +74,11 @@ val CONSOLES = listOf(
 class Game(val console: Console, val file: File) {
     /** No-Intro / Redump name without extension; also the base name of saves and runtime logs. */
     val baseName: String = file.nameWithoutExtension
-    val title: String = displayTitle(baseName)
+    /** Neo Geo: the romset's long name ("mslug" → "Metal Slug - Super Vehicle-001"), for the title and box art. */
+    private val romsetName: String? = if (console.id == "neogeo") NeoGeoNames.long(baseName) else null
+    val title: String = romsetName?.let(NeoGeoNames::romsetTitle) ?: displayTitle(baseName)
+    /** The name box art and lists know the game by (the long one for a Neo Geo romset). */
+    val lookupName: String get() = romsetName ?: baseName
     val region: String? = Regex("""\(([^)]*)\)""").find(baseName)?.groupValues?.get(1)?.let(::regionName)
     val key get() = "${console.id}/$baseName"
 
@@ -118,7 +128,7 @@ class Library(private val context: Context) {
         val logs = runtimeLogs.listFiles()?.filter { it.isDirectory }?.flatMap { listFiles(it) }.orEmpty()
 
         return CONSOLES.associate { console ->
-            val files = listFiles(console.romDir).filter { it.extension.lowercase() in console.extensions }
+            val files = listFiles(console.romDir).filter { it.extension.lowercase() in console.extensions && it.name != NEOGEO_BIOS }
             val inPlaylists = files.filter { it.extension.equals("m3u", true) }
                 .flatMap { m3u -> m3u.readLines().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("#") } }
                 .toSet()

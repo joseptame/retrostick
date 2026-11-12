@@ -21,6 +21,7 @@ export const PRESS_CONSOLES: Record<string, { qid: string; tags: RegExp }> = {
   md: { qid: 'Q10676', tags: /^(md|gen|genesis|mega ?drive|sega genesis|sega mega drive)$/i },
   sms: { qid: 'Q209868', tags: /^(sms|master system|sega master system|mark iii)$/i },
   n64: { qid: 'Q184839', tags: /^(n64|nintendo 64)$/i },
+  neogeo: { qid: 'Q1054350', tags: /^(neo ?geo|ng|aes|mvs|neo geo (aes|mvs))$/i },
   psx: { qid: 'Q10677', tags: /^(ps|ps1|psx|psone|ps one|playstation)$/i },
 }
 

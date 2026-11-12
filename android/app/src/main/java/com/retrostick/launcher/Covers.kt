@@ -78,8 +78,8 @@ class CoverLoader(context: Context) {
         val missing = File(consoleDir, "${game.baseName}.none")
         if (missing.exists() && System.currentTimeMillis() - missing.lastModified() < RETRY_MISSING_MS) return null
 
-        val names = locked("index/${game.console.id}") { boxartIndex(game.console) }?.let { listOfNotNull(bestBoxart(game.baseName, it)) }
-            ?: candidateNames(game.baseName)
+        val names = locked("index/${game.console.id}") { boxartIndex(game.console) }?.let { listOfNotNull(bestBoxart(game.lookupName, it)) }
+            ?: candidateNames(game.lookupName)
         for (name in names) {
             when (download(game.console.thumbnailSystem, name, local)) {
                 Result.OK -> return local

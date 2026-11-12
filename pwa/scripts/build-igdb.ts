@@ -25,6 +25,8 @@ const CONSOLES = [
   { id: 'md', platform: 29 },
   { id: 'sms', platform: 64 },
   { id: 'n64', platform: 4 },
+  // Neo Geo: MVS (arcade) and AES (home)
+  { id: 'neogeo', platform: '79,80' },
   { id: 'psx', platform: 7 },
 ]
 

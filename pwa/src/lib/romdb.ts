@@ -9,6 +9,23 @@ interface Db {
   sha1: Record<string, number>
   crc: Record<string, number>
   boxarts: string[]
+  /** Neo Geo: romset short name ("mslug") → index of its long name */
+  files?: Record<string, number>
+}
+
+/**
+ * The title shown for a romset's long name: the first of its names (the English one: "Samurai Shodown / Samurai
+ * Spirits (NGM-045)" or libretro's "Samurai Shodown _ Samurai Spirits"), without the board codes in brackets.
+ */
+export function romsetTitle(long: string): string {
+  return long.split(/ [\/_] /)[0].replace(/\s*[([].*$/, '').trim()
+}
+
+/** "mslug" → "Metal Slug - Super Vehicle-001" (Neo Geo romsets); null when the list doesn't have it. */
+export async function romsetName(id: ConsoleId, short: string): Promise<string | null> {
+  const db = await loadDb(id)
+  const i = db.files?.[short.toLowerCase()]
+  return i === undefined ? null : db.names[i]
 }
 
 const cache = new Map<ConsoleId, Promise<Db>>()

@@ -12,7 +12,12 @@ import java.security.MessageDigest
  * turns each core's "boot screen" option on or off (Retro Ajustes → Pantallas de inicio).
  */
 object Bios {
-    class Entry(val console: String, val file: String, val md5: Set<String>)
+    /**
+     * [zipCrcs]: a zip BIOS (Neo Geo), checked by the CRC32 of the files inside (its MD5 depends on the packing);
+     * [copies]: other places its core looks for it.
+     */
+    class Entry(val console: String, val file: String, val md5: Set<String>, val zipCrcs: Set<String> = emptySet(),
+                val copies: List<File> = emptyList())
 
     /** Same table as pwa/src/lib/bios.ts. */
     val ALL = listOf(
@@ -28,6 +33,10 @@ object Bios {
         )),
         Entry("Master System", "bios_E.sms", setOf("840481177270d5642a14ca71ee72844c")),
         Entry("Mega Drive", "bios_MD.bin", setOf("45e298905a08f9cfb38fd504cd6dbc84")),
+        // Needed to play at all. FinalBurn Neo's current 000-lo.lo, sfix.sfix, sm1.sm1 (older sets don't start any
+        // game) and the European AES BIOS; FinalBurn Neo finds it next to the games (and in system/fbneo).
+        Entry("Neo Geo", "neogeo.zip", emptySet(), zipCrcs = setOf("5a86cff2", "c2ea0cfd", "94416d67", "d27a71f1"),
+            copies = listOf(File("$SDCARD/ROMs/neogeo/neogeo.zip"), File("$SDCARD/RetroArch/system/fbneo/neogeo.zip"))),
     )
 
     val SYSTEM_DIR = File("$SDCARD/RetroArch/system")
@@ -47,9 +56,27 @@ object Bios {
         val f = File(SYSTEM_DIR, e.file)
         e to when {
             !f.isFile -> State.MISSING
+            e.zipCrcs.isNotEmpty() -> if (zipCrcs(f).containsAll(e.zipCrcs)) State.OK else State.UNKNOWN
             md5(f) in e.md5 -> State.OK
             else -> State.UNKNOWN
         }
+    }
+
+    private fun zipCrcs(f: File): Set<String> = runCatching {
+        java.util.zip.ZipFile(f).use { z -> z.entries().asSequence().map { "%08x".format(it.crc) }.toSet() }
+    }.getOrDefault(emptySet())
+
+    /** A good zip BIOS also where its core looks for it (Neo Geo: next to the games); a bad or missing one, nowhere. */
+    private fun placeCopies(e: Entry) {
+        if (e.copies.isEmpty()) return
+        val src = File(SYSTEM_DIR, e.file)
+        val ok = src.isFile && zipCrcs(src).containsAll(e.zipCrcs)
+        for (c in e.copies) runCatching {
+            when {
+                !ok -> if (c.isFile) c.delete()
+                !(c.isFile && c.length() == src.length() && md5(c) == md5(src)) -> { c.parentFile?.mkdirs(); src.copyTo(c, overwrite = true) }
+            }
+        }.onFailure { Log.w("RetroStick", "BIOS ${e.file} copy to $c", it) }
     }
 
     /** During a Drive sync: Retro/Config/bios mirrored into RetroArch/system (only the files in [ALL]). */
@@ -62,14 +89,16 @@ object Bios {
             if (r == null) {
                 // Taken out of Drive: off the stick too
                 if (local.isFile) local.delete()
+                placeCopies(e)
                 continue
             }
-            if (local.isFile && (r.md5 == null || md5(local) == r.md5)) continue
+            if (local.isFile && (r.md5 == null || md5(local) == r.md5)) { placeCopies(e); continue }
             val tmp = File(SYSTEM_DIR, "${e.file}.part")
             runCatching {
                 drive.download(r.id, tmp)
                 if (!tmp.renameTo(local)) { local.delete(); tmp.renameTo(local) }
             }.onFailure { tmp.delete(); Log.w("RetroStick", "BIOS ${e.file} not copied", it) }
+            placeCopies(e)
         }
     }
 

@@ -219,7 +219,8 @@ object DriveSync {
         }
 
         private fun localFiles(dir: File) = dir.apply { mkdirs() }.listFiles()
-            ?.filter { it.isFile && !it.name.startsWith(".") && !it.name.endsWith(".part") && !it.name.endsWith(".tmp") }
+            // Neo Geo's BIOS sits next to its games (Bios.kt puts it there): not a game to back up
+            ?.filter { it.isFile && !it.name.startsWith(".") && !it.name.endsWith(".part") && !it.name.endsWith(".tmp") && it.name != NEOGEO_BIOS }
             ?.associateBy { it.name }.orEmpty()
 
         private fun syncSaves(sub: String) {

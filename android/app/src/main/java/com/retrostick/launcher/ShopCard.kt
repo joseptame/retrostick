@@ -39,6 +39,7 @@ object ShopCard {
         "md" -> Style(0xFF2A1414.toInt(), 0xFF140D10.toInt(), 0xFFE53E3E.toInt())
         "sms" -> Style(0xFF2A1418.toInt(), 0xFF120C10.toInt(), 0xFFFF3B3B.toInt())
         "n64" -> Style(0xFF16281E.toInt(), 0xFF0E1614.toInt(), 0xFF2FB45A.toInt())
+        "neogeo" -> Style(0xFF2A1210.toInt(), 0xFF120C0C.toInt(), 0xFFE5B53A.toInt())
         "psx" -> Style(0xFF22252C.toInt(), 0xFF121418.toInt(), 0xFF3A8EE0.toInt())
         else -> Style(0xFF2A2346.toInt(), 0xFF16122C.toInt(), 0xFF9D8CFF.toInt())
     }
@@ -156,6 +157,7 @@ class ConsoleMediaView(context: Context, private val console: Console) : View(co
                 p.shader = null
             }
             "n64" -> n64Cartridge(canvas)
+            "neogeo" -> neoGeoCartridge(canvas)
             "psx" -> disc(canvas)
             else -> cartridge(canvas, 4f, 8f, 120f, 104f, floatArrayOf(4f, 4f, 4f, 4f), 0xFF9D9AA6, 0xFF7D7A86) {}
         }
@@ -241,6 +243,15 @@ class ConsoleMediaView(context: Context, private val console: Console) : View(co
             intArrayOf(0xFFE53E3E.toInt(), 0xFFF2B632.toInt(), 0xFF2FB45A.toInt(), 0xFF3A6BD9.toInt()), floatArrayOf(0f, 0.35f, 0.65f, 1f), Shader.TileMode.CLAMP)
         c.drawPath(label, p)
         p.shader = null
+    }
+
+    /** A Neo Geo AES cartridge, seen from the front: tall and black, with the big label. (First version: to refine.) */
+    private fun neoGeoCartridge(c: Canvas) {
+        cartridge(c, 22f, 2f, 84f, 116f, floatArrayOf(4f, 4f, 4f, 4f), 0xFF2A2A2E, 0xFF141416, stroke = 0x26FFFFFF) {
+            label(c, 30f, 12f, 68f, 82f, LinearGradient(30f, 12f, 98f, 94f, 0xFFE5B53A.toInt(), 0xFFB8452C.toInt(), Shader.TileMode.CLAMP), 0x33FFFFFF)
+            p.shader = null; p.color = 0x40FFFFFF
+            c.drawRect(36f, 102f, 92f, 105f, p)
+        }
     }
 
     private fun disc(c: Canvas) {
