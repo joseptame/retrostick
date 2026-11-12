@@ -710,16 +710,95 @@ class MainActivity : Activity() {
         }
     }
 
-    /** The top bar's «Retro Ajustes» button: lit while Retro Ajustes is open, outlined when it has the focus (▲ from the tabs). */
+    /** In the top bar (Zone.GEAR): 0 = «Retro Ajustes», 1 = the controllers. */
+    private var gearIndex = 0
+
+    /**
+     * The top bar's buttons: «Retro Ajustes» (lit while it is open) and the controllers; the one with the focus
+     * (▲ from the tabs, ◀ ▶ between them) is outlined.
+     */
     private fun renderGear() {
         val chip = findViewById<TextView>(R.id.settingsChip)
-        val focus = zone == Zone.GEAR
+        val focus = zone == Zone.GEAR && gearIndex == 0
         chip.background = GradientDrawable().apply {
             cornerRadius = dp(9).toFloat()
             setColor(Color.parseColor(if (settingsTab || focus) "#7B5CFF" else "#14FFFFFF"))
             if (focus) setStroke(dp(2), Color.WHITE)
         }
         chip.alpha = if (settingsTab || focus) 1f else 0.85f
+        val pads = findViewById<View>(R.id.padsChip)
+        val padsFocus = zone == Zone.GEAR && gearIndex == 1
+        pads.background = if (padsFocus) GradientDrawable().apply {
+            cornerRadius = dp(9).toFloat(); setColor(Color.parseColor("#7B5CFF")); setStroke(dp(2), Color.WHITE)
+        } else null
+    }
+
+    /** The controllers window: each connected pad with its player number and battery (when the stick can read it). */
+    private fun showPads() {
+        keySound = Sounds.Sound.OPEN
+        val pads = StickStatus.gamepads()
+        val col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(22), dp(6), dp(22), dp(4)) }
+        fun label(sp: Float, color: Int, bold: Boolean = false) = TextView(this).apply {
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, sp); setTextColor(color)
+            typeface = resources.getFont(if (bold) R.font.inter_bold else R.font.inter_regular)
+        }
+        if (pads.isEmpty()) {
+            col.addView(label(13f, getColor(R.color.text_2)).apply { text = "No hay ningún mando conectado. Enciende uno o empareja uno nuevo." })
+        }
+        var unknown = false
+        pads.forEachIndexed { i, d ->
+            val battery = StickStatus.batteryLevel(d)
+            if (battery == null) unknown = true
+            val style = StickStatus.padStyle(d)
+            val row = LinearLayout(this).apply {
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                setPadding(dp(14), dp(10), dp(16), dp(10))
+                background = GradientDrawable().apply { cornerRadius = dp(12).toFloat(); setColor(Color.parseColor("#14FFFFFF")) }
+            }
+            // Player number in a coloured disc, like the light bar of the pad
+            val colors = listOf("#3A8EE0", "#E53E3E", "#2FB45A", "#E5B53A", "#9D8CFF", "#E2575C", "#5B6BFF", "#F2B632")
+            row.addView(label(15f, Color.WHITE, bold = true).apply {
+                text = "J${i + 1}"; gravity = android.view.Gravity.CENTER
+                background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.parseColor(colors[i % colors.size])) }
+            }, LinearLayout.LayoutParams(dp(40), dp(40)))
+            row.addView(LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(label(14f, Color.WHITE, bold = true).apply { text = StickStatus.shortControllerName(d.name) })
+                addView(label(10.5f, getColor(R.color.text_2)).apply {
+                    text = listOf(
+                        when (style) { PadStyle.PLAYSTATION -> "PlayStation"; PadStyle.NINTENDO -> "Nintendo"; PadStyle.XBOX -> "Xbox / genérico"; else -> "Mando" },
+                        "Jugador ${i + 1} en los juegos",
+                    ).joinToString("  ·  ")
+                })
+            }, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(14) })
+            // Battery: a small bar with the percentage, or a dash when unknown
+            row.addView(LinearLayout(this).apply {
+                gravity = android.view.Gravity.CENTER_VERTICAL or android.view.Gravity.END
+                if (battery != null) {
+                    val tint = Color.parseColor(when { battery <= 15 -> "#E53E3E"; battery <= 35 -> "#E5B53A"; else -> "#4ADE80" })
+                    addView(android.widget.FrameLayout(this@MainActivity).apply {
+                        background = GradientDrawable().apply { cornerRadius = dp(3).toFloat(); setStroke(dp(2), Color.WHITE) }
+                        setPadding(dp(3), dp(3), dp(3), dp(3))
+                        addView(View(this@MainActivity).apply { background = GradientDrawable().apply { cornerRadius = dp(1).toFloat(); setColor(tint) } },
+                            android.widget.FrameLayout.LayoutParams(dp(34 * battery / 100).coerceAtLeast(dp(2)), -1))
+                    }, LinearLayout.LayoutParams(dp(40), dp(18)))
+                    addView(label(13f, Color.WHITE, bold = true).apply { text = "$battery %" }, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(8) })
+                } else {
+                    addView(label(11f, getColor(R.color.text_2)).apply { text = "Batería —" })
+                }
+            }, LinearLayout.LayoutParams(-2, -2))
+            col.addView(row, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
+        }
+        if (unknown) col.addView(label(10.5f, getColor(R.color.text_2)).apply {
+            text = "«—»: este stick no puede leer la batería de esos mandos (su Android 9 no trae cómo). La luz del propio mando avisa cuando queda poca."
+        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) })
+        AlertDialog.Builder(this, R.style.Dialog_RetroStick)
+            .setTitle(if (pads.size == 1) "Mando conectado" else if (pads.isEmpty()) "Mandos" else "${pads.size} mandos conectados")
+            .setView(col)
+            .setPositiveButton("Cerrar", null)
+            .setNeutralButton("Emparejar otro") { _, _ -> open(Intent(CONNECT_INPUT)) }
+            .setNegativeButton("Botones") { _, _ -> open(Intent(this, ButtonsActivity::class.java).putExtra("console", lastConsole.id)) }
+            .showForPad()
     }
 
     // ---- Shelf ----
@@ -1087,7 +1166,8 @@ class MainActivity : Activity() {
         val pads = StickStatus.controllers()
         findViewById<TextView>(R.id.controllerText).text = when {
             pads.isEmpty() -> getString(R.string.no_controller)
-            pads.size == 1 -> "${StickStatus.shortControllerName(pads[0])} · J1"
+            pads.size == 1 -> "${StickStatus.shortControllerName(pads[0])} · J1" +
+                (StickStatus.gamepads().firstOrNull()?.let(StickStatus::batteryLevel)?.let { " · $it %" } ?: "")
             else -> "${pads.size} mandos · " + (1..pads.size).joinToString(" ") { "J$it" }
         }
         val connected = driveAuth.isConfigured && driveAuth.isConnected
@@ -1331,7 +1411,10 @@ class MainActivity : Activity() {
         if (zone == Zone.GEAR) {
             when (code) {
                 KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_BUTTON_B -> zone = Zone.TABS
-                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_BUTTON_A -> openSettings()
+                KeyEvent.KEYCODE_DPAD_RIGHT -> gearIndex = 1
+                KeyEvent.KEYCODE_DPAD_LEFT -> gearIndex = 0
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_BUTTON_A ->
+                    if (gearIndex == 1) showPads() else openSettings()
                 KeyEvent.KEYCODE_BUTTON_L1 -> { zone = Zone.TABS; switchTab(-1) }
                 KeyEvent.KEYCODE_BUTTON_R1 -> { zone = Zone.TABS; switchTab(1) }
             }
@@ -1353,7 +1436,7 @@ class MainActivity : Activity() {
                 else -> moveGame(1)
             }
             KeyEvent.KEYCODE_DPAD_UP -> when {
-                tabsZone -> zone = Zone.GEAR
+                tabsZone -> { zone = Zone.GEAR; gearIndex = 0 }
                 settingsTab && settingIndex >= SETTINGS_COLUMNS -> settingIndex -= SETTINGS_COLUMNS
                 driveRow -> inDrive[tab] = false
                 else -> zone = Zone.TABS

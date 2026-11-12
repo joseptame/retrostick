@@ -54,14 +54,27 @@
             android:textColor="@color/text"
             android:textSize="11sp" />
 
-        <ImageView
+        <!-- The connected controllers: ▲ from the tabs, then ▶ from Retro Ajustes; ✕ opens the controllers window -->
+        <LinearLayout
+            android:id="@+id/padsChip"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:src="@drawable/ic_gamepad" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="8dp"
+            android:paddingTop="3dp"
+            android:paddingEnd="9dp"
+            android:paddingBottom="3dp">
 
-        <TextView
-            android:id="@+id/controllerText"
-            style="@style/Chip" />
+            <ImageView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:src="@drawable/ic_gamepad" />
+
+            <TextView
+                android:id="@+id/controllerText"
+                style="@style/Chip" />
+        </LinearLayout>
 
         <View
             android:id="@+id/syncDot"

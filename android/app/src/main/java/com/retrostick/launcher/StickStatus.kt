@@ -67,6 +67,21 @@ object StickStatus {
     fun gamepads(): List<InputDevice> =
         InputDevice.getDeviceIds().toList().mapNotNull { InputDevice.getDevice(it) }.filter(::isGamepad)
 
+    /**
+     * A controller's battery, 0-100, or null when the stick can't tell. Asked to Android's Bluetooth stack
+     * (BluetoothDevice.getBatteryLevel, hidden on Android 9): the Mi TV Stick's kernel 4.9 has no driver that reads
+     * the DualSense's or the Pro Controller's own battery, so this is mostly null there. Only for a name that matches
+     * one paired device (three DualSense look the same, so none of them is guessed).
+     */
+    @android.annotation.SuppressLint("MissingPermission")
+    fun batteryLevel(device: InputDevice): Int? = runCatching {
+        val adapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter() ?: return null
+        val bonded = adapter.bondedDevices.filter { it.name == device.name }
+        if (bonded.size != 1) return null
+        val level = android.bluetooth.BluetoothDevice::class.java.getMethod("getBatteryLevel").invoke(bonded[0]) as Int
+        level.takeIf { it in 0..100 }
+    }.getOrNull()
+
     /** Names of connected game controllers, in player order. */
     fun controllers(): List<String> = gamepads().map { it.name }
 
