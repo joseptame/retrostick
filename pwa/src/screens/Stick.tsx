@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { AppState } from '../App'
 import { BiosSection } from '../components/BiosSection'
+import { UsersSection } from '../components/UsersSection'
 import { PairSheet } from '../components/PairSheet'
 import { RaSection } from '../components/RaSection'
 import { Icon, type IconName } from '../components/icons'
@@ -81,6 +82,7 @@ export function Stick({ state, onSignOut }: { state: AppState; onSignOut: () => 
 
       <h3 className="sec2">Cuenta</h3>
       <div className="rows">
+        <UsersSection state={state} />
         <div className="row-card">
           <span className="row-ico">
             <Icon name="cloud" />

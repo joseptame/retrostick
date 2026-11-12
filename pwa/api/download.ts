@@ -8,6 +8,7 @@
  * piece (206), fetched with the user's archive.org keys (api/_archive.ts).
  */
 import { fetchArchiveRange } from './_archive.js'
+import { whoIs } from './_users.js'
 
 // Node.js, not edge: Vercel's edge adds a "Forwarded" header to outgoing requests and archive.org answers
 // those with 400 (same as api/shop.ts).
@@ -27,6 +28,9 @@ export async function GET(request: Request): Promise<Response> {
 
   const range = /^bytes=(\d+)-(\d+)$/.exec(request.headers.get('range') ?? '')
   if (range) {
+    // Restricted items go out with the admin's archive.org keys: only for the admin and their stick
+    const who = await whoIs(request)
+    if (!who?.admin) return new Response('Esta colección solo está disponible para el administrador', { status: 403 })
     const start = Number(range[1])
     const end = Number(range[2]) + 1
     if (!(end > start && end - start <= MAX_RANGE)) return new Response('Rango inválido', { status: 416 })
