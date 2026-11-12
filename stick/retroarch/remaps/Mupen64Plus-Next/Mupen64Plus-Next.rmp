@@ -5,6 +5,10 @@
 input_player1_btn_a = "1"
 # R2 held turns the face buttons into C buttons in this core: easy to press by mistake, so it does nothing.
 input_player1_btn_r2 = "-1"
-# Player 2 (a second pad): same layout
+# Players 2 to 4 (more pads, PlayStation Multitap): the same layout as player 1
 input_player2_btn_a = "1"
 input_player2_btn_r2 = "-1"
+input_player3_btn_a = "1"
+input_player3_btn_r2 = "-1"
+input_player4_btn_a = "1"
+input_player4_btn_r2 = "-1"

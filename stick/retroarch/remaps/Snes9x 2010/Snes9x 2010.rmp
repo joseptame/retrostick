@@ -5,7 +5,13 @@ input_player1_btn_l2 = "-1"
 input_player1_btn_r2 = "-1"
 # 1 = ANALOG_DPAD_LSTICK
 input_player1_analog_dpad_mode = "1"
-# Player 2 (a second DualSense): same layout
+# Players 2 to 4 (more pads, PlayStation Multitap): the same layout as player 1
 input_player2_btn_l2 = "-1"
 input_player2_btn_r2 = "-1"
 input_player2_analog_dpad_mode = "1"
+input_player3_btn_l2 = "-1"
+input_player3_btn_r2 = "-1"
+input_player3_analog_dpad_mode = "1"
+input_player4_btn_l2 = "-1"
+input_player4_btn_r2 = "-1"
+input_player4_analog_dpad_mode = "1"

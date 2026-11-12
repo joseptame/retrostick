@@ -24,7 +24,7 @@ import java.io.File
  * does in each console, and changing it. Saved as a RetroArch content-directory remap,
  * RetroArch/config/remaps/<core>/<console>.rmp (games in /ROMs/<console>): RetroStick's core remap with the user's
  * buttons on top, so Game Boy and Game Boy Color (both Gambatte) can differ. «Restablecer» deletes it, and the core
- * remap from stick/retroarch/remaps applies again. Players 1 and 2 get the same buttons.
+ * remap from stick/retroarch/remaps applies again. Players 1 to 4 get the same buttons.
  * Create / − stays out: it is RetroArch's shortcut button (Create + L1 saves…).
  */
 class ButtonsActivity : Activity() {
@@ -213,13 +213,13 @@ class ButtonsActivity : Activity() {
             .showForPad()
     }
 
-    /** RetroStick's core remap, with every pad button as shown here (both players). */
+    /** RetroStick's core remap, with every pad button as shown here (players 1 to 4). */
     private fun save(index: Int, id: Int) {
         mapping[index] = id
         val c = console
         val cfg = readCfg(coreFile(c))
         pads.forEachIndexed { i, p ->
-            for (player in 1..2) cfg["input_player${player}_${p.key}"] = mapping[i].toString()
+            for (player in 1..4) cfg["input_player${player}_${p.key}"] = mapping[i].toString()
         }
         val ok = runCatching {
             remapDir(c).mkdirs()
