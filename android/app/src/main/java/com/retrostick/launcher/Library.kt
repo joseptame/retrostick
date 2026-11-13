@@ -13,7 +13,7 @@ const val RETROARCH_PACKAGE = "com.retroarch.ra32"
 private const val RETROARCH_ACTIVITY = "com.retroarch.browser.retroactivity.RetroActivityFuture"
 internal const val RETROARCH_CFG = "$SDCARD/Android/data/$RETROARCH_PACKAGE/files/retroarch.cfg"
 /**
- * RetroStick's own retroarch.cfg, for sticks where RetroArch's can't be written: from Android 11 (Fire OS 8) no app
+ * RetroStick's own retroarch.cfg, for sticks where RetroArch's can't be written: from Android 11 (e.g. the Xiaomi Mi TV Stick 4K) no app
  * may touch another's Android/data. Games start with it (CONFIGFILE), so RetroArch reads it and saves into it.
  */
 internal const val RETROSTICK_CFG = "$SDCARD/RetroArch/retrostick.cfg"
