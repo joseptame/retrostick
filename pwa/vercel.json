@@ -3,5 +3,12 @@
   "ignoreCommand": "git diff --quiet HEAD^ HEAD -- .",
   "regions": [
     "fra1"
+  ],
+  "redirects": [
+    {
+      "source": "/apk",
+      "destination": "https://github.com/joseptame/retrostick/releases/download/stick/launcher.apk",
+      "permanent": false
+    }
   ]
 }
