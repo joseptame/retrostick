@@ -17,8 +17,12 @@ export interface Game {
   size: number
 }
 
-/** Partidas/.stick/status.json written by the launcher (README 8.3) */
+/** Partidas/.stick/status-<id>.json written by each stick's launcher (README 8.3); status.json before 1.25.5 */
 export interface StickStatus {
+  id?: string
+  name?: string
+  /** Downloads JugandoAhora by itself (false: a second stick on the account, which picks its games) */
+  autoRoms?: boolean
   updatedAt: string
   freeBytes: number
   romsBytes: number
@@ -29,7 +33,10 @@ export interface StickStatus {
 export interface Library {
   games: Game[]
   saves: DriveFile[]
+  /** The stick that downloads JugandoAhora (the newest if several): what the space card measures */
   status: StickStatus | null
+  /** Every stick on the account, newest first */
+  sticks?: StickStatus[]
   fetchedAt: number
 }
 
@@ -73,12 +80,18 @@ export async function loadLibrary(folders: Folders): Promise<Library> {
     listFolder(folders.states),
     listFolder(folders.stick),
   ])
-  const statusFile = stickFiles.find((f) => f.name === 'status.json')
-  const status = statusFile ? await readJson<StickStatus>(statusFile.id).catch(() => null) : null
+  // One file per stick; a stick on a launcher before 1.25.5 only writes status.json (shared, the last one wins)
+  const perStick = stickFiles.filter((f) => /^status-[\w-]+\.json$/.test(f.name))
+  const statusFiles = perStick.length ? perStick : stickFiles.filter((f) => f.name === 'status.json')
+  const sticks = (await Promise.all(statusFiles.map((f) => readJson<StickStatus>(f.id).catch(() => null))))
+    .filter((s): s is StickStatus => !!s)
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+  const status = sticks.find((s) => s.autoRoms !== false) ?? sticks[0] ?? null
   const library: Library = {
     games: perConsole.flat().sort((a, b) => a.title.localeCompare(b.title, 'es')),
     saves: [...saves, ...states].sort((a, b) => b.modifiedTime.localeCompare(a.modifiedTime)),
     status,
+    sticks,
     fetchedAt: Date.now(),
   }
   localStorage.setItem(CACHE_KEY, JSON.stringify(library))

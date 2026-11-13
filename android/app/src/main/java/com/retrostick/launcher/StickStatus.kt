@@ -137,16 +137,37 @@ object StickStatus {
 
     fun romsBytes() = File("$SDCARD/ROMs").walkTopDown().filter { it.isFile }.sumOf { it.length() }
 
-    /** README 8.3: Partidas/.stick/status.json, uploaded by DriveSync and read by the PWA. */
+    /** This stick, among the ones on the same Drive account: a random id kept for good (not in Backup's copy). */
+    fun stickId(context: Context): String {
+        val prefs = context.getSharedPreferences("stick", Context.MODE_PRIVATE)
+        return prefs.getString("id", null) ?: java.util.UUID.randomUUID().toString().take(8).also {
+            prefs.edit().putString("id", it).apply()
+        }
+    }
+
+    /** The stick's name in Android (Ajustes → Preferencias del dispositivo → Información → Nombre), or its model. */
+    fun stickName(context: Context): String =
+        runCatching { android.provider.Settings.Global.getString(context.contentResolver, "device_name") }.getOrNull()
+            ?.takeIf { it.isNotBlank() } ?: Build.MODEL
+
+    /**
+     * README 8.3: Partidas/.stick/status-<id>.json, uploaded by DriveSync and read by the PWA, one per stick
+     * (several sticks can share an account; each gets the others' too, through the saves sync, and ignores them).
+     */
     fun writeStatusJson(context: Context) {
         val iso = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }
+        val id = stickId(context)
         val json = JSONObject()
+            .put("id", id)
+            .put("name", stickName(context))
+            // Downloads JugandoAhora by itself (the main stick) or picks its games (DriveSync.autoRoms)
+            .put("autoRoms", DriveSync.autoRoms(context))
             .put("updatedAt", iso.format(Date()))
             .put("freeBytes", freeBytes())
             .put("romsBytes", romsBytes())
             .put("controllers", JSONArray(controllers()))
             .put("appVersion", context.packageManager.getPackageInfo(context.packageName, 0).versionName)
-        val target = File("$SDCARD/Partidas/.stick/status.json")
+        val target = File("$SDCARD/Partidas/.stick/status-$id.json")
         target.parentFile?.mkdirs()
         val tmp = File(target.path + ".tmp")
         tmp.writeText(json.toString(2))

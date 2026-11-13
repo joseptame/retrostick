@@ -86,7 +86,7 @@ Convertir un **Xiaomi Mi TV Stick** en una consola retro para jugar a **mis prop
 - **La PWA no habla con el stick.** Solo ordena archivos en Drive. El stick se pone al día en su próxima sincronización.
 - **"Poner un juego en el stick"** = mover el archivo de `Coleccion/<consola>/` a `JugandoAhora/<consola>/` (cambiar el *parent* en Drive). **"Quitarlo"** = devolverlo a `Coleccion/`.
 - **Las partidas nunca se borran** del Drive al quitar un juego. Por eso viven en una carpeta aparte.
-- **Estado del stick:** el launcher escribe `Partidas/.stick/status.json` (espacio libre, hora de la última sincronización, mando conectado). La sincronización del launcher lo sube y la PWA lo lee para la pestaña "Stick".
+- **Estado del stick:** el launcher escribe `Partidas/.stick/status.json` (espacio libre, hora de la última sincronización, mando conectado). La sincronización del launcher lo sube y la PWA lo lee para la pestaña "Stick". Desde la 1.25.5 cada stick escribe el suyo, `status-<id>.json` (con `id`, `name` —el nombre del dispositivo en Android— y `autoRoms`), y la pestaña "Stick" muestra uno por stick; el espacio de la PWA se mide con el que descarga `JugandoAhora`. `status.json` solo se lee si no hay ninguno nuevo.
 
 ---
 

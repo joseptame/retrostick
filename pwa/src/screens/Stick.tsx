@@ -7,60 +7,20 @@ import { RaSection } from '../components/RaSection'
 import { Icon, type IconName } from '../components/icons'
 import { accountEmail } from '../lib/auth'
 import { formatAgo, formatBytes, formatWhen } from '../lib/format'
+import type { StickStatus } from '../lib/library'
 
-/** status.json written by the TV launcher (README 7.4 "Stick", 8.3). */
+/** The status each stick's launcher writes (README 7.4 "Stick", 8.3): one block per stick on the account. */
 export function Stick({ state, onSignOut }: { state: AppState; onSignOut: () => void }) {
-  const status = state.library?.status
-  const stale = status && Date.now() - new Date(status.updatedAt).getTime() > 24 * 3600 * 1000
-  const total = status ? status.romsBytes + status.freeBytes : 0
-  const pct = status && total ? (status.romsBytes / total) * 100 : 0
+  const library = state.library
+  const sticks = library?.sticks ?? (library?.status ? [library.status] : [])
   const [pairing, setPairing] = useState(false)
 
   return (
     <main className="screen">
-      <section className={`stick-hero ${!status ? 'none' : stale ? 'stale' : 'ok'}`}>
-        <span className="stick-hero-ico">
-          <Icon name="tv" />
-          <span className="dot" aria-hidden />
-        </span>
-        <div className="grow">
-          <b>{!status ? 'Sin conectar' : stale ? 'Sin sincronizar' : 'Al día'}</b>
-          <small>
-            {!status
-              ? 'El stick todavía no ha enviado su estado. Conéctalo a Drive desde Retro Ajustes.'
-              : `Última sincronización ${formatAgo(status.updatedAt)}`}
-          </small>
-        </div>
-      </section>
-
-      {status && (
-        <>
-          <section className="meter" aria-label="Almacenamiento del stick">
-            <div className="meter-top">
-              <span className="meter-ico">
-                <Icon name="disk" />
-              </span>
-              <div className="meter-txt">
-                <b>Almacenamiento</b>
-                <small>{formatBytes(status.freeBytes)} libres</small>
-              </div>
-              <div className="meter-num">
-                <b>{formatBytes(status.romsBytes)}</b>
-                <small>en juegos</small>
-              </div>
-            </div>
-            <div className="meter-bar" role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}>
-              <i style={{ width: `${pct}%` }} />
-            </div>
-          </section>
-
-          <div className="tiles">
-            <Tile icon="gamepad" label="Mando" value={status.controllers.length ? status.controllers.join(', ') : 'Ninguno'} />
-            <Tile icon="info" label="Versión del menú" value={status.appVersion} />
-            <Tile icon="history" label="Sincronizado" value={formatWhen(status.updatedAt)} wide />
-          </div>
-        </>
-      )}
+      {sticks.length === 0 && <StickBlock status={null} />}
+      {sticks.map((s, i) => (
+        <StickBlock key={s.id ?? i} status={s} title={sticks.length > 1 ? (s.name ?? `Stick ${i + 1}`) : undefined} />
+      ))}
 
       <h3 className="sec2">RetroShop</h3>
       <div className="rows">
@@ -123,6 +83,67 @@ export function Stick({ state, onSignOut }: { state: AppState; onSignOut: () => 
         <a href="https://github.com/joseptame/retrostick">Código</a>
       </p>
     </main>
+  )
+}
+
+/** One stick: in sync or not, its storage, controllers and launcher version. [title] when there are several. */
+function StickBlock({ status, title }: { status: StickStatus | null; title?: string }) {
+  const stale = status && Date.now() - new Date(status.updatedAt).getTime() > 24 * 3600 * 1000
+  const total = status ? status.romsBytes + status.freeBytes : 0
+  const pct = status && total ? (status.romsBytes / total) * 100 : 0
+
+  return (
+    <>
+      {title && (
+        <h3 className="sec2">
+          {title}
+          <span>{status?.autoRoms === false ? 'Eliges sus juegos' : 'Descarga Jugando ahora'}</span>
+        </h3>
+      )}
+      <section className={`stick-hero ${!status ? 'none' : stale ? 'stale' : 'ok'}`}>
+        <span className="stick-hero-ico">
+          <Icon name="tv" />
+          <span className="dot" aria-hidden />
+        </span>
+        <div className="grow">
+          <b>{!status ? 'Sin conectar' : stale ? 'Sin sincronizar' : 'Al día'}</b>
+          <small>
+            {!status
+              ? 'El stick todavía no ha enviado su estado. Conéctalo a Drive desde Retro Ajustes.'
+              : `Última sincronización ${formatAgo(status.updatedAt)}`}
+          </small>
+        </div>
+      </section>
+
+      {status && (
+        <>
+          <section className="meter" aria-label="Almacenamiento del stick">
+            <div className="meter-top">
+              <span className="meter-ico">
+                <Icon name="disk" />
+              </span>
+              <div className="meter-txt">
+                <b>Almacenamiento</b>
+                <small>{formatBytes(status.freeBytes)} libres</small>
+              </div>
+              <div className="meter-num">
+                <b>{formatBytes(status.romsBytes)}</b>
+                <small>en juegos</small>
+              </div>
+            </div>
+            <div className="meter-bar" role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}>
+              <i style={{ width: `${pct}%` }} />
+            </div>
+          </section>
+
+          <div className="tiles">
+            <Tile icon="gamepad" label="Mando" value={status.controllers.length ? status.controllers.join(', ') : 'Ninguno'} />
+            <Tile icon="info" label="Versión del menú" value={status.appVersion} />
+            <Tile icon="history" label="Sincronizado" value={formatWhen(status.updatedAt)} wide />
+          </div>
+        </>
+      )}
+    </>
   )
 }
 
