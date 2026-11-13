@@ -564,6 +564,18 @@ emojis como iconos (decisión del usuario):
   `NewsActivity` las enseña (nunca en un stick recién instalado). Retro Ajustes → Novedades las vuelve a mostrar.
 - **Al publicar una versión con algo que contar, añadir su `Release` en `News.RELEASES`.**
 
+### 8.2g Sticks con Android 11 y el botón Home (launcher 1.26)
+- Mi TV Stick 4K (Android 11): los mandos llegan con los códigos estándar de Android. Antes de cada juego,
+  `PadProfiles.kt` escribe el perfil del Pro Controller para Android 11, aparta los de Android 9 y pone los atajos
+  (− + L / R / ZR) con esos códigos (tablas en `docs/mandos.md`). En Android 9 no cambia nada.
+- RetroArch usa la frecuencia real de la tele (`video_refresh_rate`, 59,94 Hz en algunas): con 60 se acumulaban
+  fotogramas y se notaba retraso.
+- **Home durante un juego vuelve al juego** (`RetroArchCmd.kt`): Android se queda con Home (el del Pro Controller en
+  Android 11, el del mando a distancia en todos), así que RetroStick, como pantalla de inicio, vuelve a poner
+  RetroArch delante y avisa de que el menú está en Captura (Switch) o PS (DualSense). RetroStick pide una vez ser la
+  pantalla de inicio; «Otras apps» abre el launcher que hubiera. No se puede abrir el menú de RetroArch desde fuera:
+  su versión de Android no trae órdenes por red, y un servicio de accesibilidad que captura Home rompe la cruceta.
+
 ### 8.3 `status.json`
 Al abrir la app y periódicamente (WorkManager, cada 60 min), escribir `/storage/emulated/0/Partidas/.stick/status.json`:
 ```json
