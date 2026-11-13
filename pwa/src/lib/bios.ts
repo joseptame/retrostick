@@ -64,7 +64,7 @@ export const BIOS: BiosEntry[] = [
     shows: 'Los logos de Sony y PlayStation (y mejor compatibilidad)',
   },
   { console: 'Master System', file: 'bios_E.sms', md5: ['840481177270d5642a14ca71ee72844c'], shows: 'La pantalla de SEGA de la consola' },
-  { console: 'Mega Drive', file: 'bios_MD.bin', md5: ['45e298905a08f9cfb38fd504cd6dbc84'], shows: 'El aviso «Produced by or under license from SEGA»' },
+  { console: 'Mega Drive', file: 'bios_MD.bin', md5: ['45e298905a08f9cfb38fd504cd6dbc84', 'd3293ebaaa7f4eb2a6766b68a0fb4609'], shows: 'El aviso «Produced by or under license from SEGA»' },
   // Neo Geo: needed to play at all (FinalBurn Neo). 000-lo.lo, sfix.sfix, sm1.sm1 as FinalBurn Neo dumps them now
   // (older sets carry e09e253c / 354029fc / 97cf998b and no game starts) and the European AES BIOS (neo-epo.bin).
   {

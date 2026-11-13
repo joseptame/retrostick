@@ -32,7 +32,8 @@ object Bios {
             "b9d9a0286c33dc6b7237bb13cd46fdee",
         )),
         Entry("Master System", "bios_E.sms", setOf("840481177270d5642a14ca71ee72844c")),
-        Entry("Mega Drive", "bios_MD.bin", setOf("45e298905a08f9cfb38fd504cd6dbc84")),
+        // Two TMSS dumps: the one in libretro's docs and the one in libretro-database's System.dat (CRC 3F888CF4)
+        Entry("Mega Drive", "bios_MD.bin", setOf("45e298905a08f9cfb38fd504cd6dbc84", "d3293ebaaa7f4eb2a6766b68a0fb4609")),
         // Needed to play at all. FinalBurn Neo's current 000-lo.lo, sfix.sfix, sm1.sm1 (older sets don't start any
         // game) and the European AES BIOS; FinalBurn Neo finds it next to the games (and in system/fbneo).
         Entry("Neo Geo", "neogeo.zip", emptySet(), zipCrcs = setOf("5a86cff2", "c2ea0cfd", "94416d67", "d27a71f1"),
