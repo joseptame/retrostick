@@ -165,6 +165,8 @@ object DriveCollection {
                 }
                 job.state = State.DONE
                 Sounds.play(Sounds.Sound.DONE)
+                // The stick's status (its games, for the webapp) and the webapp's request, if it came from one
+                main.post { DriveSync.sync(app) }
                 listing = listing + (c.id to listing[c.id].orEmpty().filterKeys { it !in seen })
                 saveCache(app)
             } catch (e: Exception) {

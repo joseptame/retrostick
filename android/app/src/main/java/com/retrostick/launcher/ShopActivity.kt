@@ -1113,7 +1113,7 @@ class ShopActivity : Activity() {
 
     private fun download(g: ShopGame) {
         stickGame?.let { game ->
-            if (launchInRetroArch(this, game)) { Sounds.play(Sounds.Sound.LAUNCH); finish() }
+            DriveSync.launchWithSaves(this, game, Resume.TITLE) { ok -> if (ok) { Sounds.play(Sounds.Sound.LAUNCH); finish() } }
             return
         }
         driveItem?.let { item ->

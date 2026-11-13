@@ -103,7 +103,8 @@ export function Subir({ state }: { state: AppState }) {
           update(item.id, { progress: total ? sent / total : 1 })
           state.uploadsApi.progress(uid, sent)
         })
-        await requestForTarget(state.library, state.folders, item.console, fileName, target)
+        const full = await requestForTarget(state.library, state.folders, item.console, fileName, target, item.file.size)
+        if (full.length) state.notify(`${fileName} no cabe en ${full.join(' ni en ')}: se queda en tu Drive`)
         update(item.id, { status: 'done', progress: 1 })
         state.uploadsApi.finish(uid)
       } catch (e) {

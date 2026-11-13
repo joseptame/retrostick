@@ -5,7 +5,7 @@ import { CoverCard } from '../components/SearchCard'
 import { Segmented, StickySearch } from '../components/ui'
 import { CONSOLES, type ConsoleId } from '../lib/consoles'
 import { formatAgo, formatBytes } from '../lib/format'
-import { chooseStick, chosenStick, onStick, picksGames, setOnStick, stickSpace, type Game } from '../lib/library'
+import { chooseStick, chosenStick, confirmRoom, onStick, picksGames, setOnStick, stickSpace, type Game } from '../lib/library'
 import { regionCode } from '../lib/names'
 
 type Where = 'all' | 'stick' | 'drive'
@@ -48,6 +48,7 @@ export function Coleccion({ state, onUpload, onSearch }: { state: AppState; onUp
     // Optimistic update with rollback (README 7.4)
     const flip = (v: boolean) =>
       state.setLibrary((l) => ({ ...l, games: l.games.map((g) => (g.key === game.key ? { ...g, inStick: v } : g)) }))
+    if (value && !confirmRoom(library, stick, game, stickName)) return
     const picking = picksGames(stick)
     if (!picking) flip(value)
     try {

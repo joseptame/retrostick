@@ -7,6 +7,7 @@ import android.util.Log
 import org.json.JSONObject
 import java.io.File
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.math.abs
 
 /**
@@ -85,6 +86,49 @@ object DriveSync {
 
     /** Stops between files (a game is about to start). */
     fun cancel() { cancelRequested = true }
+
+    /**
+     * Opens [game] once its saves are as in Drive (at most [WAIT_SAVES_MS]): played and saved on another stick a
+     * moment ago, it continues from there even if this stick hadn't synced yet. Offline or without Drive, right away.
+     * [done] gets launchInRetroArch's answer, on the main thread.
+     */
+    fun launchWithSaves(activity: android.app.Activity, game: Game, resume: Resume, done: (Boolean) -> Unit) {
+        val app = activity.applicationContext
+        val auth = DriveAuth(app)
+        if (!auth.isConfigured || !auth.isConnected || StickStatus.network(app) == null) {
+            cancel()
+            done(launchInRetroArch(activity, game, resume))
+            return
+        }
+        android.widget.Toast.makeText(activity, "Trayendo tus partidas de Drive…", android.widget.Toast.LENGTH_SHORT).show()
+        cancel()
+        Thread {
+            val job = executor.submit {
+                cancelRequested = false
+                runCatching { Syncer(app, auth).savesOnly() }.onFailure { Log.w("RetroStick", "Saves before a game", it) }
+            }
+            runCatching { job.get(WAIT_SAVES_MS, TimeUnit.MILLISECONDS) }
+            main.post {
+                cancel()
+                if (!activity.isFinishing && !activity.isDestroyed) done(launchInRetroArch(activity, game, resume))
+            }
+        }.start()
+    }
+
+    private const val WAIT_SAVES_MS = 8_000L
+
+    /**
+     * A stick that picks its games: whether the webapp left requests for it (one Drive listing). The home screen
+     * asks every minute and syncs when there are, so they don't wait for the 15-minute sync. Blocking.
+     */
+    fun hasRequests(context: Context): Boolean {
+        val app = context.applicationContext
+        val auth = DriveAuth(app)
+        if (autoRoms(app) || !auth.isConfigured || !auth.isConnected) return false
+        val drive = DriveClient(auth)
+        val prefix = "pedido-${StickStatus.stickId(app)}-"
+        return drive.list(folderId(app, drive, "Retro/Config/stick")).any { !it.isFolder && it.name.startsWith(prefix) }
+    }
 
     /** Every save/state of the game is in Drive exactly as it is on the stick now. */
     fun isBackedUp(context: Context, game: Game): Boolean {
@@ -219,7 +263,22 @@ object DriveSync {
             // The user's BIOS (boot screens), uploaded from the phone app
             runCatching { Bios.sync(drive, dir("Retro/Config/bios")) }.onFailure { Log.w("RetroStick", "BIOS sync failed", it) }
             CONSOLES.forEach { syncRoms(it) }
+            // Games asked for from the webapp: downloaded with their progress on the home screen, once this sync is done
+            // (a pass runs on the sync thread and would stop it). Their requests go when they're on the stick.
+            if (toPass.isNotEmpty()) {
+                val items = toPass.toList()
+                main.post { items.forEach { DriveCollection.passToStick(context, it) } }
+            }
         }
+
+        private val toPass = mutableListOf<DriveCollection.Item>()
+
+        /** Before a game: just the saves, both ways (see [launchWithSaves]). */
+        fun savesOnly() = listOf("saves", "states").forEach { syncSaves(it) }
+
+        /** Another stick's status (each stick uploads its own; the webapp can forget one): not synced here. */
+        private fun otherStatus(name: String) =
+            name == "status.json" || (name.startsWith("status-") && name.endsWith(".json") && name != "status-${StickStatus.stickId(context)}.json")
 
         private fun checkCancel() { if (cancelRequested) throw Cancelled() }
 
@@ -237,31 +296,36 @@ object DriveSync {
             val manifest = prefs.getStringSet("roms", emptySet())!!.toMutableSet()
             var added = 0
             var removed = 0
-            for (f in mine) {
+            val parsed = mine.map { f ->
                 checkCancel()
                 val tmp = File(context.cacheDir, "pedido.json")
                 val j = runCatching { drive.download(f.id, tmp); JSONObject(tmp.readText()) }.getOrNull()
                 tmp.delete()
+                f to j
+            }
+            // Asked and then un-asked (or the other way) before this stick saw it: only the last one counts
+            val gameOf = { j: JSONObject? -> j?.let { it.optString("console") + "/" + it.optString("file") } }
+            val latest = parsed.associate { (f, j) -> gameOf(j) to f.id }
+            for ((f, j) in parsed) {
+                checkCancel()
                 val c = CONSOLES.firstOrNull { it.id == j?.optString("console") }
                 val name = j?.optString("file").orEmpty().substringAfterLast('/')
-                if (c != null && name.isNotEmpty()) {
+                if (latest[gameOf(j)] == f.id && c != null && name.isNotEmpty()) {
                     val playing = drive.list(dir("Retro/JugandoAhora/${c.id}")).filter { !it.isFolder }.associateBy { it.name }
                     val collectionId = dir("Retro/Coleccion/${c.id}")
                     val collection = drive.list(collectionId).filter { !it.isFolder }.associateBy { it.name }
                     if (j!!.optBoolean("add")) {
-                        c.romDir.mkdirs()
-                        val queue = ArrayDeque(listOf(name))
-                        val seen = mutableSetOf<String>()
-                        while (queue.isNotEmpty()) {
-                            val n = queue.removeFirst()
-                            if (!seen.add(n)) continue
-                            val remote = collection[n] ?: playing[n] ?: continue
-                            val target = File(c.romDir, n)
-                            if (!(target.isFile && target.length() == remote.size)) drive.download(remote.id, target)
-                            manifest += "${c.id}/$n"
-                            DriveCollection.references(target).forEach { queue.addLast(it) }
+                        val remote = collection[name] ?: playing[name]
+                        val item = DriveCollection.Item(c, name, remote?.size ?: 0)
+                        val running = DriveCollection.jobFor(item)?.state == DriveCollection.State.RUNNING
+                        when {
+                            // Not in Drive (deleted meanwhile): nothing to download
+                            remote == null -> Unit
+                            // Already here (a pass finished): the request is done
+                            File(c.romDir, name).let { it.isFile && it.length() == remote.size } && !running -> added++
+                            // Downloading, or to download after this sync: the request stays until it's here
+                            else -> { if (!running) toPass += item; continue }
                         }
-                        if (File(c.romDir, name).isFile) added++
                     } else {
                         val game = File(c.romDir, name)
                         if (game.isFile) {
@@ -277,7 +341,7 @@ object DriveSync {
                 }
                 runCatching { drive.delete(f.id) }
             }
-            if (added + removed > 0) main.post {
+            if (removed > 0 || (added > 0 && toPass.isEmpty())) main.post {
                 DriveCollection.refresh(context, force = true)
                 val what = listOfNotNull(
                     if (added > 0) "$added ${if (added == 1) "juego descargado" else "juegos descargados"}" else null,
@@ -343,6 +407,11 @@ object DriveSync {
 
             for (name in remote.keys + local.keys) {
                 checkCancel()
+                if (sub == ".stick" && otherStatus(name)) {
+                    // Copies of other sticks' status, from before 1.25.8: gone, so a forgotten stick stays forgotten
+                    local[name]?.delete()
+                    continue
+                }
                 val key = "$sub/$name"
                 val l = local[name]
                 val r = remote[name]

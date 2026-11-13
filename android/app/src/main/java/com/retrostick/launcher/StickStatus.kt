@@ -62,7 +62,9 @@ object StickStatus {
      * but has no USB/BT vendor id.
      */
     fun isGamepad(device: InputDevice?) = device != null && !device.isVirtual && device.vendorId != 0 &&
-        (device.sources and InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD
+        (device.sources and InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD &&
+        // Devices the system makes up, like the Xiaomi remote's voice search («virtual-search»), aren't pads
+        !device.name.startsWith("virtual", ignoreCase = true) && !device.name.contains("uinput", ignoreCase = true)
 
     fun gamepads(): List<InputDevice> =
         InputDevice.getDeviceIds().toList().mapNotNull { InputDevice.getDevice(it) }.filter(::isGamepad)

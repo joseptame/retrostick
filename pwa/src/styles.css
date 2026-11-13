@@ -927,3 +927,7 @@ img.art-wide { object-fit: contain !important; z-index: 1; }
 .ra-landing-steps { text-align: left; align-self: stretch; margin: 8px 0 0; padding: 12px 14px 12px 32px; border-radius: 14px; background: rgba(255, 255, 255, 0.04); font-size: 14px; color: var(--text); line-height: 1.5; }
 .ra-landing-steps li + li { margin-top: 6px; }
 p.ra-landing-steps { padding-left: 14px; color: var(--muted); }
+
+/* Stick tab: «Olvidar este stick», under its block */
+.forget-stick { display: block; margin: 10px 2px 0 auto; padding: 6px 2px; font-size: 12.5px; font-weight: 600; color: var(--muted); background: none; border: 0; }
+.forget-stick:active { color: var(--text); }

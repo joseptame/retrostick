@@ -7,7 +7,7 @@ import { RaSection } from '../components/RaSection'
 import { Icon, type IconName } from '../components/icons'
 import { accountEmail } from '../lib/auth'
 import { formatAgo, formatBytes, formatWhen } from '../lib/format'
-import type { StickStatus } from '../lib/library'
+import { forgetStick, type StickStatus } from '../lib/library'
 
 /** The status each stick's launcher writes (README 7.4 "Stick", 8.3): one block per stick on the account. */
 export function Stick({ state, onSignOut }: { state: AppState; onSignOut: () => void }) {
@@ -15,11 +15,28 @@ export function Stick({ state, onSignOut }: { state: AppState; onSignOut: () => 
   const sticks = library?.sticks ?? (library?.status ? [library.status] : [])
   const [pairing, setPairing] = useState(false)
 
+  async function forget(s: StickStatus, name: string) {
+    if (!state.folders) return
+    if (!confirm(`¿Olvidar «${name}»? Deja de salir aquí y en la Colección. Si ese stick vuelve a sincronizar, reaparece.`)) return
+    try {
+      await forgetStick(state.folders, s)
+      state.notify(`${name} olvidado`)
+      await state.refresh()
+    } catch (e) {
+      state.notify(`No se pudo olvidar: ${e instanceof Error ? e.message : e}`)
+    }
+  }
+
   return (
     <main className="screen">
       {sticks.length === 0 && <StickBlock status={null} />}
       {sticks.map((s, i) => (
-        <StickBlock key={s.id ?? i} status={s} title={sticks.length > 1 ? (s.name ?? `Stick ${i + 1}`) : undefined} />
+        <StickBlock
+          key={s.id ?? i}
+          status={s}
+          title={sticks.length > 1 ? (s.name ?? `Stick ${i + 1}`) : undefined}
+          onForget={sticks.length > 1 && s.fileId && state.online ? () => forget(s, s.name ?? `Stick ${i + 1}`) : undefined}
+        />
       ))}
 
       <h3 className="sec2">RetroShop</h3>
@@ -87,7 +104,7 @@ export function Stick({ state, onSignOut }: { state: AppState; onSignOut: () => 
 }
 
 /** One stick: in sync or not, its storage, controllers and launcher version. [title] when there are several. */
-function StickBlock({ status, title }: { status: StickStatus | null; title?: string }) {
+function StickBlock({ status, title, onForget }: { status: StickStatus | null; title?: string; onForget?: () => void }) {
   const stale = status && Date.now() - new Date(status.updatedAt).getTime() > 24 * 3600 * 1000
   const total = status ? status.romsBytes + status.freeBytes : 0
   const pct = status && total ? (status.romsBytes / total) * 100 : 0
@@ -141,6 +158,11 @@ function StickBlock({ status, title }: { status: StickStatus | null; title?: str
             <Tile icon="info" label="Versión del menú" value={status.appVersion} />
             <Tile icon="history" label="Sincronizado" value={formatWhen(status.updatedAt)} wide />
           </div>
+          {onForget && (
+            <button className="link-btn forget-stick" onClick={onForget}>
+              Olvidar este stick
+            </button>
+          )}
         </>
       )}
     </>

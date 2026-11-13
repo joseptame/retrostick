@@ -19,6 +19,8 @@ export interface Game {
 
 /** Partidas/.stick/status-<id>.json written by each stick's launcher (README 8.3); status.json before 1.25.5 */
 export interface StickStatus {
+  /** The status file in Drive (set when read), to forget the stick */
+  fileId?: string
   id?: string
   name?: string
   /** Downloads JugandoAhora by itself (false: a second stick on the account, which picks its games) */
@@ -96,7 +98,9 @@ export async function loadLibrary(folders: Folders): Promise<Library> {
   // One file per stick; a stick on a launcher before 1.25.5 only writes status.json (shared, the last one wins)
   const perStick = stickFiles.filter((f) => /^status-[\w-]+\.json$/.test(f.name))
   const statusFiles = perStick.length ? perStick : stickFiles.filter((f) => f.name === 'status.json')
-  const sticks = (await Promise.all(statusFiles.map((f) => readJson<StickStatus>(f.id).catch(() => null))))
+  const sticks = (
+    await Promise.all(statusFiles.map((f) => readJson<StickStatus>(f.id).then((s): StickStatus => ({ ...s, fileId: f.id }), () => null)))
+  )
     .filter((s): s is StickStatus => !!s)
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
   const status = sticks.find((s) => s.autoRoms !== false) ?? sticks[0] ?? null
@@ -158,17 +162,47 @@ export function targetParent(library: Library | null, folders: Folders, console:
   return stick && picksGames(stick) ? folders.coleccion[console] : folders.jugando[console]
 }
 
-/** After the upload: the sticks that pick their games among [target] are asked for [file] (the game's main file). */
+/**
+ * After the upload: the sticks that pick their games among [target] are asked for [file] (the game's main file),
+ * those with room for [size]. Returns the names of the ones it didn't fit on (it stays in Drive for them).
+ */
 export async function requestForTarget(
   library: Library | null,
   folders: Folders,
   console: ConsoleId,
   file: string,
   target: StickTarget,
-): Promise<void> {
-  if (target === 'drive') return
-  const sticks = (library?.sticks ?? []).filter((s) => picksGames(s) && (target === 'all' || s.id === target))
-  await Promise.all(sticks.map((s) => saveStickRequest(folders, s.id!, { console, file, add: true })))
+  size: number,
+): Promise<string[]> {
+  if (target === 'drive' || !library) return []
+  const sticks = (library.sticks ?? []).filter((s) => picksGames(s) && (target === 'all' || s.id === target))
+  const fit = sticks.filter((s) => size <= spaceLeft(library, s))
+  await Promise.all(fit.map((s) => saveStickRequest(folders, s.id!, { console, file, add: true })))
+  return sticks.filter((s) => !fit.includes(s)).map((s) => s.name ?? 'un stick')
+}
+
+/** Free room on [stick] once the games marked or asked for it are there (bytes, can be negative). */
+export function spaceLeft(library: Library, stick: StickStatus | null): number {
+  const { used, capacity } = stickSpace(library, stick)
+  return capacity - used
+}
+
+/**
+ * Before putting [game] on [stick]: true when it fits, or the user says to go ahead anyway (the stick would run out
+ * of room while downloading it).
+ */
+export function confirmRoom(library: Library, stick: StickStatus | null, game: Game, where: string): boolean {
+  const left = spaceLeft(library, stick)
+  if (game.size <= left) return true
+  const free = Math.max(0, left)
+  const mb = (b: number) => (b >= 1e9 ? `${(b / 1e9).toFixed(1).replace('.', ',')} GB` : `${Math.round(b / 1e6)} MB`)
+  return confirm(`${game.title} no cabe en ${where}: ocupa ${mb(game.size)} y quedan ${mb(free)} libres. ¿Lo marcas igualmente?`)
+}
+
+/** «Olvidar este stick» (Stick tab): its status and pending requests go to the Drive bin. Back if it syncs again. */
+export async function forgetStick(folders: Folders, stick: StickStatus): Promise<void> {
+  const requests = stick.id ? (await stickRequestFiles(folders)).filter((f) => f.name.startsWith(`pedido-${stick.id}-`)) : []
+  await Promise.all([...(stick.fileId ? [stick.fileId] : []), ...requests.map((f) => f.id)].map((id) => trashFile(id)))
 }
 
 const STICK_KEY = 'retrostick.stick'

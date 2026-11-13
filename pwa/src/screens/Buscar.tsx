@@ -178,7 +178,8 @@ export function Buscar({ state }: { state: AppState }) {
         const text = discs.map((d) => fileOnly(d.name)).join('\n') + '\n'
         await uploadResumable(new Blob([text], { type: 'audio/x-mpegurl' }), playlist, parent, () => {})
       }
-      await requestForTarget(state.library, state.folders, console, first, target)
+      const full = await requestForTarget(state.library, state.folders, console, first, target, total)
+      if (full.length) state.notify(`No cabe en ${full.join(' ni en ')}: se queda en tu Drive`)
       setJob({ key, entry, phase: 'done', progress: 1 })
       state.uploadsApi.finish(id)
       state.notify(`${displayTitle(entry.name)}: subido${discs.length > 1 ? ` (${discs.length} discos)` : ''}`)
@@ -247,7 +248,8 @@ export function Buscar({ state }: { state: AppState }) {
         setJob({ key, entry, phase: 'uploading', progress: total ? sent / total : 1 })
         state.uploadsApi.progress(id, sent)
       })
-      await requestForTarget(state.library, state.folders, console, fileName, target)
+      const full = await requestForTarget(state.library, state.folders, console, fileName, target, blob.size)
+      if (full.length) state.notify(`No cabe en ${full.join(' ni en ')}: se queda en tu Drive`)
       setJob({ key, entry, phase: 'done', progress: 1 })
       state.uploadsApi.finish(id)
       state.notify(`${fileName}: subido`)

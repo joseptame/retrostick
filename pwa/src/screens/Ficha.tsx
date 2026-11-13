@@ -8,7 +8,7 @@ import type { DriveFile } from '../lib/drive'
 import { formatAgo, formatBytes, formatWhen } from '../lib/format'
 import { fetchIgdb, type IgdbGame } from '../lib/igdb'
 import { loadLookup } from '../lib/igdbdb'
-import { chosenStick, deleteGame, onStick, picksGames, savesFor, setOnStick, type Game } from '../lib/library'
+import { chosenStick, confirmRoom, deleteGame, onStick, picksGames, savesFor, setOnStick, type Game } from '../lib/library'
 import { languages, regionCode, saveLabel, saveOf } from '../lib/names'
 
 export function Ficha({ game, state, onBack }: { game: Game; state: AppState; onBack: () => void }) {
@@ -44,6 +44,7 @@ export function Ficha({ game, state, onBack }: { game: Game; state: AppState; on
 
   async function toggle(inStick: boolean) {
     if (!state.folders || !state.library) return
+    if (inStick && !confirmRoom(state.library, stick, game, where)) return
     const flip = (v: boolean) =>
       state.setLibrary((l) => ({ ...l, games: l.games.map((g) => (g.key === game.key ? { ...g, inStick: v } : g)) }))
     const picking = picksGames(stick)

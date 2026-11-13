@@ -34,8 +34,15 @@ object Backup {
     private fun state(context: Context) = context.getSharedPreferences("backup", Context.MODE_PRIVATE)
     fun lastAt(context: Context) = state(context).getLong("lastAt", 0)
 
-    /** A copy in Drive: "RetroStick-copia-2026-11-11-2215.zip". */
-    class Copy(val id: String, val name: String, val size: Long, val at: Long)
+    /**
+     * A copy in Drive: "RetroStick-copia-2026-11-11-2215-<stick id>-<stick name>.zip" (before 1.25.8 without the
+     * stick: [stick] null). Several sticks share Retro/Copias: each keeps its own last [KEEP].
+     */
+    class Copy(val id: String, val name: String, val size: Long, val at: Long) {
+        private val m = Regex("""^RetroStick-copia-\d{4}-\d\d-\d\d-\d{4}-([0-9a-f]{8})(?:-(.+))?\.zip$""").find(name)
+        val stick: String? = m?.groupValues?.get(1)
+        val stickName: String? = m?.groupValues?.get(2)?.takeIf { it.isNotEmpty() }
+    }
 
     private fun drive(context: Context): DriveClient? {
         val auth = DriveAuth(context)
@@ -54,12 +61,17 @@ object Backup {
     fun makeNow(context: Context) {
         val drive = drive(context) ?: error("Drive no está conectado")
         val app = context.applicationContext
-        val zip = File(app.cacheDir, "RetroStick-copia-" + SimpleDateFormat("yyyy-MM-dd-HHmm", Locale.US).format(Date()) + ".zip")
+        val id = StickStatus.stickId(app)
+        // The name as a file name can carry it (no slashes or odd characters)
+        val label = StickStatus.stickName(app).replace(Regex("""[^\p{L}\p{N} ._()-]"""), "").trim().take(30)
+        val zip = File(app.cacheDir, "RetroStick-copia-" + SimpleDateFormat("yyyy-MM-dd-HHmm", Locale.US).format(Date()) +
+            "-$id" + (if (label.isNotEmpty()) "-$label" else "") + ".zip")
         try {
             write(app, zip)
             val folder = DriveSync.folderId(app, drive, FOLDER)
             drive.upload(zip, folder, null)
-            list(app).drop(KEEP).forEach { runCatching { drive.trash(it.id) } }
+            // Only this stick's older copies go (the other sticks keep theirs)
+            list(app).filter { it.stick == id }.drop(KEEP).forEach { runCatching { drive.trash(it.id) } }
             state(app).edit().putLong("lastAt", System.currentTimeMillis()).apply()
         } finally {
             zip.delete()

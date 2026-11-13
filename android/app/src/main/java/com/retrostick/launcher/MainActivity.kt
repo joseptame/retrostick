@@ -244,6 +244,17 @@ class MainActivity : Activity() {
     }
     @Volatile private var loginCancelled = false
 
+    /** A stick that picks its games: requests from the webapp, every minute while the home screen is up. */
+    private val requestsTicker = object : Runnable {
+        override fun run() {
+            if (!DriveSync.autoRoms(this@MainActivity)) io.execute {
+                val any = runCatching { DriveSync.hasRequests(this@MainActivity) }.getOrDefault(false)
+                if (any) main.post { if (DriveSync.phase != DriveSync.Phase.SYNCING) DriveSync.sync(this@MainActivity) }
+            }
+            main.postDelayed(this, 60_000L)
+        }
+    }
+
     private val statusJsonTicker = object : Runnable {
         override fun run() {
             writeStatusJson()
@@ -438,6 +449,7 @@ class MainActivity : Activity() {
         if (hasStorage) DriveCollection.refresh(this)
         main.post(statusTicker)
         main.post(statusJsonTicker)
+        main.post(requestsTicker)
         // Back from a game or from boot: sync if the last one is older than a minute, then every 15 min.
         if (hasStorage && System.currentTimeMillis() - DriveSync.lastSuccess(this) > 60_000) DriveSync.sync(this)
         // A new launcher in Drive: ask right away (not only after a whole sync).
@@ -465,6 +477,7 @@ class MainActivity : Activity() {
         DriveCollection.removeListener(driveListener)
         main.removeCallbacks(statusTicker)
         main.removeCallbacks(statusJsonTicker)
+        main.removeCallbacks(requestsTicker)
         main.removeCallbacks(syncTicker)
         // Never sync while a game may have its save open.
         DriveSync.cancel()
@@ -1750,6 +1763,13 @@ class MainActivity : Activity() {
             .showForPad()
     }
 
+    /** Which stick made a copy, for the list: "este stick", its name, or nothing for copies before 1.25.8. */
+    private fun backupStick(copy: Backup.Copy) = when {
+        copy.stick == null -> ""
+        copy.stick == StickStatus.stickId(this) -> "este stick  ·  "
+        else -> (copy.stickName ?: "otro stick") + "  ·  "
+    }
+
     private val backupDate get() = SimpleDateFormat("d MMM yyyy, HH:mm", Locale("es", "ES"))
 
     /** Copia del stick: when the last one was made, what it keeps, make one now or bring one back. */
@@ -1785,7 +1805,7 @@ class MainActivity : Activity() {
                 if (copies.isEmpty()) { Toast.makeText(this, "No hay copias del stick en Drive", Toast.LENGTH_LONG).show(); return@post }
                 AlertDialog.Builder(this, R.style.Dialog_RetroStick)
                     .setTitle("Restaurar una copia")
-                    .setItems(copies.map { backupDate.format(Date(it.at)) + "  ·  " + Formatter.formatShortFileSize(this, it.size) }.toTypedArray()) { _, which ->
+                    .setItems(copies.map { backupDate.format(Date(it.at)) + "  ·  " + backupStick(it) + Formatter.formatShortFileSize(this, it.size) }.toTypedArray()) { _, which ->
                         confirmRestore(copies[which])
                     }
                     .setNegativeButton(R.string.cancel, null)
@@ -1797,7 +1817,7 @@ class MainActivity : Activity() {
     private fun confirmRestore(copy: Backup.Copy, newStick: Boolean = false) {
         AlertDialog.Builder(this, R.style.Dialog_RetroStick)
             .setTitle(if (newStick) "¿Restaurar la configuración de tu RetroStick?" else "Restaurar la copia")
-            .setMessage("Copia del ${backupDate.format(Date(copy.at))}. Vuelven las pestañas, favoritos, sonidos, botones y ajustes de " +
+            .setMessage("Copia del ${backupDate.format(Date(copy.at))}${copy.stickName?.let { " (de $it)" } ?: ""}. Vuelven las pestañas, favoritos, sonidos, botones y ajustes de " +
                 "RetroArch que tenía el stick entonces. Los juegos y las partidas no se tocan.")
             .setPositiveButton("Restaurar") { _, _ ->
                 DriveSync.runExclusive {
@@ -1855,13 +1875,21 @@ class MainActivity : Activity() {
     private fun play(resume: Resume = Resume.TITLE) {
         currentDrive?.let { return openDriveGame(it) }
         val game = currentGame ?: return openShop()
-        DriveSync.cancel()
+        if (launching) return
+        launching = true
         keySound = Sounds.Sound.LAUNCH
-        if (!launchInRetroArch(this, game, resume)) {
-            keySound = Sounds.Sound.ERROR
-            toast(R.string.retroarch_missing)
+        // Its saves from Drive first (played on another stick a moment ago)
+        DriveSync.launchWithSaves(this, game, resume) { ok ->
+            launching = false
+            if (!ok) {
+                Sounds.play(Sounds.Sound.ERROR)
+                toast(R.string.retroarch_missing)
+            }
         }
     }
+
+    /** A game is being opened (its saves first): a second press waits. */
+    private var launching = false
 
     /** The ficha of a game in the Drive collection, with "Pasar al stick" (ShopActivity in Drive mode). */
     private fun openDriveGame(item: DriveCollection.Item) {

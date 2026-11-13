@@ -341,10 +341,17 @@ class DetailsActivity : Activity() {
     private fun select() {
         if (row == 1) { actions.getOrNull(col)?.run?.invoke(); return }
         val c = cards.getOrNull(col)?.takeIf { it.enabled } ?: return
-        DriveSync.cancel()
-        if (launchInRetroArch(this, game, c.resume)) { Sounds.play(Sounds.Sound.LAUNCH); finish() }
-        else { Sounds.play(Sounds.Sound.ERROR); Toast.makeText(this, R.string.retroarch_missing, Toast.LENGTH_SHORT).show() }
+        if (launching) return
+        launching = true
+        DriveSync.launchWithSaves(this, game, c.resume) { ok ->
+            launching = false
+            if (ok) { Sounds.play(Sounds.Sound.LAUNCH); finish() }
+            else { Sounds.play(Sounds.Sound.ERROR); Toast.makeText(this, R.string.retroarch_missing, Toast.LENGTH_SHORT).show() }
+        }
     }
+
+    /** A game is being opened (its saves first): a second press waits. */
+    private var launching = false
 
     // ---- Actions ----
 
