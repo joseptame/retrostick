@@ -306,6 +306,8 @@ fun launchInRetroArch(context: Context, game: Game, resume: Resume = Resume.TITL
         .putExtra("LIBRETRO", Setup.corePath(context, game.console.core) ?: "$dataDir/cores/${game.console.core}")
         .putExtra("CONFIGFILE", retroArchCfg().path)
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+    // What Home during the game comes back to (RetroArchCmd.backToGame)
+    RetroArchCmd.remember(context, intent)
     context.startActivity(intent)
     return true
 }
