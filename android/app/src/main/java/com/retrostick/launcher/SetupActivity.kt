@@ -19,7 +19,12 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
+import android.animation.AnimatorSet
+import android.animation.ObjectAnimator
+import android.animation.ValueAnimator
+import android.os.SystemClock
 import java.io.File
+import java.util.Locale
 import java.util.concurrent.Executors
 
 /**
@@ -55,6 +60,8 @@ class SetupActivity : Activity() {
     private lateinit var rows: LinearLayout
     private lateinit var hint: TextView
     private lateinit var foot: TextView
+    private lateinit var status: TextView
+    private lateinit var statusBar: ProgressBar
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 
@@ -79,6 +86,7 @@ class SetupActivity : Activity() {
         }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
         rows = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         col.addView(rows, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(26) })
+        buildRows()
         hint = label(15f, getColor(R.color.button_text), bold = true).apply {
             gravity = Gravity.CENTER
             setPadding(dp(22), dp(11), dp(22), dp(11))
@@ -102,6 +110,7 @@ class SetupActivity : Activity() {
     override fun onDestroy() {
         super.onDestroy()
         main.removeCallbacksAndMessages(null)
+        pulse?.cancel()
         io.shutdownNow()
     }
 
@@ -147,7 +156,7 @@ class SetupActivity : Activity() {
             }
             return render()
         }
-        val m = manifest ?: return work(null, "Buscando lo necesario…", then = ::advance) {
+        val m = manifest ?: return work(null, "Consultando en internet la última versión de RetroArch, los núcleos y la configuración…", then = ::advance) {
             val found = Setup.manifest()
             main.post { manifest = found }
         }
@@ -157,13 +166,22 @@ class SetupActivity : Activity() {
             Step.RETROARCH -> install(step, m.retroarch, "retroarch.apk")
             Step.CORES -> install(step, m.cores, "cores.apk")
             Step.FIRST_RUN -> firstRun()
-            Step.CONFIG -> work(step, "Copiando la configuración…", then = ::finished) {
+            Step.CONFIG -> work(step, "Cerrando RetroArch para poder tocar su configuración…", then = ::finished) {
                 // RetroArch rewrites retroarch.cfg when it closes: it must be gone before touching it
                 getSystemService(ActivityManager::class.java).killBackgroundProcesses(RETROARCH_PACKAGE)
                 Thread.sleep(800)
                 val zip = File(cacheDir, "setup/config.zip")
-                Setup.download(m.config, zip) { p -> main.post { progress = p; render() } }
-                Setup.applyConfig(this, zip)
+                Setup.download(m.config, zip, downloading("Descargando la configuración", m.config.size))
+                var shown = 0L
+                Setup.applyConfig(this, zip) { name, i, total ->
+                    val now = SystemClock.elapsedRealtime()
+                    if (now - shown >= 120 || i == total) {
+                        shown = now
+                        val text = if (total > 0) "${describe(name)}  ·  $i de $total" else describe(name)
+                        main.post { progress = if (total > 0) i.toFloat() / total else -1f; detail = text; render() }
+                    }
+                }
+                main.post { progress = -1f; detail = "Guardando los ajustes de RetroArch…"; render() }
                 zip.delete()
                 Setup.markDone(this, m.config.version)
             }
@@ -190,8 +208,8 @@ class SetupActivity : Activity() {
             if (autoOpened.add(step)) open()
             return
         }
-        work(step, "Descargando (${asset.size / 1_048_576} MB)…", then = ::advance) {
-            Setup.download(asset, apk) { p -> main.post { progress = p; render() } }
+        work(step, "Conectando para descargar (${mb(asset.size)} MB)…", then = ::advance) {
+            Setup.download(asset, apk, downloading("Descargando", asset.size))
         }
     }
 
@@ -199,6 +217,8 @@ class SetupActivity : Activity() {
     private fun firstRun() {
         val open = {
             waitingForRetroArch = true
+            detail = "Esperando a que RetroArch cree sus carpetas y su configuración…"
+            render()
             startActivity(Intent(Intent.ACTION_MAIN).setComponent(ComponentName(RETROARCH_PACKAGE, "com.retroarch.browser.mainmenu.MainMenuActivity"))
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             main.postDelayed(::waitForRetroArch, 2000)
@@ -213,6 +233,8 @@ class SetupActivity : Activity() {
         if (!waitingForRetroArch) return
         if (isDone(Step.FIRST_RUN)) {
             waitingForRetroArch = false
+            detail = "RetroArch ya está listo. Volviendo a RetroStick…"
+            render()
             // A moment for RetroArch to finish writing, then this screen comes back to the front
             main.postDelayed({
                 startActivity(Intent(this, SetupActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
@@ -267,10 +289,63 @@ class SetupActivity : Activity() {
 
     // ---- Drawing ----
 
-    private fun render(done: Boolean = false) {
-        rows.removeAllViews()
-        val active = current
+    private class RowViews(val row: LinearLayout, val halo: View, val badge: TextView, val title: TextView,
+                           val detail: TextView, val bar: ProgressBar, var state: Int = -1)
+
+    private val rowViews = mutableListOf<RowViews>()
+    private val fontBold by lazy { resources.getFont(R.font.inter_bold) }
+    private val fontRegular by lazy { resources.getFont(R.font.inter_regular) }
+    /** The step whose number pulses: what's going on now (or waiting for A). */
+    private var pulsing: Step? = null
+    private var pulse: AnimatorSet? = null
+
+    private fun bar() = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+        max = 1000
+        progressTintList = android.content.res.ColorStateList.valueOf(getColor(R.color.brand_accent))
+        indeterminateTintList = progressTintList
+        progressBackgroundTintList = android.content.res.ColorStateList.valueOf(0x33FFFFFF)
+    }
+
+    /** The rows are made once and only updated: rebuilding them would restart the bars and the pulse each time. */
+    private fun buildRows() {
         for (step in Step.entries) {
+            val row = LinearLayout(this).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(8), dp(4), dp(18), dp(4))
+            }
+            // The number, with a halo behind that spreads and fades while the step is under way
+            val box = FrameLayout(this)
+            val halo = View(this).apply {
+                background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(0xFF7B5CFF.toInt()) }
+                alpha = 0f
+            }
+            box.addView(halo, FrameLayout.LayoutParams(dp(32), dp(32), Gravity.CENTER))
+            val badge = label(15f, Color.WHITE, bold = true).apply { gravity = Gravity.CENTER }
+            box.addView(badge, FrameLayout.LayoutParams(dp(32), dp(32), Gravity.CENTER))
+            row.addView(box, LinearLayout.LayoutParams(dp(48), dp(48)))
+            val text = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0, dp(8), 0, dp(8)) }
+            val title = label(15f, Color.WHITE).apply { this.text = step.title }
+            text.addView(title)
+            val detail = label(12.5f, getColor(R.color.text_2))
+            text.addView(detail, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(3) })
+            val bar = bar()
+            text.addView(bar, LinearLayout.LayoutParams(-1, dp(10)).apply { topMargin = dp(8) })
+            row.addView(text, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(8) })
+            rows.addView(row, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
+            rowViews += RowViews(row, halo, badge, title, detail, bar)
+        }
+        // Before the steps (permission, looking for the release): the message and its bar go under the list
+        status = label(13f, getColor(R.color.text_2))
+        rows.addView(status, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(14) })
+        statusBar = bar().apply { isIndeterminate = true }
+        rows.addView(statusBar, LinearLayout.LayoutParams(dp(320), dp(10)).apply { topMargin = dp(8) })
+    }
+
+    private fun render(done: Boolean = false) {
+        val active = current
+        val err = error
+        for (step in Step.entries) {
+            val v = rowViews[step.ordinal]
             val state = when {
                 done -> 2
                 step == active -> 1
@@ -278,51 +353,113 @@ class SetupActivity : Activity() {
                 manifest != null && step != Step.CONFIG && step.ordinal > (active?.ordinal ?: -1) && isDone(step) -> 2
                 else -> 0
             }
-            val row = LinearLayout(this).apply {
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding(dp(16), dp(12), dp(18), dp(12))
-                background = GradientDrawable().apply {
+            if (state != v.state) {
+                v.row.background = GradientDrawable().apply {
                     cornerRadius = dp(14).toFloat()
                     setColor(Color.parseColor(if (state == 1) "#1FFFFFFF" else "#0AFFFFFF"))
                     if (state == 1) setStroke(dp(1), Color.parseColor("#559D8CFF"))
                 }
-            }
-            row.addView(label(15f, Color.WHITE, bold = true).apply {
-                gravity = Gravity.CENTER
-                text = when (state) { 2 -> "✓"; 1 -> "${step.ordinal + 1}"; else -> "${step.ordinal + 1}" }
-                background = GradientDrawable().apply {
+                v.badge.text = if (state == 2) "✓" else "${step.ordinal + 1}"
+                v.badge.background = GradientDrawable().apply {
                     shape = GradientDrawable.OVAL
                     setColor(Color.parseColor(when (state) { 2 -> "#2FB45A"; 1 -> "#7B5CFF"; else -> "#26FFFFFF" }))
                 }
-                alpha = if (state == 0) 0.6f else 1f
-            }, LinearLayout.LayoutParams(dp(32), dp(32)))
-            val text = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-            text.addView(label(15f, if (state == 0) getColor(R.color.text_3) else Color.WHITE, bold = state == 1).apply { this.text = step.title })
-            if (state == 1) {
-                val err = error
-                text.addView(label(12.5f, if (err != null) getColor(R.color.danger_text) else getColor(R.color.text_2)).apply {
-                    this.text = err ?: detail
-                }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(3) })
-                if (busy && err == null) {
-                    text.addView(ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
-                        isIndeterminate = this@SetupActivity.progress < 0
-                        max = 1000
-                        this.progress = (this@SetupActivity.progress.coerceAtLeast(0f) * 1000).toInt()
-                    }, LinearLayout.LayoutParams(-1, dp(10)).apply { topMargin = dp(8) })
+                v.badge.alpha = if (state == 0) 0.6f else 1f
+                // A step just done: its tick pops
+                if (state == 2 && v.state != -1) {
+                    v.badge.scaleX = 0.4f; v.badge.scaleY = 0.4f
+                    v.badge.animate().scaleX(1f).scaleY(1f).setDuration(350)
+                        .setInterpolator(android.view.animation.OvershootInterpolator(3f)).start()
                 }
+                v.title.setTextColor(if (state == 0) getColor(R.color.text_3) else Color.WHITE)
+                v.title.typeface = if (state == 1) fontBold else fontRegular
+                v.state = state
             }
-            row.addView(text, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(16) })
-            rows.addView(row, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
+            v.detail.visibility = if (state == 1) View.VISIBLE else View.GONE
+            if (state == 1) {
+                v.detail.text = err ?: detail
+                v.detail.setTextColor(if (err != null) getColor(R.color.danger_text) else getColor(R.color.text_2))
+            }
+            val showBar = state == 1 && err == null && (busy || waitingForRetroArch)
+            v.bar.visibility = if (showBar) View.VISIBLE else View.GONE
+            if (showBar) {
+                val indeterminate = progress < 0
+                if (v.bar.isIndeterminate != indeterminate) v.bar.isIndeterminate = indeterminate
+                if (!indeterminate) v.bar.progress = (progress * 1000).toInt()
+            }
         }
-        if (active == null && !done) {
-            // Before the steps (permission, looking for the release): the message goes under the list
-            rows.addView(label(13f, if (error != null) getColor(R.color.danger_text) else getColor(R.color.text_2)).apply {
-                text = error ?: detail
-            }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(14) })
-        }
+        val before = active == null && !done
+        status.visibility = if (before) View.VISIBLE else View.GONE
+        status.text = err ?: detail
+        status.setTextColor(if (err != null) getColor(R.color.danger_text) else getColor(R.color.text_2))
+        statusBar.visibility = if (before && busy && err == null) View.VISIBLE else View.GONE
+        setPulse(if (!done && err == null) active else null)
         hint.visibility = if (action != null) View.VISIBLE else View.GONE
         hint.text = "Ⓐ  $actionLabel"
         foot.text = if (done) "Listo. Ahora conecta tu Google Drive y vincula el stick con la app del móvil desde Retro Ajustes."
             else "Los juegos, las BIOS y las partidas son tuyos: van a tu propio Google Drive."
+    }
+
+    private fun setPulse(step: Step?) {
+        if (step == pulsing) return
+        pulse?.cancel()
+        pulsing?.let { rowViews[it.ordinal].halo.apply { alpha = 0f; scaleX = 1f; scaleY = 1f } }
+        pulsing = step
+        pulse = step?.let {
+            val halo = rowViews[it.ordinal].halo
+            val parts = listOf(
+                ObjectAnimator.ofFloat(halo, View.SCALE_X, 1f, 1.5f),
+                ObjectAnimator.ofFloat(halo, View.SCALE_Y, 1f, 1.5f),
+                ObjectAnimator.ofFloat(halo, View.ALPHA, 0.6f, 0f),
+            ).onEach { a -> a.repeatCount = ValueAnimator.INFINITE; a.duration = 1400 }
+            AnimatorSet().apply { playTogether(parts); start() }
+        }
+    }
+
+    // ---- What's being done, in words ----
+
+    /** A download's progress for [detail]: «34,2 de 120,0 MB · 2,3 MB/s · quedan unos 40 s», a few times a second. */
+    private fun downloading(what: String, size: Long): (Float) -> Unit {
+        val start = SystemClock.elapsedRealtime()
+        var shown = 0L
+        return { p ->
+            val now = SystemClock.elapsedRealtime()
+            if (now - shown >= 300 || p >= 1f) {
+                shown = now
+                val done = (p * size).toLong()
+                val secs = (now - start) / 1000f
+                val speed = if (secs > 0.5f) done / secs else 0f
+                val text = if (p >= 1f) "Comprobando que la descarga está completa…" else buildString {
+                    append(what).append(": ").append(mb(done)).append(" de ").append(mb(size)).append(" MB")
+                    if (speed > 0f) append(" · ").append(mb(speed.toLong())).append(" MB/s")
+                    if (speed > 0f && secs > 3f) append(" · quedan ").append(eta(((size - done) / speed).toInt()))
+                }
+                main.post { progress = p; detail = text; render() }
+            }
+        }
+    }
+
+    private fun mb(bytes: Long) = String.format(Locale("es", "ES"), "%.1f", bytes / 1_048_576f)
+
+    private fun eta(s: Int) = when {
+        s < 10 -> "unos segundos"
+        s < 60 -> "unos ${(s + 4) / 5 * 5} s"
+        else -> "unos ${(s + 30) / 60} min"
+    }
+
+    /** A file of the configuration pack, as the person would call it. */
+    private fun describe(path: String): String {
+        val parts = path.removePrefix("RetroArch/").split('/')
+        val base = parts.last().substringBeforeLast('.')
+        fun console(id: String) = CONSOLES.firstOrNull { it.id == id }?.name
+        return when {
+            path == "retroarch-keys.cfg" -> "Ajustes generales de RetroArch"
+            parts[0] == "autoconfig" -> "Perfil de mando: $base"
+            parts[0] == "overlays" -> console(base)?.let { "Marco de $it" } ?: "Marcos de pantalla"
+            parts[0] == "config" && parts.getOrNull(1) == "remaps" -> "Botones de ${console(base) ?: parts.getOrNull(2) ?: base}"
+            parts[0] == "config" && path.endsWith(".opt") -> "Opciones del emulador ${parts.getOrNull(1) ?: base}"
+            parts[0] == "config" -> "Ajustes de ${console(base) ?: parts.getOrNull(1) ?: base}"
+            else -> parts.last()
+        }
     }
 }

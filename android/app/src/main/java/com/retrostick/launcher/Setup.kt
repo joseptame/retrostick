@@ -159,9 +159,12 @@ object Setup {
     /**
      * The configuration pack into /sdcard (RetroArch's config, controller profiles, frames) and its retroarch.cfg
      * keys merged into RetroArch's own file. RetroArch must not be running: it rewrites retroarch.cfg on exit.
+     * [onFile] hears each entry as it goes (its path in the pack, how many done, how many in all), for the assistant.
      */
-    fun applyConfig(context: Context, zip: File, update: Boolean = false) {
+    fun applyConfig(context: Context, zip: File, update: Boolean = false, onFile: ((String, Int, Int) -> Unit)? = null) {
         val root = File(SDCARD).canonicalFile
+        val total = if (onFile != null) runCatching { java.util.zip.ZipFile(zip).use { it.size() } }.getOrDefault(0) else 0
+        var count = 0
         var keys: String? = null
         // What each file was when the pack wrote it: on an update, a file that differs now was changed on this stick
         val written = runCatching { JSONObject(writtenFile(context).readText()) }.getOrDefault(JSONObject())
@@ -169,7 +172,9 @@ object Setup {
             while (true) {
                 val e = z.nextEntry ?: break
                 val name = e.name.removePrefix("./")
+                count++
                 if (e.isDirectory || name.isEmpty()) continue
+                onFile?.invoke(name, count, total)
                 when (name) {
                     "pack.json" -> continue
                     "retroarch-keys.cfg" -> keys = String(z.readBytes())
