@@ -203,7 +203,9 @@ class StorageActivity : Activity() {
         rowViews.getOrNull(selected)?.let { v -> scroll.post { scroll.smoothScrollTo(0, (v.top - scroll.height / 2 + v.height / 2).coerceAtLeast(0)) } }
         val chosen = list.filter { it.game.key in marked }
         action.visibility = if (chosen.isEmpty()) View.INVISIBLE else View.VISIBLE
-        action.text = "Borrar ${chosen.size} ${if (chosen.size == 1) "juego" else "juegos"} · libera ${size(chosen.sumOf { it.bytes })}"
+        action.text = "Borrar ${chosen.size} ${if (chosen.size == 1) "juego" else "juegos"} · libera ${size(chosen.sumOf { it.bytes })}" +
+            // Without a console pad: the remote's way (OPTIONS is in the hints for pads)
+            if (StickStatus.controllers().isEmpty()) "  ·  mantén pulsado OK" else ""
     }
 
     private fun ago(ms: Long): String {
@@ -277,18 +279,32 @@ class StorageActivity : Activity() {
         }
     }
 
+    /** The stick's remote has no OPTIONS: holding its centre button deletes the marked games (a short press marks). */
+    private var centreHeld = false
+
+    private fun toggleSelected() = list.getOrNull(selected)?.let { r ->
+        if (!marked.remove(r.game.key)) marked += r.game.key
+        Sounds.play(Sounds.Sound.MOVE)
+        renderRows()
+    }
+
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val remoteOk = event.keyCode == KeyEvent.KEYCODE_DPAD_CENTER || event.keyCode == KeyEvent.KEYCODE_ENTER
+        if (remoteOk && !StickStatus.isGamepad(event.device)) {
+            when {
+                event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0 -> centreHeld = false
+                event.action == KeyEvent.ACTION_DOWN && !centreHeld -> { centreHeld = true; confirmRemove() }
+                event.action == KeyEvent.ACTION_UP && !centreHeld -> toggleSelected()
+            }
+            return true
+        }
         if (event.action != KeyEvent.ACTION_DOWN) return super.dispatchKeyEvent(event)
         followPad(event)
         when (StickStatus.standardKey(event.device, event.keyCode)) {
             KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_BUTTON_B -> { Sounds.play(Sounds.Sound.BACK); finish() }
             KeyEvent.KEYCODE_DPAD_DOWN -> if (selected < list.size - 1) { selected++; Sounds.play(Sounds.Sound.MOVE); renderSelection() }
             KeyEvent.KEYCODE_DPAD_UP -> if (selected > 0) { selected--; Sounds.play(Sounds.Sound.MOVE); renderSelection() }
-            KeyEvent.KEYCODE_BUTTON_A, KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> list.getOrNull(selected)?.let { r ->
-                if (!marked.remove(r.game.key)) marked += r.game.key
-                Sounds.play(Sounds.Sound.MOVE)
-                renderRows()
-            }
+            KeyEvent.KEYCODE_BUTTON_A, KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> toggleSelected()
             KeyEvent.KEYCODE_BUTTON_START -> if (event.repeatCount == 0) confirmRemove()
             else -> return super.dispatchKeyEvent(event)
         }
