@@ -419,6 +419,8 @@ class MainActivity : Activity() {
         super.onResume()
         // A new stick: the welcome assistant installs RetroArch, the cores and the configuration first
         if (Setup.needed(this)) startActivity(Intent(this, SetupActivity::class.java))
+        // Then Google Drive: without it there are no games, so nothing else until it's connected
+        else main.post(::requireDrive)
         hasStorage = checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
         if (!hasStorage) {
             requestPermissions(
@@ -1491,14 +1493,34 @@ class MainActivity : Activity() {
 
     // ---- Google Drive sign-in (code typed on the phone) ----
 
-    private fun startDriveLogin() {
+    /** The Drive sign-in on screen (only one at a time). */
+    private var driveLoginDialog: AlertDialog? = null
+
+    /**
+     * A stick without Drive has no games: once the assistant is done, the sign-in takes the whole screen and can't be
+     * closed until Drive is connected (it comes back by itself if the code expires or something fails).
+     */
+    private fun requireDrive() {
+        if (isFinishing || isDestroyed || !driveAuth.isConfigured || driveAuth.isConnected) return
+        if (driveLoginDialog?.isShowing == true || Setup.needed(this)) return
+        startDriveLogin(required = true)
+    }
+
+    private fun startDriveLogin(required: Boolean = false) {
         if (!driveAuth.isConfigured) {
             toast(R.string.drive_missing_config)
             return
         }
+        if (driveLoginDialog?.isShowing == true) return
         loginCancelled = false
+        val intro = TextView(this).apply {
+            text = "Tus juegos, BIOS y partidas se guardan en tu propio Google Drive. Para empezar, vincúlalo:"
+            setTextColor(Color.WHITE)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            visibility = if (required) View.VISIBLE else View.GONE
+        }
         val info = TextView(this).apply {
-            setText(R.string.drive_login_info)
+            text = "1. En el móvil, escanea el QR o abre"
             setTextColor(getColor(R.color.text_2))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
         }
@@ -1508,6 +1530,11 @@ class MainActivity : Activity() {
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
             typeface = resources.getFont(R.font.inter_bold)
         }
+        val step2 = TextView(this).apply {
+            text = "2. Escribe este código y elige tu cuenta de Google:"
+            setTextColor(getColor(R.color.text_2))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+        }
         val code = TextView(this).apply {
             text = "…"
             setTextColor(Color.WHITE)
@@ -1516,21 +1543,39 @@ class MainActivity : Activity() {
             typeface = resources.getFont(R.font.inter_extrabold)
         }
         val waiting = TextView(this).apply {
-            setText(R.string.drive_login_waiting)
+            text = "Esperando a que lo confirmes en el móvil…"
             setTextColor(getColor(R.color.text_3))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f)
         }
-        val box = LinearLayout(this).apply {
+        val texts = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(24), dp(8), dp(24), dp(4))
-            listOf(info, url, code, waiting).forEach { addView(it, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(6) }) }
+            listOf(intro, info, url, step2, code, waiting).forEach { addView(it, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(6) }) }
         }
-        val dialog = AlertDialog.Builder(this, R.style.Dialog_RetroStick)
+        // google.com/device never changes: its QR is a drawable made once (res/drawable/qr_google_device.xml)
+        val qr = android.widget.ImageView(this).apply { setImageResource(R.drawable.qr_google_device) }
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(24), dp(8), dp(24), dp(4))
+            addView(texts, LinearLayout.LayoutParams(0, -2, 1f))
+            addView(qr, LinearLayout.LayoutParams(dp(150), dp(150)).apply { marginStart = dp(24) })
+        }
+        val builder = AlertDialog.Builder(this, R.style.Dialog_RetroStick)
             .setTitle(R.string.drive_login_title)
             .setView(box)
-            .setNegativeButton(R.string.cancel) { _, _ -> loginCancelled = true }
-            .setOnCancelListener { loginCancelled = true }
-            .showForPad()
+        if (!required) {
+            builder.setNegativeButton(R.string.cancel) { _, _ -> loginCancelled = true }
+                .setOnCancelListener { loginCancelled = true }
+        }
+        val dialog = builder.showForPad()
+        if (required) {
+            // Nothing closes it: Back, B and Escape are swallowed (padKeys' B would cancel() it even when not cancelable)
+            dialog.setCancelable(false)
+            dialog.setOnKeyListener { _, keyCode, _ ->
+                keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_BUTTON_B || keyCode == KeyEvent.KEYCODE_ESCAPE
+            }
+        }
+        driveLoginDialog = dialog
 
         Thread {
             try {
@@ -1552,11 +1597,15 @@ class MainActivity : Activity() {
                         DriveAuth.Outcome.CANCELLED -> Unit
                     }
                     refreshStatus()
+                    // Still without Drive: a new code
+                    if (required && outcome != DriveAuth.Outcome.CONNECTED) main.postDelayed(::requireDrive, 2500)
                 }
             } catch (e: Exception) {
                 main.post {
                     dialog.dismiss()
                     Toast.makeText(this, getString(R.string.drive_login_error, e.message), Toast.LENGTH_LONG).show()
+                    // No internet, for instance: tried again in a while
+                    if (required) main.postDelayed(::requireDrive, 10_000)
                 }
             }
         }.start()
