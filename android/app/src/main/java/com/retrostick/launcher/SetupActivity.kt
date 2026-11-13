@@ -82,7 +82,7 @@ class SetupActivity : Activity() {
             LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(18) })
         col.addView(label(14f, getColor(R.color.text_2)).apply {
             text = "Instalo los emuladores y dejo cada consola con sus mandos, marcos y ajustes. Tarda unos minutos; " +
-                "solo tendrás que pulsar A cuando Android pida permiso."
+                "solo tendrás que pulsar A (o el botón central del mando del stick) cuando Android pida permiso."
         }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
         rows = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         col.addView(rows, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(26) })
@@ -195,7 +195,7 @@ class SetupActivity : Activity() {
             if (packageManager.canRequestPackageInstalls()) {
                 startActivity(Updater.installIntent(this, name))
             } else {
-                // Android 8+: allowed once per app (Ajustes > Seguridad > Fuentes desconocidas); back here, A installs
+                // Android 8+: allowed once per app (Ajustes > Seguridad > Fuentes desconocidas); back here, A (or the remote's centre button) installs
                 android.widget.Toast.makeText(this, "Activa «Permitir de esta fuente» para RetroStick y vuelve", android.widget.Toast.LENGTH_LONG).show()
                 val perApp = Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, android.net.Uri.parse("package:$packageName"))
                 startActivity(if (perApp.resolveActivity(packageManager) != null) perApp else Intent(android.provider.Settings.ACTION_SECURITY_SETTINGS))
@@ -395,7 +395,12 @@ class SetupActivity : Activity() {
         statusBar.visibility = if (before && busy && err == null) View.VISIBLE else View.GONE
         setPulse(if (!done && err == null) active else null)
         hint.visibility = if (action != null) View.VISIBLE else View.GONE
-        hint.text = "Ⓐ  $actionLabel"
+        // The stick's remote has no A: its centre button does the same (onKeyDown), so both are named
+        hint.text = android.text.SpannableStringBuilder(actionLabel).apply {
+            val from = length
+            append("\nPulsa A o el botón central del mando")
+            setSpan(android.text.style.RelativeSizeSpan(0.72f), from, length, 0)
+        }
         foot.text = if (done) "Listo. Ahora conecta tu Google Drive y vincula el stick con la app del móvil desde Retro Ajustes."
             else "Los juegos, las BIOS y las partidas son tuyos: van a tu propio Google Drive."
     }
