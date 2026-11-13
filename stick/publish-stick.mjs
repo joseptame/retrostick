@@ -6,7 +6,11 @@
 // With no option, all four. setup.json (what the welcome assistant reads) is updated last, after the files it names.
 // Needs the GitHub CLI (gh) signed in with access to the repository.
 //
-//   node stick/publish-stick.mjs [--retroarch] [--cores] [--config] [--launcher]
+//   node stick/publish-stick.mjs [--retroarch] [--cores] [--config] [--launcher] [--force]
+//
+// Sticks set up by the assistant follow this release (Setup.checkUpdates): new cores (higher versionCode in
+// android/cores/build.gradle.kts) are offered to install; a new configuration (config-pack.mjs stamps the date) is
+// applied by itself, keeping the files each stick changed.
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
@@ -60,6 +64,10 @@ if (want('cores')) {
   const dir = join(root, 'android', 'cores', 'build', 'outputs', 'apk', 'debug')
   if (!existsSync(join(dir, 'cores-debug.apk'))) throw new Error('Compila antes: node android/cores/fetch-cores.mjs && ./gradlew :cores:assembleDebug')
   const meta = apkMeta(dir)
+  // Sticks only offer cores with a higher versionCode than the ones they have
+  if (setup.cores && meta.versionCode <= setup.cores.versionCode && !args.includes('--force')) {
+    throw new Error(`Los núcleos publicados ya son la versión ${setup.cores.versionCode}: sube versionCode en android/cores/build.gradle.kts (o usa --force)`)
+  }
   setup.cores = describe(stage(join(dir, 'cores-debug.apk'), 'retrostick-cores.apk'), 'retrostick-cores.apk',
     { version: meta.versionName, versionCode: meta.versionCode })
 }

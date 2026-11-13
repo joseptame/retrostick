@@ -175,7 +175,14 @@ class SetupActivity : Activity() {
     private fun install(step: Step, asset: Setup.Asset, name: String) {
         val apk = File(cacheDir, "update/$name")
         val open = {
-            startActivity(Updater.installIntent(this, name))
+            if (packageManager.canRequestPackageInstalls()) {
+                startActivity(Updater.installIntent(this, name))
+            } else {
+                // Android 8+: allowed once per app (Ajustes > Seguridad > Fuentes desconocidas); back here, A installs
+                android.widget.Toast.makeText(this, "Activa «Permitir de esta fuente» para RetroStick y vuelve", android.widget.Toast.LENGTH_LONG).show()
+                val perApp = Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, android.net.Uri.parse("package:$packageName"))
+                startActivity(if (perApp.resolveActivity(packageManager) != null) perApp else Intent(android.provider.Settings.ACTION_SECURITY_SETTINGS))
+            }
         }
         if (apk.isFile && apk.length() == asset.size) {
             detail = "Android te pedirá confirmar la instalación: elige «Instalar». Si te pregunta, permite a RetroStick instalar apps."

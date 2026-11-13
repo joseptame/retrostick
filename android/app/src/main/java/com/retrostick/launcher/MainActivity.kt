@@ -443,6 +443,13 @@ class MainActivity : Activity() {
             val found = runCatching { Updater.checkNow(this) }.onFailure { android.util.Log.w("RetroStick", "Update check failed", it) }
                 .getOrDefault(false)
             if (found) main.post { refreshStatus(); offerUpdate() }
+            // Sticks set up by the assistant: newer emulator cores (asked) and configuration (applied by itself)
+            val configUpdated = runCatching { Setup.checkUpdates(this) }
+                .onFailure { android.util.Log.w("RetroStick", "Setup update check failed", it) }.getOrDefault(false)
+            main.post {
+                if (configUpdated) Toast.makeText(this, "Configuración de los emuladores actualizada", Toast.LENGTH_LONG).show()
+                if (!found) offerCoresUpdate()
+            }
         }
         main.postDelayed(syncTicker, SYNC_PERIOD_MS)
     }
@@ -1569,15 +1576,44 @@ class MainActivity : Activity() {
             .showForPad()
     }
 
-    private fun installUpdate(update: Updater.Update) {
-        // Android 8+: the user allows RetroStick to install apps once (Ajustes > Seguridad > Fuentes desconocidas).
-        if (!packageManager.canRequestPackageInstalls()) {
-            Toast.makeText(this, R.string.update_allow, Toast.LENGTH_LONG).show()
-            // Some TV builds lack the per-app screen: fall back to Android's security settings.
-            val perApp = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName"))
-            open(if (perApp.resolveActivity(packageManager) != null) perApp else Intent(Settings.ACTION_SECURITY_SETTINGS))
-            return
+    /** Newer «RetroStick Núcleos» in the release (Setup.checkUpdates): offered like a launcher update. */
+    private fun offerCoresUpdate() {
+        val cores = Setup.coresUpdate ?: return
+        if (cores.versionCode == Setup.dismissedCores || updateDialog?.isShowing == true || isFinishing) return
+        updateDialog = AlertDialog.Builder(this, R.style.Dialog_RetroStick)
+            .setTitle("Emuladores nuevos")
+            .setMessage("Hay una versión nueva de RetroStick Núcleos, los emuladores de cada consola (${cores.version}). " +
+                "Tus juegos y partidas no cambian.")
+            .setPositiveButton(R.string.update_install) { _, _ -> installCores(cores) }
+            .setNegativeButton(R.string.update_later) { _, _ -> Setup.dismissedCores = cores.versionCode }
+            .setOnCancelListener { Setup.dismissedCores = cores.versionCode }
+            .showForPad()
+    }
+
+    private fun installCores(cores: Setup.Asset) {
+        if (!canInstallApps()) return
+        Toast.makeText(this, R.string.update_downloading, Toast.LENGTH_SHORT).show()
+        io.execute {
+            val result = runCatching { Setup.download(cores, java.io.File(cacheDir, "update/cores.apk")) {} }
+            main.post {
+                result.onSuccess { open(Updater.installIntent(this, "cores.apk")) }
+                    .onFailure { Toast.makeText(this, getString(R.string.update_failed, it.message ?: ""), Toast.LENGTH_LONG).show() }
+            }
         }
+    }
+
+    /** Android 8+: the user allows RetroStick to install apps once (Ajustes > Seguridad > Fuentes desconocidas). */
+    private fun canInstallApps(): Boolean {
+        if (packageManager.canRequestPackageInstalls()) return true
+        Toast.makeText(this, R.string.update_allow, Toast.LENGTH_LONG).show()
+        // Some TV builds lack the per-app screen: fall back to Android's security settings.
+        val perApp = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName"))
+        open(if (perApp.resolveActivity(packageManager) != null) perApp else Intent(Settings.ACTION_SECURITY_SETTINGS))
+        return false
+    }
+
+    private fun installUpdate(update: Updater.Update) {
+        if (!canInstallApps()) return
         Toast.makeText(this, R.string.update_downloading, Toast.LENGTH_SHORT).show()
         io.execute {
             val result = runCatching { Updater.download(this, update) }

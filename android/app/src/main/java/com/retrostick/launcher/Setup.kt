@@ -21,6 +21,10 @@ import java.util.zip.ZipInputStream
  * Cores: RetroArch only installs cores into its private folder through its own menu, so a new stick doesn't: they
  * come in «RetroStick Núcleos», whose lib folder any app may load from (like WebView's), and the launcher hands
  * RetroArch that path ([corePath]). Sticks set up before keep RetroArch's own cores.
+ *
+ * Afterwards ([checkUpdates], when the launcher shows up, at most every half hour) a stick set up by the assistant
+ * also follows the release: newer cores are offered like a launcher update (Android asks to install), and a newer
+ * configuration pack is applied by itself, replacing only the files this stick hasn't changed (its own buttons stay).
  */
 object Setup {
     const val RELEASE = "https://github.com/joseptame/retrostick/releases/download/stick"
@@ -32,6 +36,33 @@ object Setup {
     fun usesCoresApp(context: Context) = prefs(context).getBoolean("coresApp", false)
 
     fun configVersion(context: Context) = prefs(context).getString("config", null)
+
+    /** Newer «RetroStick Núcleos» found by the last [checkUpdates], or null. */
+    @Volatile var coresUpdate: Asset? = null
+        private set
+    /** Cores version the user answered "Ahora no" to (asked again after the launcher restarts). */
+    @Volatile var dismissedCores = 0
+    @Volatile private var lastCheck = 0L
+
+    /**
+     * Newer cores and configuration in the release (only on sticks set up by the assistant). Blocking.
+     * Returns true when a newer configuration was just applied.
+     */
+    fun checkUpdates(context: Context): Boolean {
+        if (!usesCoresApp(context)) return false
+        val now = System.currentTimeMillis()
+        if (now - lastCheck < 30 * 60_000L) return false
+        lastCheck = now
+        val m = manifest()
+        coresUpdate = m.cores.takeIf { it.versionCode > (versionCode(context, CORES_PACKAGE) ?: 0) }
+        if (m.config.version <= (configVersion(context) ?: "")) return false
+        val zip = File(context.cacheDir, "setup/config.zip")
+        download(m.config, zip) {}
+        applyConfig(context, zip, update = true)
+        zip.delete()
+        prefs(context).edit().putString("config", m.config.version).apply()
+        return true
+    }
 
     fun markDone(context: Context, config: String) =
         prefs(context).edit().putBoolean("done", true).putBoolean("coresApp", true).putString("config", config).apply()
@@ -46,6 +77,10 @@ object Setup {
         val storage = context.checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
         return storage && (!File(RETROARCH_CFG).isFile || !File("$SDCARD/RetroArch/config").isDirectory)
     }
+
+    private fun writtenFile(context: Context) = File(context.filesDir, "config-files.json")
+
+    private fun sha256(bytes: ByteArray) = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 
     private fun keysFile(context: Context) = File(context.filesDir, "retroarch-keys.cfg")
 
@@ -124,9 +159,11 @@ object Setup {
      * The configuration pack into /sdcard (RetroArch's config, controller profiles, frames) and its retroarch.cfg
      * keys merged into RetroArch's own file. RetroArch must not be running: it rewrites retroarch.cfg on exit.
      */
-    fun applyConfig(context: Context, zip: File) {
+    fun applyConfig(context: Context, zip: File, update: Boolean = false) {
         val root = File(SDCARD).canonicalFile
         var keys: String? = null
+        // What each file was when the pack wrote it: on an update, a file that differs now was changed on this stick
+        val written = runCatching { JSONObject(writtenFile(context).readText()) }.getOrDefault(JSONObject())
         ZipInputStream(zip.inputStream().buffered()).use { z ->
             while (true) {
                 val e = z.nextEntry ?: break
@@ -139,12 +176,19 @@ object Setup {
                         val out = File(root, name).canonicalFile
                         // Only inside /sdcard/RetroArch: nothing in the pack may write anywhere else
                         if (!out.path.startsWith(File(root, "RetroArch").path + File.separator)) continue
+                        val bytes = z.readBytes()
+                        if (update && out.isFile && sha256(out.readBytes()) != written.optString(name)) {
+                            android.util.Log.i("RetroStick", "Config pack: kept this stick's $name")
+                            continue
+                        }
                         out.parentFile?.mkdirs()
-                        out.outputStream().use { z.copyTo(it) }
+                        out.writeBytes(bytes)
+                        written.put(name, sha256(bytes))
                     }
                 }
             }
         }
+        writtenFile(context).writeText(written.toString())
         keysFile(context).writeText(keys.orEmpty())
         val cfg = File(RETROARCH_CFG)
         if (!cfg.isFile) {

@@ -137,6 +137,10 @@ Para el stick de otra persona (con su propio Google Drive y su usuario de la web
   (`node android/cores/fetch-cores.mjs` y `./gradlew :cores:assembleDebug` antes), la configuración y el launcher, y
   `setup.json` al final. `android/publish-update.mjs` publica el launcher en Drive y también aquí: todos los sticks
   buscan las actualizaciones primero en GitHub.
+- **Después del asistente** (`Setup.checkUpdates`, al mostrarse el launcher, como mucho cada media hora): unos núcleos
+  nuevos (sube `versionCode` en `android/cores/build.gradle.kts`) se ofrecen como una actualización; un paquete de
+  configuración nuevo se aplica solo y sustituye únicamente los archivos que ese stick no ha cambiado (recuerda el
+  SHA-256 de lo que escribió en `config-files.json`), así que los botones que haya cambiado cada uno se quedan.
 - RetroArch para Android 1.22.2 no trae las órdenes por red (`network_cmd_enable`, falta `HAVE_COMMAND` al compilar),
   así que no se puede manejar su menú desde el launcher.
 
