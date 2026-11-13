@@ -147,9 +147,9 @@ class SetupActivity : Activity() {
             }
             return render()
         }
-        val m = manifest ?: return work(null, "Buscando lo necesario…") {
-            manifest = Setup.manifest()
-            main.post { advance() }
+        val m = manifest ?: return work(null, "Buscando lo necesario…", then = ::advance) {
+            val found = Setup.manifest()
+            main.post { manifest = found }
         }
         val step = Step.entries.first { !isDone(it) }
         current = step
@@ -157,7 +157,7 @@ class SetupActivity : Activity() {
             Step.RETROARCH -> install(step, m.retroarch, "retroarch.apk")
             Step.CORES -> install(step, m.cores, "cores.apk")
             Step.FIRST_RUN -> firstRun()
-            Step.CONFIG -> work(step, "Copiando la configuración…") {
+            Step.CONFIG -> work(step, "Copiando la configuración…", then = ::finished) {
                 // RetroArch rewrites retroarch.cfg when it closes: it must be gone before touching it
                 getSystemService(ActivityManager::class.java).killBackgroundProcesses(RETROARCH_PACKAGE)
                 Thread.sleep(800)
@@ -166,7 +166,6 @@ class SetupActivity : Activity() {
                 Setup.applyConfig(this, zip)
                 zip.delete()
                 Setup.markDone(this, m.config.version)
-                main.post { finished() }
             }
         }
     }
@@ -191,9 +190,8 @@ class SetupActivity : Activity() {
             if (autoOpened.add(step)) open()
             return
         }
-        work(step, "Descargando (${asset.size / 1_048_576} MB)…") {
+        work(step, "Descargando (${asset.size / 1_048_576} MB)…", then = ::advance) {
             Setup.download(asset, apk) { p -> main.post { progress = p; render() } }
-            main.post { advance() }
         }
     }
 
@@ -224,7 +222,11 @@ class SetupActivity : Activity() {
         }
     }
 
-    private fun work(step: Step?, what: String, task: () -> Unit) {
+    /**
+     * Runs [task] off the main thread, then [then] on it. busy goes back to false BEFORE [then]: advance() does
+     * nothing while busy, so if the task posted advance() itself the setup stayed stuck on «Buscando lo necesario…».
+     */
+    private fun work(step: Step?, what: String, then: () -> Unit, task: () -> Unit) {
         busy = true
         current = step ?: current
         detail = what
@@ -244,7 +246,7 @@ class SetupActivity : Activity() {
                     setAction("Reintentar") { advance() }
                     render()
                 }
-            }.onSuccess { main.post { busy = false; progress = -1f } }
+            }.onSuccess { main.post { busy = false; progress = -1f; then() } }
         }
     }
 
