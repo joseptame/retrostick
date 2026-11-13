@@ -3,6 +3,7 @@ import type { AppState } from '../App'
 import { GameSheet } from '../components/GameSheet'
 import { SearchCard, type CardState } from '../components/SearchCard'
 import { Banner, Segmented, StickySearch } from '../components/ui'
+import { Icon } from '../components/icons'
 import { CollectionSheet } from '../components/CollectionSheet'
 import { FilterSheet, filtersActive, NO_FILTERS, UNRATED, type Filters, type FilterSection } from '../components/FilterSheet'
 import { archiveFileUrl, downloadUrl, groupDiscs, listItemFiles, m3uName, packedRom, proxyPath, type ArchiveEntry } from '../lib/archive'
@@ -306,12 +307,17 @@ export function Buscar({ state }: { state: AppState }) {
         />
       ) : (
       <>
-      <Segmented
-        label="Consola"
-        options={CONSOLES.map((c) => ({ id: c.id, label: c.short }))}
-        value={consoleId}
-        onChange={setConsoleId}
-      />
+      <div className="bx-top">
+        <button className="bx-back" onClick={() => { setChosen(false); setQuery('') }} aria-label="Volver a las plataformas">
+          <Icon name="back" />
+        </button>
+        <Segmented
+          label="Consola"
+          options={CONSOLES.map((c) => ({ id: c.id, label: c.short }))}
+          value={consoleId}
+          onChange={setConsoleId}
+        />
+      </div>
 
       <StickySearch value={query} onChange={setQuery} placeholder={`Buscar en ${collName}…`} label="Buscar juegos" />
 

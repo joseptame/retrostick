@@ -204,7 +204,10 @@ export function BottomNav({ tab, onTab, badges = {} }: { tab: Tab; onTab: (t: Ta
   )
 }
 
-/** Segmented control with a sliding white pill (console filters). */
+/**
+ * Segmented control with a sliding white pill (console filters). Each button is as wide as its label and the row
+ * scrolls sideways when they don't all fit (eleven consoles on a phone); the chosen one scrolls into view.
+ */
 export function Segmented<T extends string>({
   options,
   value,
@@ -216,15 +219,51 @@ export function Segmented<T extends string>({
   onChange: (v: T) => void
   label: string
 }) {
-  const i = Math.max(0, options.findIndex((o) => o.id === value))
+  const row = useRef<HTMLDivElement>(null)
+  const [pill, setPill] = useState<{ left: number; width: number } | null>(null)
+  const [edges, setEdges] = useState({ start: false, end: false })
+  // The pill slides between consoles, but appears in place the first time (not sliding in from the left)
+  const [ready, setReady] = useState(false)
+
+  const measure = () => {
+    const el = row.current
+    if (!el) return
+    const on = el.querySelector<HTMLButtonElement>('button.on')
+    if (on) setPill({ left: on.offsetLeft, width: on.offsetWidth })
+    if (on && !ready) requestAnimationFrame(() => requestAnimationFrame(() => setReady(true)))
+    setEdges({ start: el.scrollLeft > 2, end: el.scrollLeft + el.clientWidth < el.scrollWidth - 2 })
+  }
+
+  useEffect(() => {
+    measure()
+    const el = row.current
+    const on = el?.querySelector<HTMLButtonElement>('button.on')
+    if (el && on) {
+      const target = on.offsetLeft - (el.clientWidth - on.offsetWidth) / 2
+      el.scrollTo({ left: Math.max(0, target), behavior: ready ? 'smooth' : 'auto' })
+    }
+  }, [value, options.length])
+
+  useEffect(() => {
+    const el = row.current
+    if (!el) return
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    // Web fonts change the label widths once loaded
+    void document.fonts?.ready.then(measure)
+    return () => ro.disconnect()
+  }, [])
+
   return (
-    <div className="seg" role="tablist" aria-label={label} style={{ '--n': options.length, '--i': i } as CSSProperties}>
-      <span className="seg-pill" aria-hidden />
-      {options.map((o) => (
-        <button key={o.id} role="tab" aria-selected={o.id === value} className={o.id === value ? 'on' : ''} onClick={() => onChange(o.id)}>
-          {o.label}
-        </button>
-      ))}
+    <div className={`seg-wrap${edges.start ? ' fade-start' : ''}${edges.end ? ' fade-end' : ''}`}>
+      <div ref={row} className={`seg${ready ? ' ready' : ''}`} role="tablist" aria-label={label} onScroll={measure}>
+        <span className="seg-pill" aria-hidden style={pill ? { transform: `translateX(${pill.left}px)`, width: pill.width } : { opacity: 0 }} />
+        {options.map((o) => (
+          <button key={o.id} role="tab" aria-selected={o.id === value} className={o.id === value ? 'on' : ''} onClick={() => onChange(o.id)}>
+            {o.label}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
