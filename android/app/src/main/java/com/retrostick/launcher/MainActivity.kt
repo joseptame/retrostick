@@ -3,6 +3,7 @@ package com.retrostick.launcher
 import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
@@ -264,6 +265,8 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Opened by Home (a new home task, e.g. the first Home after RetroStick became the home screen): like onNewIntent
+        if (intent?.hasCategory(Intent.CATEGORY_HOME) == true) homePressed = true
         setContentView(R.layout.activity_main)
         library = Library(this)
         covers = CoverLoader(this)
@@ -428,6 +431,14 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        // Home during a game (the pad's on Android 11+, the remote's anywhere) lands here: back to the game
+        // (RetroArchCmd). Here without Home: the game was closed.
+        val home = homePressed
+        homePressed = false
+        if (RetroArchCmd.playing(this)) {
+            if (home) { RetroArchCmd.backToGame(this); return }
+            RetroArchCmd.setPlaying(this, false)
+        }
         // A new stick: the welcome assistant installs RetroArch, the cores and the configuration first
         if (Setup.needed(this)) startActivity(Intent(this, SetupActivity::class.java))
         // Then Google Drive: without it there are no games, so nothing else until it's connected
@@ -437,6 +448,9 @@ class MainActivity : Activity() {
             if (!isFinishing && !Setup.needed(this) && driveAuth.isConnected && News.pending(this).isNotEmpty())
                 startActivity(Intent(this, NewsActivity::class.java))
         }
+        // RetroStick as the stick's home screen (Home never leaves to another launcher, and during a game comes back
+        // to it): asked once, with Android's own window, when it isn't
+        main.post { if (!isFinishing && !Setup.needed(this) && driveAuth.isConnected) askToBeHome() }
         hasStorage =checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
         if (!hasStorage) {
             requestPermissions(
@@ -488,9 +502,13 @@ class MainActivity : Activity() {
         DriveSync.cancel()
     }
 
+    /** Home brought RetroStick up (onNewIntent comes before onResume): during a game it means RetroArch's menu. */
+    private var homePressed = false
+
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
-        // Home pressed while already here
+        if (intent?.hasCategory(Intent.CATEGORY_HOME) == true) homePressed = true
+        // Home pressed while already here (or during a game: see onResume)
         zone = Zone.CONTENT
         // Debug builds only: preview the glyphs of a controller that is not connected
         // (adb shell am start -n com.retrostick.launcher/.MainActivity --es debugPadStyle XBOX).
@@ -1134,7 +1152,7 @@ class MainActivity : Activity() {
                 launchIntent(RETROARCH_PACKAGE)?.let(::open) ?: toast(R.string.retroarch_missing)
             },
             Setting("📱", getString(R.string.set_other_apps), getString(R.string.set_other_apps_sub)) {
-                launchIntent(FLAUNCHER_PACKAGE)?.let(::open) ?: toast(R.string.app_missing)
+                (launchIntent(FLAUNCHER_PACKAGE) ?: otherLauncher())?.let(::open) ?: toast(R.string.app_missing)
             },
             Setting("☁️", getString(R.string.set_account), "") {
                 if (driveAuth.isConnected) showDriveMenu() else startDriveLogin()
@@ -2197,6 +2215,36 @@ class MainActivity : Activity() {
     }
 
     // ---- Helpers ----
+
+    private fun isHome(): Boolean =
+        packageManager.resolveActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), PackageManager.MATCH_DEFAULT_ONLY)
+            ?.activityInfo?.packageName == packageName
+
+    /** Once: Android's «default home app» window (Android 10+) or the home settings, when RetroStick isn't it. */
+    private fun askToBeHome() {
+        val prefs = getSharedPreferences("home", MODE_PRIVATE)
+        if (isHome() || prefs.getBoolean("asked", false)) return
+        prefs.edit().putBoolean("asked", true).apply()
+        val role = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q)
+            getSystemService(android.app.role.RoleManager::class.java)?.takeIf { it.isRoleAvailable(android.app.role.RoleManager.ROLE_HOME) }
+                ?.createRequestRoleIntent(android.app.role.RoleManager.ROLE_HOME) else null
+        AlertDialog.Builder(this, R.style.Dialog_RetroStick)
+            .setTitle("RetroStick como pantalla de inicio")
+            .setMessage("Así el botón Home del mando o del mando a distancia vuelve siempre a RetroStick, y durante un juego te devuelve al juego en vez de sacarte. Tus otras apps siguen en Retro Ajustes → Otras apps.")
+            .setPositiveButton("Elegir") { _, _ ->
+                runCatching { if (role != null) startActivityForResult(role, 0) else startActivity(Intent(Settings.ACTION_HOME_SETTINGS)) }
+                    .onFailure { toast(R.string.app_missing) }
+            }
+            .setNegativeButton("Ahora no", null)
+            .showForPad()
+    }
+
+    /** «Otras apps» without FLauncher: the stick's other home screen (tv.inicio…), not Android's settings fallback. */
+    private fun otherLauncher(): Intent? =
+        packageManager.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0)
+            .map { it.activityInfo }
+            .firstOrNull { it.packageName != packageName && it.packageName != "com.android.tv.settings" && it.packageName != "com.android.settings" }
+            ?.let { Intent(Intent.ACTION_MAIN).setComponent(ComponentName(it.packageName, it.name)) }
 
     private fun launchIntent(pkg: String) =
         packageManager.getLaunchIntentForPackage(pkg) ?: packageManager.getLeanbackLaunchIntentForPackage(pkg)

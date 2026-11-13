@@ -10,7 +10,7 @@ import java.util.Locale
 
 const val SDCARD = "/storage/emulated/0"
 const val RETROARCH_PACKAGE = "com.retroarch.ra32"
-private const val RETROARCH_ACTIVITY = "com.retroarch.browser.retroactivity.RetroActivityFuture"
+internal const val RETROARCH_ACTIVITY = "com.retroarch.browser.retroactivity.RetroActivityFuture"
 internal const val RETROARCH_CFG = "$SDCARD/Android/data/$RETROARCH_PACKAGE/files/retroarch.cfg"
 /**
  * RetroStick's own retroarch.cfg, for sticks where RetroArch's can't be written: from Android 11 (e.g. the Xiaomi Mi TV Stick 4K) no app
@@ -255,12 +255,6 @@ fun launchInRetroArch(context: Context, game: Game, resume: Resume = Resume.TITL
         // A picture with each save (<state>.png): the cards of Detalles → Jugar
         "savestate_thumbnail_enable" to "true",
         "state_slot" to "0",
-        // RetroArch shortcuts, the same on every console: hold Create + L1 = quick save, + R1 = load it,
-        // + R2 = fast-forward. DualSense codes on Android 9 (docs/mandos.md): Create 104, L1 100, R1 101, R2 103
-        "input_enable_hotkey_btn" to "104",
-        "input_save_state_btn" to "100",
-        "input_load_state_btn" to "101",
-        "input_toggle_fast_forward_btn" to "103",
         // A clean start: no RetroAchievements summary (game name + "1 de 124 logros"), login or "not identified"
         // messages, nor RetroArch's remap / override / controller ones. Unlocks and quick save / load still show.
         "cheevos_visibility_summary" to "2",
@@ -277,6 +271,17 @@ fun launchInRetroArch(context: Context, game: Game, resume: Resume = Resume.TITL
         "apply_cheats_after_load" to "true",
     ))
     Cheats.apply(context, game)
+    // RetroArch shortcuts, the same on every console: hold Create / − + L1 = quick save, + R1 = load it,
+    // + R2 = fast-forward; their codes depend on the Android version (PadProfiles, docs/mandos.md)
+    writeRetroArchCfg(PadProfiles.hotkeys())
+    // Android 11+ sticks: the controller profiles with that Android's codes
+    PadProfiles.apply()
+    // The TV's real refresh rate (59.94 Hz on some): with 60 RetroArch runs a little fast and frames queue up,
+    // which feels like input lag
+    displayRefreshRate(context)?.let { writeRetroArchCfg(mapOf("video_refresh_rate" to String.format(java.util.Locale.US, "%.6f", it))) }
+    // Home while playing comes back to the game (RetroArchCmd); the command interface asked for before, off
+    writeRetroArchCfg(mapOf("network_cmd_enable" to "false"))
+    RetroArchCmd.setPlaying(context, true)
     // RetroArch rewrites its config when it closes: the RetroAchievements account goes back in every time
     RetroAchievements.apply(context)
     RetroAchievements.applyGame(game)
@@ -304,3 +309,8 @@ fun launchInRetroArch(context: Context, game: Game, resume: Resume = Resume.TITL
     context.startActivity(intent)
     return true
 }
+
+/** The TV's refresh rate as Android reports it (59.94 or 60…), null if unknown. */
+fun displayRefreshRate(context: Context): Float? =
+    context.getSystemService(android.hardware.display.DisplayManager::class.java)
+        ?.getDisplay(android.view.Display.DEFAULT_DISPLAY)?.refreshRate?.takeIf { it in 23f..121f }

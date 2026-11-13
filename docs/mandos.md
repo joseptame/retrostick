@@ -77,6 +77,30 @@ Home = PS, Captura = panel táctil. Así valen tal cual los atajos (− + L / R 
 - **RetroArch:** perfil `stick/retroarch/autoconfig/android/Pro Controller (Android 9, RetroStick).cfg`. El oficial
   `Pro Controller.cfg` (códigos de Android 11+, la X sería L) se mueve a `autoconfig/disabled/`.
 
+## Switch Pro Controller en Android 11 (Mi TV Stick 4K, medido el 2026-11-13)
+
+Android 11 tiene su propio `Vendor_057e_Product_2009.kl` y el núcleo usa `hid-nintendo` (el mando se llama
+«Nintendo Switch Pro Controller»), así que llegan los códigos estándar:
+
+| Botón | Evento del núcleo | Código Android | Valor |
+|---|---|---|---|
+| A / B | `BTN_EAST` / `BTN_SOUTH` | `BUTTON_B` / `BUTTON_A` | 97 / 96 |
+| X / Y | `BTN_NORTH` / `BTN_WEST` | `BUTTON_Y` / `BUTTON_X` | 100 / 99 |
+| L / R | `BTN_TL` / `BTN_TR` | `BUTTON_L1` / `BUTTON_R1` | 102 / 103 |
+| ZL / ZR | `BTN_TL2` / `BTN_TR2` | `BUTTON_L2` / `BUTTON_R2` | 104 / 105 |
+| − / + | `BTN_SELECT` / `BTN_START` | `BUTTON_SELECT` / `BUTTON_START` | 109 / 108 |
+| L3 / R3 | `BTN_THUMBL` / `BTN_THUMBR` | `BUTTON_THUMBL` / `BUTTON_THUMBR` | 106 / 107 |
+| Captura | `BTN_Z` | `BUTTON_MODE` | 110 |
+| Home | `BTN_MODE` | `HOME` (el de Android: sale al inicio) | — |
+
+- **Launcher:** en Android 11+ `standardKey()` solo cambia A↔B (ya iba bien).
+- **RetroArch:** con el perfil de Android 9 los botones salían cambiados (+ era R3, L era ZL…). Desde la 1.26.0 el
+  launcher (`PadProfiles.kt`), antes de cada juego y solo en Android 11+: escribe
+  `Nintendo Switch Pro Controller (Android 11, RetroStick).cfg` (mismo reparto: A = ✕, B = ○, Y = □, X = △;
+  **Captura abre el menú de RetroArch**), aparta los perfiles «(Android 9, RetroStick)», recupera el oficial del
+  DualSense para Android 13, pone los atajos con − (109) + L (102) / R (103) / ZR (105) y quita el cambio de
+  marco (106, que aquí es L3).
+
 ## Botones en cada consola (DualSense)
 
 | | NES (FCEUmm) | Super Nintendo (Snes9x 2010) | Game Boy / Color (Gambatte) | Game Boy Advance (mGBA) | Mega Drive / Master System (Genesis Plus GX) | Nintendo 64 (Mupen64Plus-Next) | Neo Geo (FinalBurn Neo) | PlayStation (PCSX ReARMed) |
