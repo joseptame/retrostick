@@ -225,6 +225,8 @@ fun launchInRetroArch(context: Context, game: Game, resume: Resume = Resume.TITL
     }
     // RetroArch only auto-loads .state.auto: the quick save goes there first (closing writes it again anyway)
     if (resume == Resume.QUICK) quickState(game)?.let { runCatching { it.copyTo(File(STATES_DIR, "${game.baseName}.state.auto"), overwrite = true) } }
+    // The configuration pack's keys again, in case RetroArch rewrote retroarch.cfg on closing (assistant sticks only)
+    Setup.packKeys(context).takeIf { it.isNotEmpty() }?.let { writeRetroArchCfg(it) }
     writeRetroArchCfg(linkedMapOf(
         // From the title screen unless asked to continue; the state on closing is always kept
         "savestate_auto_load" to (resume != Resume.TITLE).toString(),
@@ -271,7 +273,8 @@ fun launchInRetroArch(context: Context, game: Game, resume: Resume = Resume.TITL
     val intent = Intent(Intent.ACTION_MAIN)
         .setComponent(ComponentName(RETROARCH_PACKAGE, RETROARCH_ACTIVITY))
         .putExtra("ROM", game.file.absolutePath)
-        .putExtra("LIBRETRO", "$dataDir/cores/${game.console.core}")
+        // A stick set up by the assistant: the cores of «RetroStick Núcleos» (Setup.kt); otherwise RetroArch's own
+        .putExtra("LIBRETRO", Setup.corePath(context, game.console.core) ?: "$dataDir/cores/${game.console.core}")
         .putExtra("CONFIGFILE", RETROARCH_CFG)
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
     context.startActivity(intent)

@@ -14,4 +14,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "RetroStickLauncher"
-include(":app")
+include(":app", ":cores")

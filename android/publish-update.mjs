@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Publishes the launcher APK to the user's Drive (Retro/Config/launcher) so the stick offers the update
+ * Publishes the launcher APK to the user's Drive (Retro/Config/launcher) and to GitHub (stick/publish-stick.mjs) so sticks offer the update
  * (Updater.kt). Usage, from android/:
  *
  *   ./gradlew assembleDebug && node publish-update.mjs [--force]
@@ -9,6 +9,7 @@
  * approve at google.com/device with the same Google account; the refresh token stays in .publish-token.json
  * (git-ignored). Bump versionCode in app/build.gradle.kts for every release: the stick only installs newer ones.
  */
+import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -149,3 +150,6 @@ if (current && !force) {
 await put(dir, release.apk, apk, 'application/vnd.android.package-archive')
 await put(dir, 'launcher.json', Buffer.from(JSON.stringify(release, null, 2)), 'application/json')
 console.log(`Publicada la versión ${release.versionName} (${release.versionCode}, ${(apk.length / 1048576).toFixed(1)} MB) en Retro/Config/launcher`)
+
+// The same version on GitHub (the «stick» release): every stick looks there first, also a friend's with its own Drive
+execFileSync(process.execPath, [join(here, '..', 'stick', 'publish-stick.mjs'), '--launcher'], { stdio: 'inherit' })

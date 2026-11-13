@@ -36,3 +36,8 @@ Thumbs.db
 .vercel/
 
 .vercel
+
+# Emulator cores (downloaded by android/cores/fetch-cores.mjs)
+android/cores/build/
+android/cores/src/main/jniLibs/
+stick/dist/

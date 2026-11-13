@@ -116,6 +116,30 @@ Retro/
 
 ## 5. Stick: instalación y configuración
 
+### 5.0 Stick nuevo sin PC: el asistente de bienvenida (launcher 1.24)
+Para el stick de otra persona (con su propio Google Drive y su usuario de la web), sin ADB:
+1. Instalar el launcher una vez (por ejemplo con la app «Downloader» y el enlace
+   `https://github.com/joseptame/retrostick/releases/download/stick/launcher.apk`) y elegirlo como pantalla de inicio.
+2. Al abrirse, el asistente (`SetupActivity`, `Setup.kt`) lo hace todo desde la versión «stick» de GitHub: instala
+   RetroArch 1.22.2 y **RetroStick Núcleos**, abre RetroArch una vez para que cree su configuración, lo cierra y copia
+   el paquete de configuración. Solo hay que pulsar A cuando Android pide confirmar una instalación o un permiso.
+3. Después, como siempre: conectar su Drive y vincular el stick con la web (Retro Ajustes).
+
+- **Núcleos sin pasar por RetroArch:** RetroArch solo instala núcleos en su carpeta privada desde su menú. «RetroStick
+  Núcleos» (`android/cores`) es una app sin código que lleva los núcleos como bibliotecas nativas (`lib<núcleo>.so`);
+  Android las deja en su carpeta `lib`, que cualquier app puede cargar, y el launcher le pasa a RetroArch esa ruta en
+  `LIBRETRO` (`Setup.corePath`). Comprobado el 2026-11-13 con Pokémon Rojo en el stick del administrador. Los sticks
+  instalados a mano (`install.ps1`) siguen con los núcleos de RetroArch.
+- **Paquete de configuración:** `node stick/config-pack.mjs` lo saca del stick del administrador (solo lectura): la
+  carpeta `RetroArch/config` sin los archivos de un juego concreto, los perfiles de mando, los marcos y las claves de
+  `retroarch.cfg` que difieren de `retroarch.cfg.orig`, sin nada personal (cuenta de RetroAchievements, contraseñas).
+- **Publicar:** `node stick/publish-stick.mjs` sube a la versión «stick» RetroArch, los núcleos
+  (`node android/cores/fetch-cores.mjs` y `./gradlew :cores:assembleDebug` antes), la configuración y el launcher, y
+  `setup.json` al final. `android/publish-update.mjs` publica el launcher en Drive y también aquí: todos los sticks
+  buscan las actualizaciones primero en GitHub.
+- RetroArch para Android 1.22.2 no trae las órdenes por red (`network_cmd_enable`, falta `HAVE_COMMAND` al compilar),
+  así que no se puede manejar su menú desde el launcher.
+
 ### 5.1 Preparar ADB (desde el PC con VS Code)
 1. En el stick: *Ajustes → Preferencias del dispositivo → Información →* pulsar 7 veces en **Compilación**.
 2. *Opciones de desarrollador →* activar **Depuración USB**. En Android TV esto suele habilitar también ADB por red en el puerto 5555. ⚠️ VERIFICAR

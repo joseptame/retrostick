@@ -417,6 +417,8 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        // A new stick: the welcome assistant installs RetroArch, the cores and the configuration first
+        if (Setup.needed(this)) startActivity(Intent(this, SetupActivity::class.java))
         hasStorage = checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
         if (!hasStorage) {
             requestPermissions(
