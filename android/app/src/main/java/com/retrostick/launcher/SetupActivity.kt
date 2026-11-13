@@ -139,7 +139,11 @@ class SetupActivity : Activity() {
         return when (step) {
             Step.RETROARCH -> Setup.versionCode(this, RETROARCH_PACKAGE) != null
             Step.CORES -> (Setup.versionCode(this, Setup.CORES_PACKAGE) ?: -1) >= (m?.cores?.versionCode ?: 0)
-            Step.FIRST_RUN -> File(RETROARCH_CFG).let { it.isFile && it.length() > 0 }
+            // RetroArch writes retroarch.cfg only when it's closed, but creates its folders as soon as it starts
+            // (docs/dispositivo.md): those are enough, CONFIG closes it and writes retroarch.cfg if it's missing.
+            // playlists and thumbnails: folders the configuration pack never creates, so only RetroArch has made them
+            Step.FIRST_RUN -> File(RETROARCH_CFG).let { it.isFile && it.length() > 0 } ||
+                listOf("RetroArch/playlists", "RetroArch/thumbnails").all { File(SDCARD, it).isDirectory }
             Step.CONFIG -> false
         }
     }
@@ -217,14 +221,14 @@ class SetupActivity : Activity() {
     private fun firstRun() {
         val open = {
             waitingForRetroArch = true
-            detail = "Esperando a que RetroArch guarde su configuración: en su menú, elige «Cerrar RetroArch»…"
+            detail = "Esperando a que RetroArch cree sus carpetas… (si tarda, elige «Cerrar RetroArch» en su menú)"
             render()
             startActivity(Intent(Intent.ACTION_MAIN).setComponent(ComponentName(RETROARCH_PACKAGE, "com.retroarch.browser.mainmenu.MainMenuActivity"))
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             main.postDelayed(::waitForRetroArch, 2000)
         }
-        detail = "Se abrirá RetroArch. Si pide permiso para acceder a los archivos, acepta. Cuando veas su menú, baja hasta " +
-            "«Cerrar RetroArch» y púlsalo: al cerrarse guarda su configuración y vuelvo aquí solo."
+        detail = "Se abrirá RetroArch. Si pide permiso para acceder a los archivos, acepta. En cuanto haya creado sus " +
+            "carpetas lo cierro y vuelvo aquí solo."
         setAction("Abrir RetroArch") { open() }
         render()
         if (autoOpened.add(Step.FIRST_RUN)) main.postDelayed({ open() }, 1500)
@@ -234,7 +238,7 @@ class SetupActivity : Activity() {
         if (!waitingForRetroArch) return
         if (isDone(Step.FIRST_RUN)) {
             waitingForRetroArch = false
-            detail = "RetroArch ya está listo. Volviendo a RetroStick…"
+            detail = "RetroArch ya está listo. Lo cierro y vuelvo a RetroStick…"
             render()
             // A moment for RetroArch to finish writing, then this screen comes back to the front
             main.postDelayed({
