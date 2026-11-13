@@ -12,6 +12,26 @@ const val SDCARD = "/storage/emulated/0"
 const val RETROARCH_PACKAGE = "com.retroarch.ra32"
 private const val RETROARCH_ACTIVITY = "com.retroarch.browser.retroactivity.RetroActivityFuture"
 internal const val RETROARCH_CFG = "$SDCARD/Android/data/$RETROARCH_PACKAGE/files/retroarch.cfg"
+/**
+ * RetroStick's own retroarch.cfg, for sticks where RetroArch's can't be written: from Android 11 (Fire OS 8) no app
+ * may touch another's Android/data. Games start with it (CONFIGFILE), so RetroArch reads it and saves into it.
+ */
+internal const val RETROSTICK_CFG = "$SDCARD/RetroArch/retrostick.cfg"
+
+private var cfgChosen: File? = null
+
+/**
+ * The retroarch.cfg the launcher writes and starts games with: RetroArch's own where it can be written (Android 9,
+ * like the admin's stick, set up by hand), RetroStick's otherwise. Once RetroStick's exists, always that one.
+ */
+fun retroArchCfg(): File {
+    cfgChosen?.let { if (it.path == RETROSTICK_CFG || it.isFile) return it }
+    val own = File(RETROSTICK_CFG)
+    val ra = File(RETROARCH_CFG)
+    // Opened for appending without writing a byte: the only reliable test (canWrite() can say yes and open fail)
+    val raWritable = ra.isFile && runCatching { java.io.FileOutputStream(ra, true).close() }.isSuccess
+    return (if (own.isFile || !raWritable) own else ra).also { cfgChosen = it }
+}
 
 /**
  * «Seguir jugando», the first tab of the home screen (Retro Ajustes → Inicio can hide it): the last games played,
@@ -199,7 +219,7 @@ fun lastState(game: Game) = File(STATES_DIR, "${game.baseName}.state.auto").take
 fun quickState(game: Game) = File(STATES_DIR, "${game.baseName}.state").takeIf { it.isFile }
 
 /** Writes these keys into retroarch.cfg, or a core's .opt (missing ones are added at the end); false if it couldn't. */
-fun writeRetroArchCfg(keys: Map<String, String>, cfg: File = File(RETROARCH_CFG)): Boolean {
+fun writeRetroArchCfg(keys: Map<String, String>, cfg: File = retroArchCfg()): Boolean {
     if (!cfg.isFile) return false
     return runCatching {
         val lines = cfg.readLines().toMutableList()
@@ -275,7 +295,7 @@ fun launchInRetroArch(context: Context, game: Game, resume: Resume = Resume.TITL
         .putExtra("ROM", game.file.absolutePath)
         // A stick set up by the assistant: the cores of «RetroStick Núcleos» (Setup.kt); otherwise RetroArch's own
         .putExtra("LIBRETRO", Setup.corePath(context, game.console.core) ?: "$dataDir/cores/${game.console.core}")
-        .putExtra("CONFIGFILE", RETROARCH_CFG)
+        .putExtra("CONFIGFILE", retroArchCfg().path)
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
     context.startActivity(intent)
     return true

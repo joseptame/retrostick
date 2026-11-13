@@ -102,7 +102,7 @@ object Backup {
                     val bytes = input.readBytes()
                     when {
                         e.name == "prefs.json" -> restorePrefs(app, JSONObject(String(bytes)))
-                        e.name == RA_CFG_ENTRY -> File(RETROARCH_CFG).apply { parentFile?.mkdirs() }.writeBytes(bytes)
+                        e.name == RA_CFG_ENTRY -> retroArchCfg().apply { parentFile?.mkdirs() }.writeBytes(bytes)
                         e.name.startsWith("sd/") && ".." !in e.name -> File(SDCARD, e.name.removePrefix("sd/")).apply { parentFile?.mkdirs() }.writeBytes(bytes)
                     }
                 }
@@ -117,7 +117,7 @@ object Backup {
         ZipOutputStream(zip.outputStream().buffered()).use { out ->
             fun put(name: String, bytes: ByteArray) { out.putNextEntry(ZipEntry(name)); out.write(bytes); out.closeEntry() }
             put("prefs.json", prefsJson(context).toString().toByteArray())
-            File(RETROARCH_CFG).takeIf { it.isFile }?.let { put(RA_CFG_ENTRY, it.readBytes()) }
+            retroArchCfg().takeIf { it.isFile }?.let { put(RA_CFG_ENTRY, it.readBytes()) }
             DIRS.forEach { dir ->
                 File(SDCARD, dir).walkTopDown().filter { it.isFile && it.length() < 2 * 1024 * 1024 }.forEach { f ->
                     put("sd/" + f.relativeTo(File(SDCARD)).path.replace('\\', '/'), f.readBytes())

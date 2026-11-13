@@ -113,6 +113,8 @@ del Switch Pro se tomarán en la Fase 2.
 - Versión **1.22.2** estable del buildbot, `RetroArch_ra32.apk`. `aapt dump badging`: paquete `com.retroarch.ra32`,
   `targetSdkVersion 28`, ABIs `armeabi-v7a` y `x86`, con actividad leanback (aparece en el launcher de la TV).
 - Config: **`/storage/emulated/0/Android/data/com.retroarch.ra32/files/retroarch.cfg`**. ADB puede leerlo y escribirlo.
+  En Android 11+ (Fire OS 8) ninguna app puede escribir en el `Android/data` de otra (`EACCES`): ahí el launcher usa
+  su propio `/storage/emulated/0/RetroArch/retrostick.cfg` y abre los juegos con él (`CONFIGFILE`, `retroArchCfg()` en `Library.kt`).
 - Al primer arranque crea `/storage/emulated/0/RetroArch/{saves,states,system,config,downloads,playlists,thumbnails,…}`.
 - Directorios internos (`/data/user/0/com.retroarch.ra32/…`, ADB no puede escribir en ellos): `libretro_directory` (núcleos),
   `libretro_info_path`, `assets_directory`, `joypad_autoconfig_dir`, `overlay_directory`.

@@ -76,7 +76,7 @@ object Setup {
         if (prefs(context).getBoolean("done", false)) return false
         if (versionCode(context, RETROARCH_PACKAGE) == null) return true
         val storage = context.checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
-        return storage && (!File(RETROARCH_CFG).isFile || !File("$SDCARD/RetroArch/config").isDirectory)
+        return storage && (!retroArchCfg().isFile || !File("$SDCARD/RetroArch/config").isDirectory)
     }
 
     private fun writtenFile(context: Context) = File(context.filesDir, "config-files.json")
@@ -199,10 +199,12 @@ object Setup {
         }
         writtenFile(context).writeText(written.toString())
         keysFile(context).writeText(keys.orEmpty())
-        val cfg = File(RETROARCH_CFG)
+        val cfg = retroArchCfg()
         if (!cfg.isFile) {
             cfg.parentFile?.mkdirs()
-            cfg.writeText("")
+            // RetroStick's own: starts from RetroArch's where it can be read; empty, RetroArch fills in its defaults
+            val ra = File(RETROARCH_CFG)
+            cfg.writeText(runCatching { if (cfg.path != ra.path && ra.isFile) ra.readText() else "" }.getOrDefault(""))
         }
         writeRetroArchCfg(packKeys(context), cfg)
         // The folders the launcher and RetroArch use
