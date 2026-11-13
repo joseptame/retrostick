@@ -272,7 +272,11 @@ fun launchInRetroArch(context: Context, game: Game, resume: Resume = Resume.TITL
         "notification_show_set_initial_disk" to "false",
         // Nor the loading band across the middle (RetroArch logo + the game's name)
         "menu_show_load_content_animation" to "false",
+        // Trucos (Cheats.kt): the game's cheat file in our folder, applied as soon as it loads
+        "cheat_database_path" to Cheats.DIR,
+        "apply_cheats_after_load" to "true",
     ))
+    Cheats.apply(context, game)
     // RetroArch rewrites its config when it closes: the RetroAchievements account goes back in every time
     RetroAchievements.apply(context)
     RetroAchievements.applyGame(game)

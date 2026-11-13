@@ -544,6 +544,26 @@ emojis como iconos (decisión del usuario):
 - Opciones que escribe el launcher: `gambatte_gb_bootloader`, `mgba_use_bios` / `mgba_skip_bios`,
   `pcsx_rearmed_bios` (`auto` / `HLE`) y `pcsx_rearmed_show_bios_bootlogo`, `genesis_plus_gx_bios`.
 
+### 8.2e Trucos (launcher 1.26)
+- Detalles → **Trucos** (`CheatsActivity`): la lista de trucos del juego con un interruptor cada uno; los habituales
+  traducidos (vidas infinitas, invencible…, `Cheats.spanish`) y arriba, el resto en inglés. △ quita todos.
+- De dónde salen: `libretro-database/cht/<sistema>/`, los mismos que trae el actualizador de RetroArch. La webapp
+  sirve la lista de archivos de cada consola (`pwa/public/db/cheats-<consola>.json`, se regenera con
+  `npx tsx scripts/build-cheats.ts`); el stick la guarda una semana, busca los del juego (mismo nombre No-Intro /
+  Redump y sus variantes «(Game Genie)», «(Code Breaker)»…; si no hay, los de otra versión del mismo título, con
+  aviso) y los baja de GitHub una vez (`files/cheats/<consola>/<juego>.json`). Neo Geo no tiene (FinalBurn Neo usa
+  los suyos).
+- Los elegidos se guardan por juego (preferencias `cheats`, solo en ese stick). Al abrir el juego, `Cheats.apply`
+  escribe `RetroArch/cheats/<núcleo>/<rom>.cht` solo con esos activados (y los códigos maestro de GBA), con
+  `cheat_database_path` y `apply_cheats_after_load = "true"`; sin trucos, se borra el archivo.
+- **Los logros siguen contando**: RetroArch solo bloquea trucos en modo hardcore y RetroStick usa el normal
+  (comprobado en la TV: SMB con «Siempre grande», sesión de RetroAchievements activa).
+
+### 8.2f Novedades (launcher 1.26)
+- `News.kt` tiene, por versión, 3–4 líneas de lo que trae. La primera vez que se abre el inicio tras actualizar,
+  `NewsActivity` las enseña (nunca en un stick recién instalado). Retro Ajustes → Novedades las vuelve a mostrar.
+- **Al publicar una versión con algo que contar, añadir su `Release` en `News.RELEASES`.**
+
 ### 8.3 `status.json`
 Al abrir la app y periódicamente (WorkManager, cada 60 min), escribir `/storage/emulated/0/Partidas/.stick/status.json`:
 ```json

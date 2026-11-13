@@ -432,7 +432,12 @@ class MainActivity : Activity() {
         if (Setup.needed(this)) startActivity(Intent(this, SetupActivity::class.java))
         // Then Google Drive: without it there are no games, so nothing else until it's connected
         else main.post(::requireDrive)
-        hasStorage = checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+        // Just updated: what's new, once (not on a new stick, nor before Drive is connected)
+        main.post {
+            if (!isFinishing && !Setup.needed(this) && driveAuth.isConnected && News.pending(this).isNotEmpty())
+                startActivity(Intent(this, NewsActivity::class.java))
+        }
+        hasStorage =checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
         if (!hasStorage) {
             requestPermissions(
                 arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE),
@@ -1168,6 +1173,10 @@ class MainActivity : Activity() {
             Setting("🏆", getString(R.string.set_trophies), trophiesLabel()) {
                 // Signed in: straight to Mis logros (signing out is in there); else the login screen (keyboard or QR)
                 open(Intent(this, if (RetroAchievements.account(this) != null) ProfileActivity::class.java else RaLoginActivity::class.java))
+            },
+            // What the last updates brought (News.kt), the screen shown once after each update
+            Setting("🆕", "Novedades", "Versión ${BuildConfig.VERSION_NAME}") {
+                open(Intent(this, NewsActivity::class.java).putExtra(NewsActivity.EXTRA_ALL, true))
             },
         )
         settings.forEach { s ->

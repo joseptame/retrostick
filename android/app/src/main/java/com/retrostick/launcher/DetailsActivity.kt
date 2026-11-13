@@ -44,6 +44,8 @@ class DetailsActivity : Activity() {
     private var row = 0
     private var col = 0
     private lateinit var finishedAction: TextView
+    /** The Trucos on for this game (their names), read on each build */
+    private var cheatNames = listOf<String>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -59,6 +61,7 @@ class DetailsActivity : Activity() {
     // ---- Layout ----
 
     private fun build() {
+        cheatNames = if (Cheats.supports(game.console)) Cheats.chosenNames(this, game) else emptyList()
         val info = Fichas.cached(this, game.title, game.console.id)?.info
         val ra = RetroAchievements.cached(game)?.takeIf { RetroAchievements.supports(game.console) && RetroAchievements.account(this) != null }
 
@@ -84,6 +87,9 @@ class DetailsActivity : Activity() {
             val langs = Languages.of(game.file.name)
             if (langs.contains("Español")) first.addView(chip("Español", "#244ADE80", R.color.ok))
             addView(first)
+            if (cheatNames.isNotEmpty()) addView(LinearLayout(this@DetailsActivity).apply {
+                addView(chip(if (cheatNames.size == 1) "1 truco activo" else "${cheatNames.size} trucos activos", "#29EAB308", R.color.cheat))
+            }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(5) })
             val facts = listOfNotNull(info?.year?.toString(), info?.genres?.take(2)?.joinToString(", ")?.takeIf { it.isNotEmpty() })
             if (facts.isNotEmpty()) addView(text(10.5f, R.color.text_2).apply { text = facts.joinToString("  ·  ") }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(8) })
         }
@@ -148,6 +154,19 @@ class DetailsActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             addView(section("Jugar"))
             addView(cardRow, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
+            // Trucos on: said where you choose how to play
+            if (cheatNames.isNotEmpty()) addView(text(10f, R.color.text).apply {
+                text = android.text.SpannableStringBuilder("Trucos al jugar:  ").apply {
+                    setSpan(android.text.style.StyleSpan(Typeface.BOLD), 0, length, 0)
+                    val s = length; append(cheatNames.joinToString("  ·  "))
+                    setSpan(android.text.style.ForegroundColorSpan(getColor(R.color.text_2)), s, length, 0)
+                }
+                maxLines = 1; ellipsize = TextUtils.TruncateAt.END; gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(10), dp(6), dp(10), dp(6))
+                background = round(Color.parseColor("#1AEAB308"), 7).apply { setStroke(1, Color.parseColor("#38EAB308")) }
+                setCompoundDrawablesRelative(getDrawable(R.drawable.ic_star)!!.mutate().apply { setBounds(0, 0, dp(12), dp(12)); setTint(getColor(R.color.cheat)) }, null, null, null)
+                compoundDrawablePadding = dp(7)
+            }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(9) })
             addView(section("Tu progreso"), LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(16) })
             addView(tiles, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
             addView(section("Partidas en el stick"), LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(16) })
@@ -162,6 +181,10 @@ class DetailsActivity : Activity() {
         // Bottom bar: actions and hints
         finishedAction = actionView(finishedLabel(), R.drawable.ic_trophy)
         val actionList = mutableListOf(Action(finishedAction) { toggleFinished() })
+        if (Cheats.supports(game.console)) {
+            val n = cheatNames.size
+            actionList += Action(actionView(if (n == 0) "Trucos" else "Trucos · $n ${if (n == 1) "activo" else "activos"}", R.drawable.ic_star)) { openCheats() }
+        }
         if (Manuals.find(this, game.console, game.baseName) != null) actionList += Action(actionView("Manual", null)) { openManual() }
         actionList += Action(actionView("Borrar…", R.drawable.ic_trash, danger = true)) { confirmRemove() }
         actions = actionList
@@ -361,6 +384,24 @@ class DetailsActivity : Activity() {
         startActivity(Intent(this, AchievementsActivity::class.java)
             .putExtra(AchievementsActivity.EXTRA_CONSOLE, game.console.id)
             .putExtra(AchievementsActivity.EXTRA_FILE, game.file.path))
+    }
+
+    private fun openCheats() {
+        Sounds.play(Sounds.Sound.OPEN)
+        startActivity(Intent(this, CheatsActivity::class.java)
+            .putExtra(CheatsActivity.EXTRA_CONSOLE, game.console.id)
+            .putExtra(CheatsActivity.EXTRA_FILE, game.file.path))
+    }
+
+    /** Back from Trucos: the chip, the line under Jugar and the button say what's on now. */
+    override fun onRestart() {
+        super.onRestart()
+        val before = cheatNames
+        if ((if (Cheats.supports(game.console)) Cheats.chosenNames(this, game) else emptyList()) == before) return
+        val (r, c) = row to col
+        build()
+        row = r; col = c.coerceAtMost(if (r == 0) cards.size - 1 else actions.size - 1)
+        render()
     }
 
     private fun openManual() {
