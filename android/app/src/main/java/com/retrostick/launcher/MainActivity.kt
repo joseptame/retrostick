@@ -613,14 +613,17 @@ class MainActivity : Activity() {
 
     /** Retro Ajustes → Inicio: the view (covers / list), «Seguir jugando» and which consoles show as tabs. */
     private fun showHomeSetup() {
-        val labels = arrayOf("Seguir jugando") + CONSOLES.map { it.name }.toTypedArray()
+        // The tabs, then (last) whether RetroStick opens by itself when the stick starts (BootReceiver)
+        val labels = arrayOf("Seguir jugando") + CONSOLES.map { it.name }.toTypedArray() + "Abrir RetroStick al encender el stick"
         val hidden = homePrefs.getStringSet("hiddenConsoles", emptySet()).orEmpty()
-        val checked = booleanArrayOf(homePrefs.getBoolean("recentTab", true)) + CONSOLES.map { it.id !in hidden }.toBooleanArray()
+        val checked = booleanArrayOf(homePrefs.getBoolean("recentTab", true)) + CONSOLES.map { it.id !in hidden }.toBooleanArray() +
+            BootReceiver.enabled(this)
         AlertDialog.Builder(this, R.style.Dialog_RetroStick)
-            .setTitle("Inicio · qué pestañas se ven")
+            .setTitle("Inicio · pestañas y arranque")
             .setMultiChoiceItems(labels, checked) { _, which, on -> checked[which] = on }
             .setPositiveButton("Guardar") { _, _ ->
-                if (checked.drop(1).none { it }) {
+                BootReceiver.setEnabled(this, checked.last())
+                if (checked.drop(1).dropLast(1).none { it }) {
                     Toast.makeText(this, "Deja al menos una consola", Toast.LENGTH_SHORT).show()
                     return@setPositiveButton
                 }
