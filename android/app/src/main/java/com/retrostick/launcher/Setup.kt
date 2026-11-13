@@ -24,7 +24,8 @@ import java.util.zip.ZipInputStream
  *
  * Afterwards ([checkUpdates], when the launcher shows up, at most every half hour) a stick set up by the assistant
  * also follows the release: newer cores are offered like a launcher update (Android asks to install), and a newer
- * configuration pack is applied by itself, replacing only the files this stick hasn't changed (its own buttons stay).
+ * configuration pack is applied by itself, replacing only the files this stick hasn't changed; button remaps are
+ * never updated (each stick keeps its own buttons, whoever set them up).
  */
 object Setup {
     const val RELEASE = "https://github.com/joseptame/retrostick/releases/download/stick"
@@ -177,6 +178,9 @@ object Setup {
                         // Only inside /sdcard/RetroArch: nothing in the pack may write anywhere else
                         if (!out.path.startsWith(File(root, "RetroArch").path + File.separator)) continue
                         val bytes = z.readBytes()
+                        // Buttons (remaps) are each stick's own: copied when it's set up, never updated afterwards
+                        // (only a console it has none for yet, e.g. a new one, gets the pack's as a start)
+                        if (update && out.isFile && name.startsWith("RetroArch/config/remaps/")) continue
                         if (update && out.isFile && sha256(out.readBytes()) != written.optString(name)) {
                             android.util.Log.i("RetroStick", "Config pack: kept this stick's $name")
                             continue

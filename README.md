@@ -140,7 +140,9 @@ Para el stick de otra persona (con su propio Google Drive y su usuario de la web
 - **Después del asistente** (`Setup.checkUpdates`, al mostrarse el launcher, como mucho cada media hora): unos núcleos
   nuevos (sube `versionCode` en `android/cores/build.gradle.kts`) se ofrecen como una actualización; un paquete de
   configuración nuevo se aplica solo y sustituye únicamente los archivos que ese stick no ha cambiado (recuerda el
-  SHA-256 de lo que escribió en `config-files.json`), así que los botones que haya cambiado cada uno se quedan.
+  SHA-256 de lo que escribió en `config-files.json`). Los botones (`config/remaps`) no se actualizan nunca: cada stick se
+  queda con los suyos aunque el administrador cambie los de su mando; solo una consola sin botones todavía recibe los
+  del paquete.
 - RetroArch para Android 1.22.2 no trae las órdenes por red (`network_cmd_enable`, falta `HAVE_COMMAND` al compilar),
   así que no se puede manejar su menú desde el launcher.
 
