@@ -186,6 +186,10 @@ Debe ser **idempotente** (se puede ejecutar varias veces) y hacer:
 - **Juegos** (`Retro/JugandoAhora/<c>` → `/ROMs/<c>`): descarga lo que hay en Drive y **borra solo los juegos que
   descargó él mismo** (lista en las preferencias de la app). Los juegos copiados a mano al stick se suben a
   `JugandoAhora/<c>`.
+  **Otro stick con la misma cuenta** (en su primera sincronización `JugandoAhora` ya tiene juegos que él no tiene):
+  no descarga nada solo. Los juegos de `JugandoAhora` salen en cada consola marcados «Drive», como los de la
+  colección, y se bajan uno a uno sin mover nada en Drive; quitar uno de ese stick no lo quita de los demás, y lo
+  que se le copia a mano va a `Coleccion/<c>`. Se cambia en *Retro Ajustes → Cuenta de Drive*.
 - **Cuándo:** solo con el launcher en pantalla (nunca durante una partida): al volver a él si la última sincronización
   tiene más de 1 minuto, cada 15 minutos y con *Retro Ajustes → Sincronizar ahora*. Se cancela entre archivos al
   lanzar un juego.

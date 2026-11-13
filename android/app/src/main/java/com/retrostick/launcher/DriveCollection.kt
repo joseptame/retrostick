@@ -13,6 +13,8 @@ import java.util.concurrent.Executors
  * Games in the user's Drive collection (Retro/Coleccion/<console>) that are not on the stick: the home screen
  * shows them after the stick's own games, and the ficha can pass one to the stick (moved to JugandoAhora,
  * as the webapp does, and downloaded right away with its progress).
+ * On a stick that picks its games (DriveSync.autoRoms off) the games in JugandoAhora it doesn't have are listed
+ * too, and passing one only downloads it: Drive stays as it is, so the other sticks don't get it.
  */
 object DriveCollection {
     class Item(val console: Console, val name: String, val size: Long) {
@@ -64,9 +66,12 @@ object DriveCollection {
                     listing = emptyMap()
                 } else {
                     val drive = DriveClient(auth)
+                    val folders = listOf("Coleccion") + if (DriveSync.autoRoms(app)) emptyList() else listOf("JugandoAhora")
                     listing = CONSOLES.associate { c ->
-                        val id = DriveSync.folderId(app, drive, "Retro/Coleccion/${c.id}")
-                        c.id to drive.list(id).filter { !it.isFolder }.associate { it.name to it.size }
+                        c.id to folders.flatMap { f ->
+                            val id = DriveSync.folderId(app, drive, "Retro/$f/${c.id}")
+                            drive.list(id).filter { !it.isFolder }.map { it.name to it.size }
+                        }.toMap()
                     }
                 }
                 saveCache(app)
@@ -154,7 +159,7 @@ object DriveCollection {
                     }
                     before += remote.size
                     job.done = before
-                    if (inCollection[name] != null && inPlaying[name] == null) drive.move(remote.id, playing, collection)
+                    if (DriveSync.autoRoms(app) && inCollection[name] != null && inPlaying[name] == null) drive.move(remote.id, playing, collection)
                     DriveSync.markDownloaded(app, c.id, name)
                     references(target).forEach { queue.addLast(it) }
                 }
@@ -184,7 +189,10 @@ object DriveCollection {
                 val c = item.console
                 val drive = DriveClient(DriveAuth(app))
                 val collection = DriveSync.folderId(app, drive, "Retro/Coleccion/${c.id}")
-                val files = drive.list(collection).filter { !it.isFolder }.associateBy { it.name }
+                // A picking stick also lists JugandoAhora's games (another stick's): «Borrar de Drive» reaches them too
+                val playing = if (DriveSync.autoRoms(app)) emptyList()
+                    else drive.list(DriveSync.folderId(app, drive, "Retro/JugandoAhora/${c.id}")).filter { !it.isFolder }
+                val files = (playing + drive.list(collection).filter { !it.isFolder }).associateBy { it.name }
                 val queue = ArrayDeque(listOf(item.name))
                 val seen = mutableSetOf<String>()
                 while (queue.isNotEmpty()) {

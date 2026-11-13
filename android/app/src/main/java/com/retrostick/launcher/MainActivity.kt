@@ -1676,11 +1676,39 @@ class MainActivity : Activity() {
         }
     }
 
-    /** Cuenta de Drive, connected: the stick's copy (Backup) or disconnecting. */
+    /** Cuenta de Drive, connected: the stick's copy (Backup), how games reach it, or disconnecting. */
     private fun showDriveMenu() {
+        val games = "Juegos de «Jugando ahora»: " + if (DriveSync.autoRoms(this)) "se descargan solos" else "los eliges tú"
         AlertDialog.Builder(this, R.style.Dialog_RetroStick)
             .setTitle(driveAuth.email ?: getString(R.string.set_account))
-            .setItems(arrayOf("Copia del stick…", "Desconectar Drive")) { _, which -> if (which == 0) showBackup() else confirmDisconnect() }
+            .setItems(arrayOf("Copia del stick…", games, "Desconectar Drive")) { _, which ->
+                when (which) {
+                    0 -> showBackup()
+                    1 -> confirmAutoRoms()
+                    else -> confirmDisconnect()
+                }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .showForPad()
+    }
+
+    /** DriveSync.autoRoms: download everything in JugandoAhora (one stick) or pick (another stick on the account). */
+    private fun confirmAutoRoms() {
+        val auto = DriveSync.autoRoms(this)
+        AlertDialog.Builder(this, R.style.Dialog_RetroStick)
+            .setTitle("Juegos de «Jugando ahora»")
+            .setMessage(if (auto)
+                "Ahora este stick descarga todo lo que hay en «Jugando ahora» de tu Drive.\n\n" +
+                    "Si lo usas junto a otro stick con la misma cuenta, puedes elegir tú qué juegos bajar: los demás " +
+                    "aparecen en cada consola marcados «Drive». Los que ya tienes se quedan."
+            else
+                "Este stick solo tiene los juegos que eliges (los demás de tu Drive aparecen marcados «Drive»).\n\n" +
+                    "Si lo cambias, descargará todo lo que hay en «Jugando ahora», como el stick principal.")
+            .setPositiveButton(if (auto) "Elegir yo" else "Descargar todo") { _, _ ->
+                DriveSync.setAutoRoms(this, !auto)
+                DriveCollection.refresh(this, force = true)
+                DriveSync.sync(this)
+            }
             .setNegativeButton(R.string.cancel, null)
             .showForPad()
     }

@@ -14,6 +14,9 @@ import kotlin.math.abs
  *  - Partidas/{saves,states,.stick} <-> Retro/Partidas/... : both ways, newest wins, never deletes.
  *  - Retro/JugandoAhora/<console> -> ROMs/<console> : downloads; deletes only games it downloaded itself
  *    and uploads games copied to the stick by hand.
+ *    Unless [autoRoms] is off (a second stick on the same account, decided on its first sync): then it only keeps
+ *    up the games this stick chose (DriveCollection lists the rest as «Drive»), never deletes them because another
+ *    stick took them off, and what it adds goes to the collection, so the other sticks don't download it.
  * Runs only while the launcher is on screen, so RetroArch never has a save open.
  */
 object DriveSync {
@@ -38,6 +41,11 @@ object DriveSync {
     fun removeListener(l: () -> Unit) { listeners -= l }
 
     fun lastSuccess(context: Context) = prefs(context).getLong("last_success", 0)
+
+    /** This stick downloads by itself what is in Retro/JugandoAhora (off: the user picks the games). */
+    fun autoRoms(context: Context) = prefs(context).getBoolean("autoRoms", true)
+
+    fun setAutoRoms(context: Context, on: Boolean) = prefs(context).edit().putBoolean("autoRoms", on).apply()
 
     /** Starts a sync unless one is running or Drive is not connected. */
     fun sync(context: Context) {
@@ -107,16 +115,20 @@ object DriveSync {
                     val drive = DriveClient(auth)
                     val playing = folderId(app, drive, "Retro/JugandoAhora/${game.console.id}")
                     val remote = drive.list(playing).filter { !it.isFolder }.associateBy { it.name }
-                    val collection = if (alsoDrive) null else folderId(app, drive, "Retro/Coleccion/${game.console.id}")
-                    val kept = collection?.let { id -> drive.list(id).filter { !it.isFolder }.associateBy { it.name } }.orEmpty()
+                    val collection = folderId(app, drive, "Retro/Coleccion/${game.console.id}")
+                    val kept = drive.list(collection).filter { !it.isFolder }.associateBy { it.name }
+                    // A picking stick (autoRoms off) leaves JugandoAhora as it is: it's what the other sticks have
+                    val auto = autoRoms(app)
                     for (f in files) {
                         val r = remote[f.name]
+                        val c = kept[f.name]
                         when {
-                            alsoDrive -> if (r != null) drive.trash(r.id)
+                            alsoDrive -> { if (r != null) drive.trash(r.id); if (!auto && c != null) drive.trash(c.id) }
+                            !auto -> if (r == null && c?.size != f.length()) drive.upload(f, collection, null)
                             // Already in the collection (same size): the JugandoAhora copy is a duplicate.
-                            kept[f.name]?.size == f.length() -> if (r != null) drive.trash(r.id)
-                            r != null -> drive.move(r.id, collection!!, playing)
-                            else -> drive.upload(f, collection!!, null)
+                            c?.size == f.length() -> if (r != null) drive.trash(r.id)
+                            r != null -> drive.move(r.id, collection, playing)
+                            else -> drive.upload(f, collection, null)
                         }
                     }
                 }
@@ -195,6 +207,7 @@ object DriveSync {
             // Same tree as README 4, so the phone app finds it.
             CONSOLES.forEach { dir("Retro/Coleccion/${it.id}"); dir("Retro/JugandoAhora/${it.id}") }
             dir("Retro/Config/bios")
+            if (!prefs.contains("autoRoms")) decideAutoRoms()
             runCatching { StickStatus.writeStatusJson(context) }
             listOf("saves", "states", ".stick").forEach { syncSaves(it) }
             // A new launcher published with android/publish-update.mjs (before the ROMs, which can take long).
@@ -207,6 +220,25 @@ object DriveSync {
         }
 
         private fun checkCancel() { if (cancelRequested) throw Cancelled() }
+
+        /**
+         * First sync of a stick: when the account's JugandoAhora already has games this stick doesn't, another stick
+         * uses the account, and this one lets the user pick its games instead of downloading them all.
+         * A stick that synced before (an update from a version without the choice) keeps downloading them.
+         */
+        private fun decideAutoRoms() {
+            val firstSync = prefs.getLong("last_success", 0) == 0L
+            val others = firstSync && CONSOLES.any { c ->
+                val local = localFiles(c.romDir).keys
+                drive.list(dir("Retro/JugandoAhora/${c.id}")).any { !it.isFolder && it.name !in local }
+            }
+            prefs.edit().putBoolean("autoRoms", !others).apply()
+            if (others) main.post {
+                DriveCollection.refresh(context, force = true)
+                android.widget.Toast.makeText(context, "Tu Drive ya tiene juegos de otro stick: no se descargan solos. " +
+                    "Elige los que quieras en cada consola (salen como «Drive»).", android.widget.Toast.LENGTH_LONG).show()
+            }
+        }
 
         /** Folder id for a "Retro/..." path, created when missing and cached. */
         private fun dir(path: String): String {
@@ -276,26 +308,36 @@ object DriveSync {
             val local = localFiles(console.romDir)
             val manifest = prefs.getStringSet("roms", emptySet())!!.toMutableSet()
             fun save() = prefs.edit().putStringSet("roms", manifest.toSet()).apply()
+            val auto = autoRoms(context)
 
             for (r in remote.values) {
                 checkCancel()
+                val key = "${console.id}/${r.name}"
                 val l = local[r.name]
+                // Picking: only the games this stick has or chose (DriveCollection.passToStick marks them)
+                if (!auto && l == null && key !in manifest) continue
                 if (l == null || l.length() != r.size) drive.download(r.id, File(console.romDir, r.name))
-                manifest += "${console.id}/${r.name}"
+                manifest += key
                 save()
             }
+            val collectionId by lazy { dir("Retro/Coleccion/${console.id}") }
+            val collection by lazy { drive.list(collectionId).filter { !it.isFolder }.associateBy { it.name } }
             for (l in local.values) {
                 if (l.name in remote) continue
                 checkCancel()
                 val key = "${console.id}/${l.name}"
-                if (key in manifest) {
+                when {
                     // Downloaded by us and no longer in JugandoAhora: removed from the stick on purpose.
-                    l.delete()
-                    manifest -= key
-                } else {
+                    key in manifest && auto -> { l.delete(); manifest -= key }
+                    // Picking: taken off by another stick, or chosen from the collection; this one keeps it.
+                    key in manifest -> Unit
                     // Copied to the stick by hand: keep it and back it up.
-                    drive.upload(l, folderId, null)
-                    manifest += key
+                    auto -> { drive.upload(l, folderId, null); manifest += key }
+                    // ...on a picking stick, into the collection, where the other sticks don't pull it
+                    else -> {
+                        if (collection[l.name]?.size != l.length()) drive.upload(l, collectionId, null)
+                        manifest += key
+                    }
                 }
                 save()
             }
