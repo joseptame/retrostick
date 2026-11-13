@@ -220,7 +220,7 @@ object DriveCollection {
     }
 
     /** Files a .m3u (discs) or .cue (tracks) points to, by name. */
-    private fun references(file: File): List<String> = when (file.extension.lowercase()) {
+    fun references(file: File): List<String> = when (file.extension.lowercase()) {
         "m3u" -> file.readLines().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("#") }
         "cue" -> file.readLines().mapNotNull { CUE_FILE.find(it)?.groupValues?.get(1) }
         else -> emptyList()

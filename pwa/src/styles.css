@@ -490,6 +490,10 @@ h2 { font-size: 20px; font-weight: 800; }
 .bx-stick.on { color: #86efac; border-color: rgba(134, 239, 172, 0.55); background: rgba(74, 222, 128, 0.14); box-shadow: 0 0 14px rgba(74, 222, 128, 0.3); }
 .bx-stick.on .bx-sw { background: var(--ok); }
 .bx-stick.on .bx-sw i { transform: translateX(10px); }
+.bx-target { position: relative; padding: 0 10px; max-width: 46vw; cursor: pointer; }
+.bx-target.disabled { opacity: 0.5; }
+.bx-target-txt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bx-target select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 16px; }
 .bx-count { margin: 8px 0 0 2px; font-size: 12.5px; color: var(--muted); }
 .bx-count b { color: var(--text); }
 .bx-count + .grid { margin-top: 12px; }
@@ -603,6 +607,9 @@ h2 { font-size: 20px; font-weight: 800; }
 }
 .pill2.on { color: #e4dfff; background: rgba(157, 140, 255, 0.22); }
 .pills + .grid { margin-top: 12px; }
+.stick-pills { margin: 0 0 12px; }
+.stick-pills .pill2 { display: inline-flex; align-items: center; gap: 6px; }
+.stick-pills svg { width: 14px; height: 14px; }
 
 .empty-hero { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; padding: 70px 12px 20px; animation: gs-rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .empty-ico {

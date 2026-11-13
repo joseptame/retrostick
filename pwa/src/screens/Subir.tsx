@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import type { AppState } from '../App'
 import { Icon } from '../components/icons'
+import { defaultTarget, StickTargetPicker } from '../components/StickTargetPicker'
+import { requestForTarget, targetParent, type StickTarget } from '../lib/library'
 import { Banner, Cover } from '../components/ui'
 import { UploadsPanel } from '../components/UploadsPanel'
 import { consoleById, consoleForFile, extension, isCartridge, UPLOAD_ACCEPT, type ConsoleId } from '../lib/consoles'
@@ -32,7 +34,9 @@ let nextId = 0
 
 export function Subir({ state }: { state: AppState }) {
   const [items, setItems] = useState<Item[]>([])
-  const [toStick, setToStick] = useState(true)
+  const sticks = state.library?.sticks ?? []
+  const [target, setTarget] = useState<StickTarget>(() => defaultTarget(sticks, state.library?.status ?? null, true))
+  const toStick = target !== 'drive'
   const [uploading, setUploading] = useState(false)
 
   const update = (id: string, patch: Partial<Item>) => setItems((list) => list.map((i) => (i.id === id ? { ...i, ...patch } : i)))
@@ -82,7 +86,7 @@ export function Subir({ state }: { state: AppState }) {
     setUploading(true)
     for (const item of items) {
       if (item.status !== 'ready' || !item.console || (item.duplicate && !item.force)) continue
-      const parent = toStick ? state.folders.jugando[item.console] : state.folders.coleccion[item.console]
+      const parent = targetParent(state.library, state.folders, item.console, target)
       const fileName = `${item.name}.${extension(item.file.name)}`
       update(item.id, { status: 'uploading', progress: 0 })
       const uid = state.uploadsApi.start({
@@ -99,6 +103,7 @@ export function Subir({ state }: { state: AppState }) {
           update(item.id, { progress: total ? sent / total : 1 })
           state.uploadsApi.progress(uid, sent)
         })
+        await requestForTarget(state.library, state.folders, item.console, fileName, target)
         update(item.id, { status: 'done', progress: 1 })
         state.uploadsApi.finish(uid)
       } catch (e) {
@@ -216,20 +221,7 @@ export function Subir({ state }: { state: AppState }) {
 
       {items.length > 0 && (
         <div className="action-bar">
-          <button
-            role="switch"
-            aria-checked={toStick}
-            aria-label="Enviar también al stick"
-            className={`bx-stick ${toStick ? 'on' : ''}`}
-            onClick={() => setToStick((v) => !v)}
-            disabled={uploading}
-          >
-            <Icon name="tv" />
-            Al stick
-            <span className="bx-sw" aria-hidden>
-              <i />
-            </span>
-          </button>
+          <StickTargetPicker sticks={sticks} value={target} onChange={setTarget} disabled={uploading} />
           <button className="cta grow" disabled={!pending || uploading || !state.online} onClick={uploadAll}>
             <Icon name="upload" strokeWidth={2.4} />
             {uploading ? 'Subiendo…' : pending ? `Subir ${pending} ${pending === 1 ? 'archivo' : 'archivos'}` : 'Nada que subir'}

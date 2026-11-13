@@ -8,7 +8,7 @@ import type { DriveFile } from '../lib/drive'
 import { formatAgo, formatBytes, formatWhen } from '../lib/format'
 import { fetchIgdb, type IgdbGame } from '../lib/igdb'
 import { loadLookup } from '../lib/igdbdb'
-import { deleteGame, savesFor, setInStick, type Game } from '../lib/library'
+import { chosenStick, deleteGame, onStick, picksGames, savesFor, setOnStick, type Game } from '../lib/library'
 import { languages, regionCode, saveLabel, saveOf } from '../lib/names'
 
 export function Ficha({ game, state, onBack }: { game: Game; state: AppState; onBack: () => void }) {
@@ -36,15 +36,23 @@ export function Ficha({ game, state, onBack }: { game: Game; state: AppState; on
     }
   }, [game.key, game.title, game.name, game.console, state.online])
 
+  // Several sticks on the account: the one chosen in Colección
+  const stick = state.library ? chosenStick(state.library) : null
+  const several = (state.library?.sticks?.length ?? 0) > 1
+  const where = several && stick?.name ? stick.name : 'el stick'
+  const { on, pending } = state.library ? onStick(state.library, stick, game) : { on: game.inStick, pending: false }
+
   async function toggle(inStick: boolean) {
-    if (!state.folders) return
+    if (!state.folders || !state.library) return
     const flip = (v: boolean) =>
       state.setLibrary((l) => ({ ...l, games: l.games.map((g) => (g.key === game.key ? { ...g, inStick: v } : g)) }))
-    flip(inStick)
+    const picking = picksGames(stick)
+    if (!picking) flip(inStick)
     try {
-      await setInStick(game, inStick, state.folders)
+      const request = await setOnStick(stick, game, inStick, state.folders)
+      if (request) state.setLibrary((l) => ({ ...l, requests: [...(l.requests ?? []), request] }))
     } catch (e) {
-      flip(!inStick)
+      if (!picking) flip(!inStick)
       state.notify(`No se pudo cambiar: ${e instanceof Error ? e.message : e}`)
     }
   }
@@ -116,15 +124,23 @@ export function Ficha({ game, state, onBack }: { game: Game; state: AppState; on
         </div>
       </div>
 
-      <div className={`stick-card ${game.inStick ? 'on' : ''}`}>
+      <div className={`stick-card ${on ? 'on' : ''}`}>
         <span className="stick-ico">
           <Icon name="tv" />
         </span>
         <div className="grow">
-          <b>{game.inStick ? 'En el stick' : 'Solo en Drive'}</b>
-          <small>{game.inStick ? 'Disponible en la TV tras sincronizar' : 'Actívalo para llevarlo al stick'}</small>
+          <b>{on ? (several ? `En ${where}` : 'En el stick') : 'Solo en Drive'}</b>
+          <small>
+            {pending
+              ? on
+                ? `Pedido: ${where} lo descargará al sincronizar`
+                : `${where} lo quitará al sincronizar`
+              : on
+                ? 'Disponible en la TV tras sincronizar'
+                : `Actívalo para llevarlo a ${where}`}
+          </small>
         </div>
-        <Switch on={game.inStick} disabled={!state.online} label="En el stick" onChange={toggle} />
+        <Switch on={on} disabled={!state.online} label="En el stick" onChange={toggle} />
       </div>
 
       {info && (info.genres.length > 0 || desc) && (

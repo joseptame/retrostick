@@ -261,6 +261,31 @@ export async function removeRaAccount(folders: Folders): Promise<void> {
 }
 
 /**
+ * A game for a stick that picks its own (not the main one, which follows JugandoAhora): leaves
+ * Retro/Config/stick/pedido-<stick id>-<time>.json, {"console", "file", "add"}; that stick applies it at its next sync
+ * (DriveSync.takeRequests) and deletes it.
+ */
+export async function saveStickRequest(
+  folders: Folders,
+  stickId: string,
+  request: { console: string; file: string; add: boolean },
+): Promise<DriveFile> {
+  const config = await childFolder(folders.root, 'Config')
+  const dir = await childFolder(config, 'stick')
+  const body = new Blob([JSON.stringify({ ...request, at: new Date().toISOString() })], { type: 'application/json' })
+  const name = `pedido-${stickId}-${Date.now()}.json`
+  await uploadResumable(body, name, dir, () => {})
+  return { id: name, name, mimeType: 'application/json', modifiedTime: new Date().toISOString() } as DriveFile
+}
+
+/** The requests no stick has taken yet (see [saveStickRequest]). */
+export async function stickRequestFiles(folders: Folders): Promise<DriveFile[]> {
+  const config = await childFolder(folders.root, 'Config')
+  const dir = await childFolder(config, 'stick')
+  return (await listFolder(dir)).filter((f) => /^pedido-[\w-]+-\d+\.json$/.test(f.name))
+}
+
+/**
  * RetroShop pairing: leaves the stick's pass in Retro/Config/stick/pair-<code>.json, where the stick showing
  * that code (ShopActivity) picks it up and deletes it.
  */

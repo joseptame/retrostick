@@ -180,6 +180,14 @@ object StickStatus {
             .put("freeBytes", freeBytes())
             .put("romsBytes", romsBytes())
             .put("controllers", JSONArray(controllers()))
+            // The games on this stick, by console (file names): the webapp's Colección shows them per stick
+            .put("games", JSONObject().apply {
+                CONSOLES.forEach { c ->
+                    val files = c.romDir.listFiles()?.filter { it.isFile && !it.name.startsWith(".") && !it.name.endsWith(".part") }
+                        ?.map { it.name }?.sorted().orEmpty()
+                    if (files.isNotEmpty()) put(c.id, JSONArray(files))
+                }
+            })
             .put("appVersion", context.packageManager.getPackageInfo(context.packageName, 0).versionName)
         val target = File("$SDCARD/Partidas/.stick/status-$id.json")
         target.parentFile?.mkdirs()

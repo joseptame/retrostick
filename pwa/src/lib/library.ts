@@ -1,6 +1,6 @@
 /** The collection as seen in Drive: games (Coleccion + JugandoAhora), saves and the stick status. */
 import { CONSOLES, type ConsoleId } from './consoles'
-import { listFolder, moveFile, readJson, trashFile, type DriveFile, type Folders } from './drive'
+import { listFolder, moveFile, readJson, saveStickRequest, stickRequestFiles, trashFile, type DriveFile, type Folders } from './drive'
 import { groupFiles } from './group'
 import { baseName, displayTitle, region, saveOf } from './names'
 
@@ -23,6 +23,8 @@ export interface StickStatus {
   name?: string
   /** Downloads JugandoAhora by itself (false: a second stick on the account, which picks its games) */
   autoRoms?: boolean
+  /** File names on that stick, by console (launcher 1.25.7+) */
+  games?: Partial<Record<ConsoleId, string[]>>
   updatedAt: string
   freeBytes: number
   romsBytes: number
@@ -37,7 +39,18 @@ export interface Library {
   status: StickStatus | null
   /** Every stick on the account, newest first */
   sticks?: StickStatus[]
+  /** Games asked for a stick that picks its own, not taken by it yet, oldest first */
+  requests?: StickRequest[]
   fetchedAt: number
+}
+
+/** Retro/Config/stick/pedido-<stick>-<time>.json (drive.ts saveStickRequest) */
+export interface StickRequest {
+  stick: string
+  console: string
+  file: string
+  add: boolean
+  at: string
 }
 
 const CACHE_KEY = 'retrostick.library'
@@ -87,11 +100,24 @@ export async function loadLibrary(folders: Folders): Promise<Library> {
     .filter((s): s is StickStatus => !!s)
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
   const status = sticks.find((s) => s.autoRoms !== false) ?? sticks[0] ?? null
+  const requests = sticks.some((s) => s.autoRoms === false)
+    ? (
+        await Promise.all(
+          (await stickRequestFiles(folders).catch(() => [])).map(async (f) => {
+            const j = await readJson<Omit<StickRequest, 'stick'>>(f.id).catch(() => null)
+            return j ? { ...j, stick: f.name.split('-')[1] } : null
+          }),
+        )
+      )
+        .filter((r): r is StickRequest => !!r)
+        .sort((a, b) => a.at.localeCompare(b.at))
+    : []
   const library: Library = {
     games: perConsole.flat().sort((a, b) => a.title.localeCompare(b.title, 'es')),
     saves: [...saves, ...states].sort((a, b) => b.modifiedTime.localeCompare(a.modifiedTime)),
     status,
     sticks,
+    requests,
     fetchedAt: Date.now(),
   }
   localStorage.setItem(CACHE_KEY, JSON.stringify(library))
@@ -119,7 +145,87 @@ export async function deleteGame(game: Game): Promise<void> {
   await Promise.all(game.files.map((f) => trashFile(f.id)))
 }
 
-export function stickSpace(library: Library) {
+/**
+ * Where a game being downloaded or uploaded goes: only the collection, one stick (by id) or all of them.
+ * The main stick (and «all») = JugandoAhora; a stick that picks its games gets a request (see setOnStick).
+ */
+export type StickTarget = 'drive' | 'all' | string
+
+/** The Drive folder a new game goes to for [target]. */
+export function targetParent(library: Library | null, folders: Folders, console: ConsoleId, target: StickTarget): string {
+  if (target === 'drive') return folders.coleccion[console]
+  const stick = library?.sticks?.find((s) => s.id === target)
+  return stick && picksGames(stick) ? folders.coleccion[console] : folders.jugando[console]
+}
+
+/** After the upload: the sticks that pick their games among [target] are asked for [file] (the game's main file). */
+export async function requestForTarget(
+  library: Library | null,
+  folders: Folders,
+  console: ConsoleId,
+  file: string,
+  target: StickTarget,
+): Promise<void> {
+  if (target === 'drive') return
+  const sticks = (library?.sticks ?? []).filter((s) => picksGames(s) && (target === 'all' || s.id === target))
+  await Promise.all(sticks.map((s) => saveStickRequest(folders, s.id!, { console, file, add: true })))
+}
+
+const STICK_KEY = 'retrostick.stick'
+
+/** The stick Colección and the ficha show (several on the account): the one picked last, else the main one. */
+export function chosenStick(library: Library): StickStatus | null {
+  const sticks = library.sticks ?? []
+  let id: string | null = null
+  try {
+    id = localStorage.getItem(STICK_KEY)
+  } catch {
+    /* private mode */
+  }
+  return sticks.find((s) => s.id && s.id === id) ?? library.status
+}
+
+export function chooseStick(id: string) {
+  try {
+    localStorage.setItem(STICK_KEY, id)
+  } catch {
+    /* private mode */
+  }
+}
+
+/** A stick that picks its own games (DriveSync.autoRoms off), as opposed to the main one that follows JugandoAhora. */
+export const picksGames = (stick: StickStatus | null) => !!stick && stick.autoRoms === false && !!stick.id
+
+/** Whether [game] is (or is about to be) on [stick]; pending: asked, the stick hasn't taken it yet. */
+export function onStick(library: Library, stick: StickStatus | null, game: Game): { on: boolean; pending: boolean } {
+  if (!picksGames(stick)) return { on: game.inStick, pending: false }
+  const asked = (library.requests ?? []).filter((r) => r.stick === stick!.id && r.console === game.console && r.file === game.main.name)
+  const has = !!stick!.games?.[game.console]?.includes(game.main.name)
+  const last = asked.at(-1)
+  return last ? { on: last.add, pending: last.add !== has } : { on: has, pending: false }
+}
+
+/** Puts [game] on [stick] or takes it off: moved to JugandoAhora (main stick) or asked for (a stick that picks). */
+export async function setOnStick(
+  stick: StickStatus | null,
+  game: Game,
+  value: boolean,
+  folders: Folders,
+): Promise<StickRequest | null> {
+  if (!picksGames(stick)) {
+    await setInStick(game, value, folders)
+    return null
+  }
+  const request = { console: game.console, file: game.main.name, add: value }
+  await saveStickRequest(folders, stick!.id!, request)
+  return { ...request, stick: stick!.id!, at: new Date().toISOString() }
+}
+
+export function stickSpace(library: Library, stick: StickStatus | null = library.status) {
+  if (picksGames(stick)) {
+    const used = library.games.filter((g) => onStick(library, stick, g).on).reduce((s, g) => s + g.size, 0)
+    return { used, capacity: stick!.freeBytes + stick!.romsBytes }
+  }
   const used = library.games.filter((g) => g.inStick).reduce((s, g) => s + g.size, 0)
   // Without status.json: 4.5 GB free by default (README 7.4)
   const capacity = library.status ? library.status.freeBytes + library.status.romsBytes : 4.5e9

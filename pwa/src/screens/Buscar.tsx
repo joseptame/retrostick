@@ -2,8 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AppState } from '../App'
 import { GameSheet } from '../components/GameSheet'
 import { SearchCard, type CardState } from '../components/SearchCard'
+import { StickTargetPicker } from '../components/StickTargetPicker'
 import { Banner, Segmented, StickySearch } from '../components/ui'
 import { Icon } from '../components/icons'
+import { requestForTarget, targetParent, type StickTarget } from '../lib/library'
 import { CollectionSheet } from '../components/CollectionSheet'
 import { FilterSheet, filtersActive, NO_FILTERS, UNRATED, type Filters, type FilterSection } from '../components/FilterSheet'
 import { archiveFileUrl, downloadUrl, groupDiscs, listItemFiles, m3uName, packedRom, proxyPath, type ArchiveEntry } from '../lib/archive'
@@ -59,7 +61,9 @@ export function Buscar({ state }: { state: AppState }) {
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [toStick, setToStick] = useState(false)
+  const sticks = state.library?.sticks ?? []
+  const [target, setTarget] = useState<StickTarget>('drive')
+  const toStick = target !== 'drive'
   const [job, setJob] = useState<Job | null>(null)
   const [ficha, setFicha] = useState<Ficha | null>(null)
   const loaded = useRef(false)
@@ -140,7 +144,7 @@ export function Buscar({ state }: { state: AppState }) {
       state.notify(`${first}: ya estaba en tu colección`)
       return
     }
-    const parent = toStick ? state.folders.jugando[console] : state.folders.coleccion[console]
+    const parent = targetParent(state.library, state.folders, console, target)
     const total = discs.reduce((n, d) => n + d.size, 0)
     const id = state.uploadsApi.start({
       key: `${loadedId}/${key}`,
@@ -174,6 +178,7 @@ export function Buscar({ state }: { state: AppState }) {
         const text = discs.map((d) => fileOnly(d.name)).join('\n') + '\n'
         await uploadResumable(new Blob([text], { type: 'audio/x-mpegurl' }), playlist, parent, () => {})
       }
+      await requestForTarget(state.library, state.folders, console, first, target)
       setJob({ key, entry, phase: 'done', progress: 1 })
       state.uploadsApi.finish(id)
       state.notify(`${displayTitle(entry.name)}: subido${discs.length > 1 ? ` (${discs.length} discos)` : ''}`)
@@ -235,13 +240,14 @@ export function Buscar({ state }: { state: AppState }) {
         return
       }
 
-      const parent = toStick ? state.folders.jugando[console] : state.folders.coleccion[console]
+      const parent = targetParent(state.library, state.folders, console, target)
       setJob({ key, entry, phase: 'uploading', progress: 0 })
       state.uploadsApi.progress(id, 0, 'uploading')
       await uploadResumable(blob, fileName, parent, (sent, total) => {
         setJob({ key, entry, phase: 'uploading', progress: total ? sent / total : 1 })
         state.uploadsApi.progress(id, sent)
       })
+      await requestForTarget(state.library, state.folders, console, fileName, target)
       setJob({ key, entry, phase: 'done', progress: 1 })
       state.uploadsApi.finish(id)
       state.notify(`${fileName}: subido`)
@@ -332,23 +338,7 @@ export function Buscar({ state }: { state: AppState }) {
             <path d="M6 9l6 6 6-6" />
           </svg>
         </button>
-        <button
-          role="switch"
-          aria-checked={toStick}
-          aria-label="Enviar también al stick"
-          className={`bx-stick ${toStick ? 'on' : ''}`}
-          onClick={() => setToStick((v) => !v)}
-          disabled={busy}
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
-            <rect x="3" y="4" width="18" height="12" rx="2" />
-            <path d="M9 20h6M12 16v4" />
-          </svg>
-          Al stick
-          <span className="bx-sw" aria-hidden>
-            <i />
-          </span>
-        </button>
+        <StickTargetPicker sticks={sticks} value={target} onChange={setTarget} disabled={busy} />
       </div>
 
       {error && <Banner tone="error">{error}</Banner>}

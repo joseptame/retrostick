@@ -5,7 +5,7 @@ import { CoverCard } from '../components/SearchCard'
 import { Segmented, StickySearch } from '../components/ui'
 import { CONSOLES, type ConsoleId } from '../lib/consoles'
 import { formatAgo, formatBytes } from '../lib/format'
-import { setInStick, stickSpace, type Game } from '../lib/library'
+import { chooseStick, chosenStick, onStick, picksGames, setOnStick, stickSpace, type Game } from '../lib/library'
 import { regionCode } from '../lib/names'
 
 type Where = 'all' | 'stick' | 'drive'
@@ -17,6 +17,11 @@ export function Coleccion({ state, onUpload, onSearch }: { state: AppState; onUp
   const [filter, setFilter] = useState<ConsoleId | 'all'>('all')
   const [where, setWhere] = useState<Where>('all')
   const [query, setQuery] = useState('')
+  // Several sticks on the account: which one the «en el stick» marks and the space are about
+  const [stickId, setStickId] = useState<string | undefined>(() => (library ? chosenStick(library)?.id : undefined))
+  const sticks = library?.sticks ?? []
+  const stick = (stickId && sticks.find((s) => s.id === stickId)) || library?.status || null
+  const has = (g: Game) => (library ? onStick(library, stick, g) : { on: g.inStick, pending: false })
 
   const games = useMemo(() => {
     if (!library) return []
@@ -24,30 +29,33 @@ export function Coleccion({ state, onUpload, onSearch }: { state: AppState; onUp
     return library.games.filter(
       (g) =>
         (filter === 'all' || g.console === filter) &&
-        (where === 'all' || (where === 'stick') === g.inStick) &&
+        (where === 'all' || (where === 'stick') === onStick(library, stick, g).on) &&
         (!q || norm(g.title).includes(q) || norm(g.name).includes(q)),
     )
-  }, [library, filter, where, query])
+  }, [library, stick, filter, where, query])
 
   if (!library) return <main className="screen" />
 
-  const { used, capacity } = stickSpace(library)
+  const { used, capacity } = stickSpace(library, stick)
   const over = used > capacity
   const pct = Math.min(100, (used / capacity) * 100)
-  const inStick = library.games.filter((g) => g.inStick).length
-  const stale = library.status && Date.now() - new Date(library.status.updatedAt).getTime() > 24 * 3600 * 1000
+  const inStick = library.games.filter((g) => has(g).on).length
+  const stale = stick && Date.now() - new Date(stick.updatedAt).getTime() > 24 * 3600 * 1000
+  const stickName = sticks.length > 1 ? (stick?.name ?? 'el stick') : 'el stick'
 
   async function toggle(game: Game, value: boolean) {
-    if (!state.folders || !state.online) return
+    if (!state.folders || !state.online || !library) return
     // Optimistic update with rollback (README 7.4)
     const flip = (v: boolean) =>
       state.setLibrary((l) => ({ ...l, games: l.games.map((g) => (g.key === game.key ? { ...g, inStick: v } : g)) }))
-    flip(value)
+    const picking = picksGames(stick)
+    if (!picking) flip(value)
     try {
-      await setInStick(game, value, state.folders)
-      state.notify(value ? `${game.title}: irá al stick en la próxima sincronización` : `${game.title}: se quitará del stick`)
+      const request = await setOnStick(stick, game, value, state.folders)
+      if (request) state.setLibrary((l) => ({ ...l, requests: [...(l.requests ?? []), request] }))
+      state.notify(value ? `${game.title}: irá a ${stickName} en la próxima sincronización` : `${game.title}: se quitará de ${stickName}`)
     } catch (e) {
-      flip(!value)
+      if (!picking) flip(!value)
       state.notify(`No se pudo cambiar: ${e instanceof Error ? e.message : e}`)
     }
   }
@@ -76,23 +84,42 @@ export function Coleccion({ state, onUpload, onSearch }: { state: AppState; onUp
 
   return (
     <main className="screen">
+      {sticks.length > 1 && (
+        <div className="pills stick-pills" role="radiogroup" aria-label="Qué stick">
+          {sticks.map((s, i) => (
+            <button
+              key={s.id ?? i}
+              role="radio"
+              aria-checked={s === stick}
+              className={`pill2 ${s === stick ? 'on' : ''}`}
+              onClick={() => {
+                if (!s.id) return
+                chooseStick(s.id)
+                setStickId(s.id)
+              }}
+            >
+              <Icon name="tv" /> {s.name ?? `Stick ${i + 1}`}
+            </button>
+          ))}
+        </div>
+      )}
       <section className={`meter ${over ? 'over' : ''}`} aria-label="Espacio en el stick">
         <div className="meter-top">
           <span className="meter-ico">
             <Icon name="tv" />
           </span>
           <div className="meter-txt">
-            <b>En el stick</b>
+            <b>{sticks.length > 1 ? `En ${stickName}` : 'En el stick'}</b>
             <small>
-              <span className={`dot ${library.status ? (stale ? 'stale' : 'ok') : ''}`} aria-hidden />
-              {library.status ? `Sincronizado ${formatAgo(library.status.updatedAt)}` : 'Aún no ha sincronizado'}
+              <span className={`dot ${stick ? (stale ? 'stale' : 'ok') : ''}`} aria-hidden />
+              {stick ? `Sincronizado ${formatAgo(stick.updatedAt)}` : 'Aún no ha sincronizado'}
             </small>
           </div>
           <div className="meter-num">
             <b>{formatBytes(used)}</b>
             <small>
               de {formatBytes(capacity)}
-              {library.status ? '' : ' (est.)'}
+              {stick ? '' : ' (est.)'}
             </small>
           </div>
         </div>
@@ -129,32 +156,37 @@ export function Coleccion({ state, onUpload, onSearch }: { state: AppState; onUp
         <div className="empty">No hay juegos con estos filtros.</div>
       ) : (
         <div className="grid gp-grid">
-          {games.map((g, i) => (
+          {games.map((g, i) => {
+            const { on, pending } = has(g)
+            return (
             <CoverCard
               key={g.key}
               console={g.console}
               fileName={g.name}
               title={g.title}
-              meta={[g.inStick ? 'En el stick' : regionCode(g.name), formatBytes(g.size)].filter(Boolean).join(' · ')}
-              metaTone={g.inStick ? 'ok' : undefined}
+              meta={[pending ? (on ? 'Pedido' : 'Se quitará') : on ? 'En el stick' : regionCode(g.name), formatBytes(g.size)]
+                .filter(Boolean)
+                .join(' · ')}
+              metaTone={on && !pending ? 'ok' : undefined}
               style={i < 12 ? { animationDelay: `${i * 40}ms` } : { animation: 'none' }}
               onOpen={() => state.openGame(g.key)}
               action={
                 <button
-                  className={`gp-btn ${g.inStick ? 'ok' : 'off'}`}
-                  aria-pressed={g.inStick}
-                  aria-label={g.inStick ? `Quitar ${g.title} del stick` : `Llevar ${g.title} al stick`}
+                  className={`gp-btn ${on ? 'ok' : 'off'}`}
+                  aria-pressed={on}
+                  aria-label={on ? `Quitar ${g.title} de ${stickName}` : `Llevar ${g.title} a ${stickName}`}
                   disabled={!state.online}
                   onClick={(ev) => {
                     ev.stopPropagation()
-                    toggle(g, !g.inStick)
+                    toggle(g, !on)
                   }}
                 >
-                  <Icon name={g.inStick ? 'check' : 'tv'} strokeWidth={g.inStick ? 3.2 : 2.2} />
+                  <Icon name={on ? 'check' : 'tv'} strokeWidth={on ? 3.2 : 2.2} />
                 </button>
               }
             />
-          ))}
+            )
+          })}
         </div>
       )}
     </main>

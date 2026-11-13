@@ -208,6 +208,8 @@ object DriveSync {
             CONSOLES.forEach { dir("Retro/Coleccion/${it.id}"); dir("Retro/JugandoAhora/${it.id}") }
             dir("Retro/Config/bios")
             if (!prefs.contains("autoRoms")) decideAutoRoms()
+            // Games the webapp asked for this stick (before the status, so it already lists them)
+            runCatching { takeRequests() }.onFailure { Log.w("RetroStick", "Requests from the webapp failed", it) }
             runCatching { StickStatus.writeStatusJson(context) }
             listOf("saves", "states", ".stick").forEach { syncSaves(it) }
             // A new launcher published with android/publish-update.mjs (before the ROMs, which can take long).
@@ -220,6 +222,70 @@ object DriveSync {
         }
 
         private fun checkCancel() { if (cancelRequested) throw Cancelled() }
+
+        /**
+         * The webapp's Colección, on a stick that picks its games: Retro/Config/stick/pedido-<stick id>-<time>.json,
+         * {"console", "file", "add"}, one per change, applied oldest first and deleted. «add» downloads the game
+         * (and the discs / tracks its .m3u / .cue lists) from Coleccion or JugandoAhora without moving it in Drive;
+         * otherwise it's taken off this stick (Drive keeps it, uploaded to the collection if it had no copy).
+         */
+        private fun takeRequests() {
+            val id = StickStatus.stickId(context)
+            val requestsDir = dir("Retro/Config/stick")
+            val mine = drive.list(requestsDir).filter { !it.isFolder && it.name.startsWith("pedido-$id-") }.sortedBy { it.name }
+            if (mine.isEmpty()) return
+            val manifest = prefs.getStringSet("roms", emptySet())!!.toMutableSet()
+            var added = 0
+            var removed = 0
+            for (f in mine) {
+                checkCancel()
+                val tmp = File(context.cacheDir, "pedido.json")
+                val j = runCatching { drive.download(f.id, tmp); JSONObject(tmp.readText()) }.getOrNull()
+                tmp.delete()
+                val c = CONSOLES.firstOrNull { it.id == j?.optString("console") }
+                val name = j?.optString("file").orEmpty().substringAfterLast('/')
+                if (c != null && name.isNotEmpty()) {
+                    val playing = drive.list(dir("Retro/JugandoAhora/${c.id}")).filter { !it.isFolder }.associateBy { it.name }
+                    val collectionId = dir("Retro/Coleccion/${c.id}")
+                    val collection = drive.list(collectionId).filter { !it.isFolder }.associateBy { it.name }
+                    if (j!!.optBoolean("add")) {
+                        c.romDir.mkdirs()
+                        val queue = ArrayDeque(listOf(name))
+                        val seen = mutableSetOf<String>()
+                        while (queue.isNotEmpty()) {
+                            val n = queue.removeFirst()
+                            if (!seen.add(n)) continue
+                            val remote = collection[n] ?: playing[n] ?: continue
+                            val target = File(c.romDir, n)
+                            if (!(target.isFile && target.length() == remote.size)) drive.download(remote.id, target)
+                            manifest += "${c.id}/$n"
+                            DriveCollection.references(target).forEach { queue.addLast(it) }
+                        }
+                        if (File(c.romDir, name).isFile) added++
+                    } else {
+                        val game = File(c.romDir, name)
+                        if (game.isFile) {
+                            for (rom in romFiles(Game(c, game))) {
+                                if (rom.name !in playing && collection[rom.name]?.size != rom.length()) drive.upload(rom, collectionId, null)
+                                rom.delete()
+                                manifest -= "${c.id}/${rom.name}"
+                            }
+                            removed++
+                        }
+                    }
+                    prefs.edit().putStringSet("roms", manifest.toSet()).apply()
+                }
+                runCatching { drive.delete(f.id) }
+            }
+            if (added + removed > 0) main.post {
+                DriveCollection.refresh(context, force = true)
+                val what = listOfNotNull(
+                    if (added > 0) "$added ${if (added == 1) "juego descargado" else "juegos descargados"}" else null,
+                    if (removed > 0) "$removed ${if (removed == 1) "juego quitado" else "juegos quitados"}" else null,
+                ).joinToString(" y ")
+                android.widget.Toast.makeText(context, "Desde el móvil: $what", android.widget.Toast.LENGTH_LONG).show()
+            }
+        }
 
         /**
          * First sync of a stick: when the account's JugandoAhora already has games this stick doesn't, another stick
