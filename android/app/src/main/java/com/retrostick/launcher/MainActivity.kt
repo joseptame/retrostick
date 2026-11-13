@@ -1681,15 +1681,52 @@ class MainActivity : Activity() {
         val games = "Juegos de «Jugando ahora»: " + if (DriveSync.autoRoms(this)) "se descargan solos" else "los eliges tú"
         AlertDialog.Builder(this, R.style.Dialog_RetroStick)
             .setTitle(driveAuth.email ?: getString(R.string.set_account))
-            .setItems(arrayOf("Copia del stick…", games, "Desconectar Drive")) { _, which ->
+            .setItems(arrayOf("Nombre de este stick: ${StickStatus.stickName(this)}", "Copia del stick…", games, "Desconectar Drive")) { _, which ->
                 when (which) {
-                    0 -> showBackup()
-                    1 -> confirmAutoRoms()
+                    0 -> showStickName()
+                    1 -> showBackup()
+                    2 -> confirmAutoRoms()
                     else -> confirmDisconnect()
                 }
             }
             .setNegativeButton(R.string.cancel, null)
             .showForPad()
+    }
+
+    /** How the webapp's Stick tab calls this stick, when there are several on the account (StickStatus.stickName). */
+    private fun showStickName() {
+        val custom = StickStatus.customName(this)
+        val field = android.widget.EditText(this).apply {
+            setText(custom.orEmpty())
+            hint = StickStatus.androidName(this@MainActivity)
+            setSingleLine()
+            filters = arrayOf(android.text.InputFilter.LengthFilter(40))
+            setTextColor(getColor(R.color.text)); setHintTextColor(getColor(R.color.text_3))
+            imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_DONE
+        }
+        val box = android.widget.FrameLayout(this).apply {
+            val pad = (20 * resources.displayMetrics.density).toInt()
+            setPadding(pad, pad / 2, pad, 0)
+            addView(field)
+        }
+        val save = { name: String? ->
+            StickStatus.setCustomName(this, name)
+            Toast.makeText(this, "Este stick se llama «${StickStatus.stickName(this)}»", Toast.LENGTH_SHORT).show()
+            io.execute { runCatching { StickStatus.writeStatusJson(this) } }
+            DriveSync.sync(this)
+        }
+        val dialog = AlertDialog.Builder(this, R.style.Dialog_RetroStick)
+            .setTitle("Nombre de este stick")
+            .setMessage("Así aparece en la pestaña Stick de la webapp, para distinguirlo de tus otros sticks.")
+            .setView(box)
+            .setPositiveButton("Guardar") { _, _ -> save(field.text.toString()) }
+            .apply { if (custom != null) setNeutralButton("Quitar") { _, _ -> save(null) } }
+            .setNegativeButton(R.string.cancel, null)
+            .showForPad()
+        field.setOnEditorActionListener { _, _, _ -> save(field.text.toString()); dialog.dismiss(); true }
+        field.requestFocus()
+        field.setSelection(field.text.length)
+        dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
     }
 
     /** DriveSync.autoRoms: download everything in JugandoAhora (one stick) or pick (another stick on the account). */

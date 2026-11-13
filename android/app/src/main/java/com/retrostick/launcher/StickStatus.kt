@@ -145,8 +145,22 @@ object StickStatus {
         }
     }
 
-    /** The stick's name in Android (Ajustes → Preferencias del dispositivo → Información → Nombre), or its model. */
-    fun stickName(context: Context): String =
+    /**
+     * The name the webapp shows: the one given in Retro Ajustes → Cuenta de Drive → Nombre de este stick, else
+     * the stick's name in Android (Ajustes → Preferencias del dispositivo → Información → Nombre), else its model.
+     */
+    fun stickName(context: Context): String = customName(context) ?: androidName(context)
+
+    /** Given in Retro Ajustes (kept in "stick", which Backup doesn't copy: each stick keeps its own). */
+    fun customName(context: Context): String? =
+        context.getSharedPreferences("stick", Context.MODE_PRIVATE).getString("name", null)?.takeIf { it.isNotBlank() }
+
+    fun setCustomName(context: Context, name: String?) {
+        context.getSharedPreferences("stick", Context.MODE_PRIVATE).edit()
+            .apply { if (name.isNullOrBlank()) remove("name") else putString("name", name.trim().take(40)) }.apply()
+    }
+
+    fun androidName(context: Context): String =
         runCatching { android.provider.Settings.Global.getString(context.contentResolver, "device_name") }.getOrNull()
             ?.takeIf { it.isNotBlank() } ?: Build.MODEL
 
