@@ -173,6 +173,10 @@ object Cheats {
             .put("version", if (exact) "" else files.firstOrNull()?.let { regionOf(it) } ?: "")
             .put("cheats", JSONArray().apply { all.forEach { put(JSONObject().put("fields", JSONObject(it.fields))) } })
         gameFile(context, game).apply { parentFile?.mkdirs() }.writeText(out.toString())
+        // Cheats chosen from an older list (a demo disc's Tony Hawk codes in Tekken 3) that this one hasn't: forgotten
+        val ids = all.map { it.id }.toSet()
+        val chosen = chosen(context, game)
+        if (chosen.any { it !in ids }) setChosen(context, game, chosen.filter { it in ids }.toSet())
         return cached(context, game)!!
     }
 
@@ -283,7 +287,8 @@ object Cheats {
     fun chosenNames(context: Context, game: Game): List<String> {
         val ids = chosen(context, game)
         if (ids.isEmpty()) return emptyList()
-        val all = cached(context, game)?.cheats ?: return ids.map { it.substringBefore("|") }
+        // Not looked up yet with the current matcher: they may be another game's (shown again once Trucos opens)
+        val all = cached(context, game)?.cheats ?: return emptyList()
         return all.filter { it.id in ids && !it.master }.map { it.name }
     }
 

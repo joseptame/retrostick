@@ -62,7 +62,7 @@ class CheatsActivity : Activity() {
     private fun show(g: Cheats.GameCheats) {
         cheats = g.visible
         // Chosen ones the list no longer has don't count
-        chosen.retainAll(g.cheats.map { it.id }.toSet())
+        if (chosen.retainAll(g.cheats.map { it.id }.toSet())) Cheats.setChosen(this, game, chosen)
         if (!g.exact) {
             versionNote.text = "Son trucos de otra versión del juego${g.version?.let { " ($it)" } ?: ""}: puede que alguno no funcione."
             versionNote.visibility = View.VISIBLE
