@@ -21,6 +21,8 @@ object Cheats {
     const val DIR = "$SDCARD/RetroArch/cheats"
     private const val RAW = "https://raw.githubusercontent.com/libretro/libretro-database/master/cht/"
     private const val INDEX_DAYS = 7L
+    /** Raised when [match] changes: a game's kept cheats from before are looked up again. */
+    private const val MATCH_VERSION = 2
 
     /** libretro-database folder of each console (Neo Geo has none: FinalBurn Neo keeps its own). */
     private val FOLDERS = mapOf(
@@ -104,8 +106,18 @@ object Cheats {
     /** The first bracket: «(Europe)», «(USA, Europe)»… */
     private fun regionOf(name: String) = Regex("""\(([^)]*)\)""").find(name)?.groupValues?.get(1)
 
+    /**
+     * Brackets that make a file another release, not a cheat device («(Demo)», «(Beta)», «(Rev 1)»…). libretro's
+     * «Tekken 3 (Europe) (Demo) (Game Buster)» is a demo disc with other games' codes (Tony Hawk's Pro Skater 2…):
+     * it was taken for Tekken 3 (Europe)'s own (2026-11-14).
+     */
+    private val OTHER_RELEASE = Regex("""\((?:[^)]*\b)?(?:demo|beta|proto(?:type)?|sample|kiosk|trial|promo|preview|rev\s*\w+|v\d[\w.]*)\b[^)]*\)""", RegexOption.IGNORE_CASE)
+
     /** The cheat files for [baseName]: its own, else those of the best other version of the same title. */
-    internal fun match(names: List<String>, baseName: String): Pair<List<String>, Boolean>? {
+    internal fun match(all: List<String>, baseName: String): Pair<List<String>, Boolean>? {
+        // A demo, beta, revision… only when the game is that one too
+        val mineOther = OTHER_RELEASE.findAll(baseName).map { it.value.lowercase() }.toSet()
+        val names = all.filter { n -> OTHER_RELEASE.findAll(n).all { it.value.lowercase() in mineOther } }
         val own = names.filter { it == baseName || it.startsWith("$baseName (") }
         if (own.isNotEmpty()) return own to true
         val t = title(baseName)
@@ -113,7 +125,10 @@ object Cheats {
         if (same.isEmpty()) return null
         val byRegion = same.groupBy { regionOf(it) }
         val mine = regionOf(baseName)
-        val pick = listOf(mine, "World", "Europe", "USA, Europe", "Europe, USA", "USA").firstOrNull { it in byRegion } ?: byRegion.keys.first()
+        // Its region, else one that shares a country with it («Europe» → «Europe, Australia»), else the usual ones
+        val mineParts = mine?.split(",")?.map { it.trim() }.orEmpty()
+        val sharing = byRegion.keys.firstOrNull { k -> k != null && k.split(",").any { it.trim() in mineParts } }
+        val pick = listOf(mine, sharing, "World", "Europe", "USA, Europe", "Europe, USA", "USA").firstOrNull { it in byRegion } ?: byRegion.keys.first()
         // The plain version of that region first («Title (Europe)»), with its device variants
         val group = byRegion.getValue(pick)
         val base = group.minByOrNull { it.length }!!
@@ -123,6 +138,8 @@ object Cheats {
     /** Kept on the stick: shown at once, and what each launch uses. */
     fun cached(context: Context, game: Game): GameCheats? {
         val j = runCatching { JSONObject(gameFile(context, game).readText()) }.getOrNull() ?: return null
+        // Kept by an older matcher (it could pick a demo disc's codes): looked up again
+        if (j.optInt("v") < MATCH_VERSION) return null
         val list = j.getJSONArray("cheats")
         val cheats = List(list.length()) { i ->
             val c = list.getJSONObject(i)
@@ -151,6 +168,7 @@ object Cheats {
             parse(text)
         }.filter { seen.add(it.id.lowercase()) }
         val out = JSONObject()
+            .put("v", MATCH_VERSION)
             .put("exact", exact)
             .put("version", if (exact) "" else files.firstOrNull()?.let { regionOf(it) } ?: "")
             .put("cheats", JSONArray().apply { all.forEach { put(JSONObject().put("fields", JSONObject(it.fields))) } })
