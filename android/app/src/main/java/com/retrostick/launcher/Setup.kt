@@ -76,7 +76,11 @@ object Setup {
         if (prefs(context).getBoolean("done", false)) return false
         if (versionCode(context, RETROARCH_PACKAGE) == null) return true
         val storage = context.checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
-        return storage && (!retroArchCfg().isFile || !File("$SDCARD/RetroArch/config").isDirectory)
+        // RetroStick's configuration missing: no config file, or no per-console settings from the pack. RetroArch's
+        // own retroarch.cfg alone isn't it (Android 10 lets the launcher write it, and a TV with RetroArch freshly
+        // installed has one, without cores: every game stayed black; seen on a Mi TV, 2026-11-14)
+        val pack = File("$SDCARD/RetroArch/config/FCEUmm/nes.cfg").isFile
+        return storage && (!retroArchCfg().isFile || !File("$SDCARD/RetroArch/config").isDirectory || !pack)
     }
 
     private fun writtenFile(context: Context) = File(context.filesDir, "config-files.json")

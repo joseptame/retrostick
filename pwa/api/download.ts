@@ -5,7 +5,7 @@
  * Called only for the identifiers/files the PWA picked from archive.org's own public API.
  *
  * With a `Range: bytes=a-b` header (RetroShop on the stick, PS1 discs of restricted items) it returns that
- * piece (206), fetched with the user's archive.org keys (api/_archive.ts).
+ * piece (206), fetched with the admin's archive.org keys (api/_archive.ts), for any user of the webapp.
  */
 import { fetchArchiveRange } from './_archive.js'
 import { whoIs } from './_users.js'
@@ -28,9 +28,10 @@ export async function GET(request: Request): Promise<Response> {
 
   const range = /^bytes=(\d+)-(\d+)$/.exec(request.headers.get('range') ?? '')
   if (range) {
-    // Restricted items go out with the admin's archive.org keys: only for the admin and their stick
+    // Restricted items (PS1) go out with the admin's archive.org keys, shared with every user of the webapp and
+    // their sticks (the admin's choice, 2026-11-14); still only for someone signed in or a paired stick
     const who = await whoIs(request)
-    if (!who?.admin) return new Response('Esta colección solo está disponible para el administrador', { status: 403 })
+    if (!who) return new Response('Inicia sesión en la webapp para descargar', { status: 403 })
     const start = Number(range[1])
     const end = Number(range[2]) + 1
     if (!(end > start && end - start <= MAX_RANGE)) return new Response('Rango inválido', { status: 416 })
