@@ -13,6 +13,10 @@ object News {
 
     /** Newest first. */
     val RELEASES = listOf(
+        Release(92, "1.27.2", listOf(
+            Item(R.drawable.ic_star, "Trucos más certeros",
+                "Las demos y betas ya no se confunden con el juego, y si no hay trucos de tu versión se usan los de una región parecida."),
+        )),
         Release(91, "1.27.1", listOf(
             Item(R.drawable.ic_gamepad, "También en teles Android",
                 "El asistente prepara RetroArch aunque ya estuviera instalado, y Nintendo 64 usa el emulador adecuado para gráficas más modernas."),
