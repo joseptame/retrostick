@@ -185,6 +185,10 @@ class DetailsActivity : Activity() {
             val n = cheatNames.size
             actionList += Action(actionView(if (n == 0) "Trucos" else "Trucos · $n ${if (n == 1) "activo" else "activos"}", R.drawable.ic_star)) { openCheats() }
         }
+        if (game.console.id == "psx") {
+            ditherAction = actionView(ditherLabel(), null)
+            actionList += Action(ditherAction!!) { toggleDither() }
+        }
         if (Manuals.find(this, game.console, game.baseName) != null) actionList += Action(actionView("Manual", null)) { openManual() }
         actionList += Action(actionView("Borrar…", R.drawable.ic_trash, danger = true)) { confirmRemove() }
         actions = actionList
@@ -384,6 +388,19 @@ class DetailsActivity : Activity() {
         startActivity(Intent(this, AchievementsActivity::class.java)
             .putExtra(AchievementsActivity.EXTRA_CONSOLE, game.console.id)
             .putExtra(AchievementsActivity.EXTRA_FILE, game.file.path))
+    }
+
+    /** PlayStation: «Tramado: original» / «Sin tramado» (Dithering), applied next time the game opens. */
+    private var ditherAction: TextView? = null
+    private fun ditherLabel() = if (Dithering.removed(this, game)) "Sin tramado" else "Tramado: original"
+
+    private fun toggleDither() {
+        val removed = !Dithering.removed(this, game)
+        Dithering.setRemoved(this, game, removed)
+        Sounds.play(if (removed) Sounds.Sound.OPEN else Sounds.Sound.BACK)
+        ditherAction?.text = ditherLabel()
+        Toast.makeText(this, if (removed) "Sin tramado: la imagen se verá más limpia al jugar" else "Tramado original de PlayStation", Toast.LENGTH_SHORT).show()
+        render()
     }
 
     private fun openCheats() {

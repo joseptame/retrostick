@@ -302,7 +302,9 @@ fun launchInRetroArch(context: Context, game: Game, resume: Resume = Resume.TITL
             else -> "disabled"
         }
         val opt = File("$SDCARD/RetroArch/config/PCSX-ReARMed/PCSX-ReARMed.opt")
-        if (opt.isFile) writeRetroArchCfg(mapOf("pcsx_rearmed_multitap" to multitap), opt)
+        // The PlayStation's dithering (the grid of dots over its colours): off for the games where Detalles says so
+        val dither = if (Dithering.removed(context, game)) "disabled" else "enabled"
+        if (opt.isFile) writeRetroArchCfg(mapOf("pcsx_rearmed_multitap" to multitap, "pcsx_rearmed_dithering" to dither), opt)
     }
     val intent = Intent(Intent.ACTION_MAIN)
         .setComponent(ComponentName(RETROARCH_PACKAGE, RETROARCH_ACTIVITY))
@@ -340,3 +342,21 @@ fun coreFor(context: Context, console: Console, retroArchDataDir: String): Strin
 /** OpenGL ES version of the device's GPU: 2 on the Mali-450 sticks, 3 on newer GPUs. */
 fun glesMajor(context: Context): Int =
     (context.getSystemService(android.app.ActivityManager::class.java)?.deviceConfigurationInfo?.reqGlEsVersion ?: 0x20000) shr 16
+
+
+/**
+ * PlayStation dithering, per game (Detalles → «Tramado»): the PS1 drew a grid of dots to fake more colours; without it
+ * the picture looks cleaner and smoother. Costs nothing, so every stick can do it. Original by default.
+ */
+object Dithering {
+    private fun prefs(context: Context) = context.getSharedPreferences("psx", Context.MODE_PRIVATE)
+    private fun key(game: Game) = game.baseName
+
+    fun removed(context: Context, game: Game) = prefs(context).getStringSet("noDither", emptySet())!!.contains(key(game))
+
+    fun setRemoved(context: Context, game: Game, removed: Boolean) {
+        val set = prefs(context).getStringSet("noDither", emptySet())!!.toMutableSet()
+        if (removed) set += key(game) else set -= key(game)
+        prefs(context).edit().putStringSet("noDither", set).apply()
+    }
+}

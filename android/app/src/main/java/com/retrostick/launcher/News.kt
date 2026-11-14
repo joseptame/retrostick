@@ -13,6 +13,10 @@ object News {
 
     /** Newest first. */
     val RELEASES = listOf(
+        Release(94, "1.27.4", listOf(
+            Item(R.drawable.ic_settings, "PlayStation sin tramado",
+                "En la ficha de cada juego de PlayStation puedes quitar el tramado, esa rejilla de puntos sobre los colores: la imagen se ve más limpia."),
+        )),
         Release(92, "1.27.2", listOf(
             Item(R.drawable.ic_star, "Trucos más certeros",
                 "Las demos y betas ya no se confunden con el juego, y si no hay trucos de tu versión se usan los de una región parecida."),
