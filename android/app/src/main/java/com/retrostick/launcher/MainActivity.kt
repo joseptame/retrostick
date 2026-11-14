@@ -123,7 +123,8 @@ class MainActivity : Activity() {
     private var tabBeforeSettings = 0
     private val selected = IntArray(CONSOLES.size + 1)
     private var settingIndex = 0
-    private var zone = Zone.CONTENT
+    /** Opening RetroStick starts on the console tabs (the selected one), not on a game */
+    private var zone = Zone.TABS
     private var initialTabChosen = false
     private var hasStorage = false
     private var heroKey: String? = null
@@ -508,8 +509,9 @@ class MainActivity : Activity() {
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
         if (intent?.hasCategory(Intent.CATEGORY_HOME) == true) homePressed = true
-        // Home pressed while already here (or during a game: see onResume)
-        zone = Zone.CONTENT
+        // Home pressed while already here, or RetroStick opened from another launcher: on the console tabs
+        // (during a game Home goes back to it: see onResume)
+        zone = Zone.TABS
         // Debug builds only: preview the glyphs of a controller that is not connected
         // (adb shell am start -n com.retrostick.launcher/.MainActivity --es debugPadStyle XBOX).
         val debuggable = applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
@@ -652,22 +654,22 @@ class MainActivity : Activity() {
     /** Retro Ajustes → Inicio: the view (covers / list), «Seguir jugando» and which consoles show as tabs. */
     private fun showHomeSetup() {
         // The tabs, then (last) whether RetroStick opens by itself when the stick starts (BootReceiver)
-        // Starting with RetroStick: it's the home screen (Android's choice), or it opens itself over the other one
+        // RetroStick as the home screen: what the stick starts with and Home opens. Only Android can change it, in its
+        // own window; opening by itself at boot (BootReceiver) only works up to Android 9, so it follows this choice
         val home = isHome()
-        val labels = arrayOf("Seguir jugando") + CONSOLES.map { it.name }.toTypedArray() +
-            (if (home) "Arrancar con RetroStick (es la pantalla de inicio)" else "Arrancar con RetroStick al encender el stick")
+        val labels = arrayOf("Seguir jugando") + CONSOLES.map { it.name }.toTypedArray() + "Usar RetroStick como pantalla de inicio"
         val hidden = homePrefs.getStringSet("hiddenConsoles", emptySet()).orEmpty()
-        val checked = booleanArrayOf(homePrefs.getBoolean("recentTab", true)) + CONSOLES.map { it.id !in hidden }.toBooleanArray() +
-            (home || BootReceiver.enabled(this))
+        val checked = booleanArrayOf(homePrefs.getBoolean("recentTab", true)) + CONSOLES.map { it.id !in hidden }.toBooleanArray() + home
         AlertDialog.Builder(this, R.style.Dialog_RetroStick)
             .setTitle("Inicio · pestañas y arranque")
             .setMultiChoiceItems(labels, checked) { _, which, on -> checked[which] = on }
             .setPositiveButton("Guardar") { _, _ ->
-                BootReceiver.setEnabled(this, checked.last())
-                // Off while RetroStick is the home screen: only Android can change that, in its own screen
-                if (home && !checked.last()) {
-                    Toast.makeText(this, "Elige el otro launcher como aplicación de inicio", Toast.LENGTH_LONG).show()
-                    runCatching { open(Intent(Settings.ACTION_HOME_SETTINGS)) }
+                val want = checked.last()
+                BootReceiver.setEnabled(this, want)
+                if (want != home) {
+                    Toast.makeText(this, if (want) "Elige RetroStick como aplicación de inicio" else "Elige el otro launcher como aplicación de inicio", Toast.LENGTH_LONG).show()
+                    runCatching { if (want) homeRoleIntent()?.let { startActivityForResult(it, 0) } ?: open(Intent(Settings.ACTION_HOME_SETTINGS)) else open(Intent(Settings.ACTION_HOME_SETTINGS)) }
+                        .onFailure { toast(R.string.app_missing) }
                 }
                 if (checked.drop(1).dropLast(1).none { it }) {
                     Toast.makeText(this, "Deja al menos una consola", Toast.LENGTH_SHORT).show()
@@ -2232,6 +2234,11 @@ class MainActivity : Activity() {
         return "Abre ${name ?: "el otro launcher"}"
     }
 
+    /** Android 10+: its own «make RetroStick the home app» window; null before (then its home settings) */
+    private fun homeRoleIntent(): Intent? = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q)
+        getSystemService(android.app.role.RoleManager::class.java)?.takeIf { it.isRoleAvailable(android.app.role.RoleManager.ROLE_HOME) }
+            ?.createRequestRoleIntent(android.app.role.RoleManager.ROLE_HOME) else null
+
     private fun isHome(): Boolean =
         packageManager.resolveActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), PackageManager.MATCH_DEFAULT_ONLY)
             ?.activityInfo?.packageName == packageName
@@ -2241,9 +2248,7 @@ class MainActivity : Activity() {
         val prefs = getSharedPreferences("home", MODE_PRIVATE)
         if (isHome() || prefs.getBoolean("asked", false)) return
         prefs.edit().putBoolean("asked", true).apply()
-        val role = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q)
-            getSystemService(android.app.role.RoleManager::class.java)?.takeIf { it.isRoleAvailable(android.app.role.RoleManager.ROLE_HOME) }
-                ?.createRequestRoleIntent(android.app.role.RoleManager.ROLE_HOME) else null
+        val role = homeRoleIntent()
         AlertDialog.Builder(this, R.style.Dialog_RetroStick)
             .setTitle("RetroStick como pantalla de inicio")
             .setMessage("Así el botón Home del mando o del mando a distancia vuelve siempre a RetroStick, y durante un juego te devuelve al juego en vez de sacarte. Tus otras apps siguen en Retro Ajustes → Otras apps.")

@@ -574,8 +574,10 @@ emojis como iconos (decisión del usuario):
 - **Home durante un juego vuelve al juego** (`RetroArchCmd.kt`): Android se queda con Home (el del Pro Controller en
   Android 11, el del mando a distancia en todos), así que RetroStick, como pantalla de inicio, vuelve a poner
   RetroArch delante y avisa de que el menú está en Captura (Switch) o PS (DualSense). RetroStick pide una vez ser la
-  pantalla de inicio; Retro Ajustes → Inicio → «Arrancar con RetroStick» lo cambia (si es la pantalla de inicio,
-  abre la de Android para elegir otra; si no, activa o quita que se abra solo al encender, `BootReceiver`).
+  pantalla de inicio; Retro Ajustes → Inicio → «Usar RetroStick como pantalla de inicio» lo cambia
+  con la ventana de Android (marcar: «¿Quieres establecer a RetroStick…?»; desmarcar: la de aplicación de inicio).
+  Abrirse solo al encender (`BootReceiver`) solo funciona hasta Android 9 y sigue esa misma casilla.
+- Al entrar a RetroStick (abrirlo o con Home) el cursor está en la pestaña de la consola, no en el juego.
   «Otras apps» abre FLauncher o, si no está, el launcher que haya. No se puede abrir el menú de RetroArch desde fuera:
   su versión de Android no trae órdenes por red, y un servicio de accesibilidad que captura Home rompe la cruceta.
 
