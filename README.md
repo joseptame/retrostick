@@ -565,6 +565,13 @@ emojis como iconos (decisión del usuario):
   mostrar cuando ya está al día (Retro Ajustes tiene 15 tarjetas: no caben más sin desplazamiento).
 - **Al publicar una versión con algo que contar, añadir su `Release` en `News.RELEASES`.**
 
+### 8.2h Retro Ajustes → Inicio (launcher 1.27)
+- Pantalla completa (`HomeSetupActivity`, diseño A de https://claude.ai/artifact/EhFhiHHwwGfyq7AXRmJ6Kp): a la izquierda
+  la vista (Carátulas / Lista) y «Usar RetroStick como pantalla de inicio»; a la derecha una tarjeta por pestaña con
+  su logo y sus juegos. [X] la enciende o la apaga; [△]/Y la levanta para moverla con la cruceta ([X] suelta, [O]
+  deshace). «Seguir jugando» va siempre la primera. Se guarda al momento (`HomeTabs.kt`: `recentTab`,
+  `hiddenConsoles`, `consoleOrder` en las preferencias `home`) y el inicio lo aplica al volver.
+
 ### 8.2g Sticks con Android 11 y el botón Home (launcher 1.26)
 - Mi TV Stick 4K (Android 11): los mandos llegan con los códigos estándar de Android. Antes de cada juego,
   `PadProfiles.kt` escribe el perfil del Pro Controller para Android 11, aparta los de Android 9 y pone los atajos

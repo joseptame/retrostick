@@ -365,6 +365,7 @@ class MainActivity : Activity() {
         Manuals.load(this)
 
         homeTabs = computeHomeTabs()
+        shownListMode = listMode
         buildTabs()
         buildSettings()
         // Only on a cold start (boot, reinstall), not when coming back from a game.
@@ -460,6 +461,14 @@ class MainActivity : Activity() {
             )
         }
         padStyle = forcedPadStyle ?: StickStatus.firstPadStyle()
+        // Back from Retro Ajustes → Inicio: its tabs, order and view
+        if (homeTabs.isNotEmpty() && computeHomeTabs() != homeTabs) applyHomeTabs()
+        if (listMode != shownListMode) {
+            shownListMode = listMode
+            mediaFocus = -1
+            if (::homeList.isInitialized) homeList.leaveMedia()
+        }
+        if (settings.size > VIEW_SETTING) settings[VIEW_SETTING].subtitle = homeLabel()
         reload()
         getSystemService(InputManager::class.java).registerInputDeviceListener(inputListener, main)
         getSystemService(ConnectivityManager::class.java).registerDefaultNetworkCallback(networkCallback)
@@ -590,11 +599,8 @@ class MainActivity : Activity() {
     }
 
     /** The tabs as chosen in Retro Ajustes → Inicio: «Seguir jugando» first, then the consoles not hidden (at least one). */
-    private fun computeHomeTabs(): List<Console> {
-        val hidden = homePrefs.getStringSet("hiddenConsoles", emptySet()).orEmpty()
-        val consoles = CONSOLES.filter { it.id !in hidden }.ifEmpty { CONSOLES }
-        return listOfNotNull(RECENT.takeIf { homePrefs.getBoolean("recentTab", true) }) + consoles
-    }
+    /** Chosen in Retro Ajustes → Inicio (HomeSetupActivity): which tabs, in which order. */
+    private fun computeHomeTabs(): List<Console> = HomeTabs.tabs(this)
 
     /** Applies a new choice of tabs: the row is rebuilt and every tab starts on its first game. */
     private fun applyHomeTabs() {
@@ -652,46 +658,6 @@ class MainActivity : Activity() {
     }
 
     /** Retro Ajustes → Inicio: the view (covers / list), «Seguir jugando» and which consoles show as tabs. */
-    private fun showHomeSetup() {
-        // The tabs, then (last) whether RetroStick opens by itself when the stick starts (BootReceiver)
-        // RetroStick as the home screen: what the stick starts with and Home opens. Only Android can change it, in its
-        // own window; opening by itself at boot (BootReceiver) only works up to Android 9, so it follows this choice
-        val home = isHome()
-        val labels = arrayOf("Seguir jugando") + CONSOLES.map { it.name }.toTypedArray() + "Usar RetroStick como pantalla de inicio"
-        val hidden = homePrefs.getStringSet("hiddenConsoles", emptySet()).orEmpty()
-        val checked = booleanArrayOf(homePrefs.getBoolean("recentTab", true)) + CONSOLES.map { it.id !in hidden }.toBooleanArray() + home
-        AlertDialog.Builder(this, R.style.Dialog_RetroStick)
-            .setTitle("Inicio · pestañas y arranque")
-            .setMultiChoiceItems(labels, checked) { _, which, on -> checked[which] = on }
-            .setPositiveButton("Guardar") { _, _ ->
-                val want = checked.last()
-                BootReceiver.setEnabled(this, want)
-                if (want != home) {
-                    Toast.makeText(this, if (want) "Elige RetroStick como aplicación de inicio" else "Elige el otro launcher como aplicación de inicio", Toast.LENGTH_LONG).show()
-                    runCatching { if (want) homeRoleIntent()?.let { startActivityForResult(it, 0) } ?: open(Intent(Settings.ACTION_HOME_SETTINGS)) else open(Intent(Settings.ACTION_HOME_SETTINGS)) }
-                        .onFailure { toast(R.string.app_missing) }
-                }
-                if (checked.drop(1).dropLast(1).none { it }) {
-                    Toast.makeText(this, "Deja al menos una consola", Toast.LENGTH_SHORT).show()
-                    return@setPositiveButton
-                }
-                homePrefs.edit()
-                    .putBoolean("recentTab", checked[0])
-                    .putStringSet("hiddenConsoles", CONSOLES.filterIndexed { i, _ -> !checked[i + 1] }.map { it.id }.toSet())
-                    .apply()
-                applyHomeTabs()
-                settings[VIEW_SETTING].subtitle = homeLabel()
-                render()
-            }
-            .setNeutralButton(if (listMode) "Ver en carátulas" else "Ver en lista") { _, _ ->
-                toggleView()
-                settings[VIEW_SETTING].subtitle = homeLabel()
-                render()
-            }
-            .setNegativeButton("Cerrar", null)
-            .showForPad()
-    }
-
     /** "Carátulas · 10 pestañas" */
     private fun homeLabel(): String {
         val n = homeTabs.size
@@ -1200,7 +1166,7 @@ class MainActivity : Activity() {
                 // Heard at the new volume (nothing when switched off)
                 keySound = Sounds.Sound.OPEN
             },
-            Setting("🏠", getString(R.string.set_view), homeLabel()) { showHomeSetup() },
+            Setting("🏠", getString(R.string.set_view), homeLabel()) { open(Intent(this, HomeSetupActivity::class.java)) },
             Setting("✨", getString(R.string.set_boot), bootLabel()) { showBootScreens() },
             Setting("🏆", getString(R.string.set_trophies), trophiesLabel()) {
                 // Signed in: straight to Mis logros (signing out is in there); else the login screen (keyboard or QR)
@@ -2012,8 +1978,12 @@ class MainActivity : Activity() {
             .showForPad()
     }
 
+    /** The view the screen is drawn in (Retro Ajustes → Inicio changes the preference while away) */
+    private var shownListMode = false
+
     private fun toggleView() {
         listMode = !listMode
+        shownListMode = listMode
         mediaFocus = -1
         if (::homeList.isInitialized) homeList.leaveMedia()
         if (settings.size > VIEW_SETTING) settings[VIEW_SETTING].subtitle = homeLabel()

@@ -13,6 +13,10 @@ object News {
 
     /** Newest first. */
     val RELEASES = listOf(
+        Release(90, "1.27.0", listOf(
+            Item(R.drawable.ic_settings, "Elige y ordena tus consolas",
+                "Retro Ajustes → Inicio es ahora una pantalla con una tarjeta por consola: enciéndelas o apágalas y cámbialas de sitio con Y. También eliges la vista y con qué arranca el stick."),
+        )),
         Release(87, "1.26.2", listOf(
             Item(R.drawable.ic_resume, "Home durante un juego",
                 "Te devuelve al juego en vez de sacarte. El menú del juego está en Captura (mando de Switch) o PS (DualSense)."),
