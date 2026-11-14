@@ -13,6 +13,14 @@ object News {
 
     /** Newest first. */
     val RELEASES = listOf(
+        Release(91, "1.27.1", listOf(
+            Item(R.drawable.ic_gamepad, "También en teles Android",
+                "El asistente prepara RetroArch aunque ya estuviera instalado, y Nintendo 64 usa el emulador adecuado para gráficas más modernas."),
+            Item(R.drawable.ic_cloud_down, "PlayStation para todos",
+                "Los juegos de PlayStation de RetroShop se pueden descargar desde cualquier cuenta de la webapp."),
+            Item(R.drawable.ic_star, "Neo Geo sin BIOS propia",
+                "Si no tienes la BIOS de Neo Geo, RetroShop la trae con tu primer juego. Sin la de consola, los juegos van como en la recreativa: mete crédito con Select."),
+        )),
         Release(90, "1.27.0", listOf(
             Item(R.drawable.ic_settings, "Elige y ordena tus consolas",
                 "Retro Ajustes → Inicio es ahora una pantalla con una tarjeta por consola: enciéndelas o apágalas y cámbialas de sitio con Y. También eliges la vista y con qué arranca el stick."),

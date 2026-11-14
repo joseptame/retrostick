@@ -287,6 +287,11 @@ fun launchInRetroArch(context: Context, game: Game, resume: Resume = Resume.TITL
     RetroAchievements.applyGame(game)
     // The consoles' boot screens (their BIOS), on or off in Retro Ajustes
     Bios.applyOptions(context)
+    // Neo Geo: home console or arcade, as the BIOS allows (Bios.neoGeoMode)
+    if (game.console.id == "neogeo") {
+        val opt = File("$SDCARD/RetroArch/config/FinalBurn Neo/FinalBurn Neo.opt")
+        if (opt.isFile) writeRetroArchCfg(mapOf("fbneo-neogeo-mode" to Bios.neoGeoMode()), opt)
+    }
     // PlayStation: more than two players needs the Multitap (and a game that supports it). On only when 3+ pads are
     // connected: some one / two player games don't find their pad with a Multitap plugged in.
     if (game.console.id == "psx") {
@@ -303,7 +308,7 @@ fun launchInRetroArch(context: Context, game: Game, resume: Resume = Resume.TITL
         .setComponent(ComponentName(RETROARCH_PACKAGE, RETROARCH_ACTIVITY))
         .putExtra("ROM", game.file.absolutePath)
         // A stick set up by the assistant: the cores of «RetroStick Núcleos» (Setup.kt); otherwise RetroArch's own
-        .putExtra("LIBRETRO", Setup.corePath(context, game.console.core) ?: "$dataDir/cores/${game.console.core}")
+        .putExtra("LIBRETRO", coreFor(context, game.console, dataDir))
         .putExtra("CONFIGFILE", retroArchCfg().path)
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
     // What Home during the game comes back to (RetroArchCmd.backToGame)
@@ -316,3 +321,22 @@ fun launchInRetroArch(context: Context, game: Game, resume: Resume = Resume.TITL
 fun displayRefreshRate(context: Context): Float? =
     context.getSystemService(android.hardware.display.DisplayManager::class.java)
         ?.getDisplay(android.view.Display.DEFAULT_DISPLAY)?.refreshRate?.takeIf { it in 23f..121f }
+
+
+/**
+ * The core file for [console]: «RetroStick Núcleos» on sticks set up by the assistant, else RetroArch's own. Nintendo
+ * 64 has two builds: GLES2 (Mali-450 sticks) and GLES3, used where the GPU has OpenGL ES 3 — the GLES2 one crashes on
+ * those (Mali-G52 TV, 2026-11-14), and falls back to GLES2 when the GLES3 one isn't there.
+ */
+fun coreFor(context: Context, console: Console, retroArchDataDir: String): String {
+    val gles3 = console.core.replace("_gles2_", "_gles3_").takeIf { it != console.core && glesMajor(context) >= 3 }
+    gles3?.let { core ->
+        Setup.corePath(context, core)?.let { return it }
+        File("$retroArchDataDir/cores/$core").takeIf { it.isFile }?.let { return it.path }
+    }
+    return Setup.corePath(context, console.core) ?: "$retroArchDataDir/cores/${console.core}"
+}
+
+/** OpenGL ES version of the device's GPU: 2 on the Mali-450 sticks, 3 on newer GPUs. */
+fun glesMajor(context: Context): Int =
+    (context.getSystemService(android.app.ActivityManager::class.java)?.deviceConfigurationInfo?.reqGlEsVersion ?: 0x20000) shr 16

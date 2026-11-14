@@ -35,8 +35,9 @@ object Bios {
         // Two TMSS dumps: the one in libretro's docs and the one in libretro-database's System.dat (CRC 3F888CF4)
         Entry("Mega Drive", "bios_MD.bin", setOf("45e298905a08f9cfb38fd504cd6dbc84", "d3293ebaaa7f4eb2a6766b68a0fb4609")),
         // Needed to play at all. FinalBurn Neo's current 000-lo.lo, sfix.sfix, sm1.sm1 (older sets don't start any
-        // game) and the European AES BIOS; FinalBurn Neo finds it next to the games (and in system/fbneo).
-        Entry("Neo Geo", "neogeo.zip", emptySet(), zipCrcs = setOf("5a86cff2", "c2ea0cfd", "94416d67", "d27a71f1"),
+        // game); with the European AES BIOS games run as on the home console, without it as the European arcade
+        // (MVS: insert a coin with Select) — [neoGeoMode]. FinalBurn Neo finds it next to the games (and in system/fbneo).
+        Entry("Neo Geo", "neogeo.zip", emptySet(), zipCrcs = setOf("5a86cff2", "c2ea0cfd", "94416d67"),
             copies = listOf(File("$SDCARD/ROMs/neogeo/neogeo.zip"), File("$SDCARD/RetroArch/system/fbneo/neogeo.zip"))),
     )
 
@@ -61,6 +62,17 @@ object Bios {
             md5(f) in e.md5 -> State.OK
             else -> State.UNKNOWN
         }
+    }
+
+    /**
+     * FinalBurn Neo's Neo Geo mode for the BIOS this stick has: the European home console (AES) when its BIOS is in
+     * neogeo.zip (crc d27a71f1, the user's own set), else the European arcade (MVS, sp-s3.sp1) — the BIOS RetroShop
+     * brings from Cylum's collection has no AES one (2026-11-14).
+     */
+    fun neoGeoMode(): String {
+        val zip = listOf(File("$SDCARD/ROMs/neogeo/neogeo.zip"), File("$SDCARD/RetroArch/system/fbneo/neogeo.zip"), File(SYSTEM_DIR, "neogeo.zip"))
+            .firstOrNull { it.isFile } ?: return "AES_EUR"
+        return if ("d27a71f1" in zipCrcs(zip)) "AES_EUR" else "MVS_EUR"
     }
 
     private fun zipCrcs(f: File): Set<String> = runCatching {

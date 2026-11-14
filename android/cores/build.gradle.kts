@@ -14,8 +14,8 @@ android {
         applicationId = "com.retrostick.cores"
         minSdk = 26
         targetSdk = 28
-        versionCode = 1
-        versionName = "2026.11.13"
+        versionCode = 2
+        versionName = "2026.11.14"
         ndk { abiFilters += "armeabi-v7a" }
     }
 

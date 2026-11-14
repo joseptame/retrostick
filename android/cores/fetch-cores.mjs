@@ -9,6 +9,8 @@ import { join } from 'node:path'
 const BUILDBOT = 'https://buildbot.libretro.com/nightly/android/latest/armeabi-v7a'
 export const CORES = [
   'fceumm', 'snes9x2010', 'gambatte', 'mgba', 'genesis_plus_gx', 'mupen64plus_next_gles2', 'fbneo', 'pcsx_rearmed',
+  // Nintendo 64 on GPUs with OpenGL ES 3 (Mali-G52 TVs…): the GLES2 build crashes there (GLideN64, 2026-11-14)
+  'mupen64plus_next_gles3',
 ]
 
 const out = join(import.meta.dirname, 'src/main/jniLibs/armeabi-v7a')

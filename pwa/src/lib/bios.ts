@@ -69,7 +69,8 @@ export const BIOS: BiosEntry[] = [
   // (older sets carry e09e253c / 354029fc / 97cf998b and no game starts) and the European AES BIOS (neo-epo.bin).
   {
     console: 'Neo Geo', file: 'neogeo.zip', md5: [],
-    zipCrcs: ['5a86cff2', 'c2ea0cfd', '94416d67', 'd27a71f1'],
+    // With the European AES BIOS (d27a71f1) games run as the home console; without it, as the arcade (MVS): both fine
+    zipCrcs: ['5a86cff2', 'c2ea0cfd', '94416d67'],
     shows: 'Imprescindible: sin ella no arranca ningún juego de Neo Geo',
   },
 ]

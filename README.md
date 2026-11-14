@@ -565,6 +565,17 @@ emojis como iconos (decisión del usuario):
   mostrar cuando ya está al día (Retro Ajustes tiene 15 tarjetas: no caben más sin desplazamiento).
 - **Al publicar una versión con algo que contar, añadir su `Release` en `News.RELEASES`.**
 
+### 8.2i Teles Android y gráficas modernas (launcher 1.27.1)
+- El asistente se ejecuta si falta la configuración de RetroStick (`RetroArch/config/FCEUmm/nes.cfg`), aunque
+  RetroArch tenga su propio `retroarch.cfg`: en una Mi TV con Android 10 no se ejecutaba y todo salía en negro.
+- Nintendo 64: «RetroStick Núcleos» trae también `mupen64plus_next_gles3`; el launcher lo usa donde la gráfica tiene
+  OpenGL ES 3 (`coreFor`, `glesMajor`). La versión GLES2 se cae con GLideN64 en una Mali-G52 (probado 2026-11-14).
+- Neo Geo: RetroShop baja la BIOS de la colección de Cylum («BIOS Files/neogeo.zip») con el primer juego si no hay
+  ninguna. No trae la AES europea, así que `Bios.neoGeoMode()` pone FinalBurn Neo en `MVS_EUR` (recreativa: crédito
+  con Select); con la BIOS del usuario sigue en `AES_EUR`.
+- PlayStation (colección restringida) se descarga con la cuenta de archive.org del administrador para cualquier
+  usuario de la webapp (`api/download.ts`).
+
 ### 8.2h Retro Ajustes → Inicio (launcher 1.27)
 - Pantalla completa (`HomeSetupActivity`, diseño A de https://claude.ai/artifact/EhFhiHHwwGfyq7AXRmJ6Kp): a la izquierda
   la vista (Carátulas / Lista) y «Usar RetroStick como pantalla de inicio»; a la derecha una tarjeta por pestaña con

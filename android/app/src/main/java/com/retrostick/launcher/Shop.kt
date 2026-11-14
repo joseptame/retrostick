@@ -303,6 +303,20 @@ object ShopDownloads {
         val ext = game.file.substringAfterLast('.').lowercase()
         val target = File(dir, if (catalog.console.id == "psx") game.file.substringAfterLast('/') else "${game.name}.$ext")
         fetchTo(catalog, game.file, game.size, target) { job.done = it; tick() }
+        if (catalog.console.id == "neogeo") neoGeoBios(catalog, game.file, dir)
+    }
+
+    /**
+     * Neo Geo games need neogeo.zip (the BIOS) beside them. A stick without one (no BIOS in the user's Drive, e.g. a
+     * friend's) gets the one Cylum's collection keeps in «BIOS Files», next to the games' folder. Best effort: a
+     * missing or failed BIOS doesn't spoil the game's download.
+     */
+    private fun neoGeoBios(catalog: ShopCatalog, gameFile: String, dir: File) {
+        val target = File(dir, NEOGEO_BIOS)
+        if (target.isFile || File("$SDCARD/RetroArch/system/fbneo/$NEOGEO_BIOS").isFile) return
+        val folder = gameFile.substringBeforeLast('/', "")
+        val bios = if (folder.isEmpty()) "BIOS Files/$NEOGEO_BIOS" else "$folder/BIOS Files/$NEOGEO_BIOS"
+        runCatching { fetchTo(catalog, bios, 0L, target) {} }.onFailure { Log.w("RetroStick", "Neo Geo BIOS not downloaded", it) }
     }
 
     private var lastTick = 0L
