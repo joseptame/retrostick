@@ -4,7 +4,7 @@ import { BIOS, isKnownBios, type BiosEntry } from '../lib/bios'
 import { listFolder, trashFile, uploadResumable, type DriveFile } from '../lib/drive'
 import { Icon } from './icons'
 
-/** Stick → Pantallas de inicio: the user's own BIOS, one per console, uploaded to Retro/Config/bios. */
+/** Stick → BIOS de consolas: the user's own BIOS, one per console, uploaded to Retro/Config/bios. */
 export function BiosSection({ state }: { state: AppState }) {
   const folder = state.folders?.bios
   const [files, setFiles] = useState<DriveFile[] | null>(null)
@@ -55,7 +55,7 @@ export function BiosSection({ state }: { state: AppState }) {
 
   return (
     <>
-      <h3 className="sec2">Pantallas de inicio</h3>
+      <h3 className="sec2">BIOS de consolas</h3>
       <p className="lead">
         <Icon name="sparkle" />
         <span>

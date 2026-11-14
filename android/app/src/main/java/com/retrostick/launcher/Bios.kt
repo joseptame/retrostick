@@ -9,7 +9,7 @@ import java.security.MessageDigest
  * The consoles' boot screens (the Game Boy's Nintendo logo, the PlayStation's Sony one…) come from their BIOS /
  * boot ROM. RetroStick never downloads one: the user uploads their own from the phone app (Stick → Pantallas de
  * inicio) to Drive Retro/Config/bios, each sync copies them to RetroArch/system, and before each game the launcher
- * turns each core's "boot screen" option on or off (Retro Ajustes → Pantallas de inicio).
+ * turns each core's "boot screen" option on or off (Retro Ajustes → BIOS de consolas).
  */
 object Bios {
     /**

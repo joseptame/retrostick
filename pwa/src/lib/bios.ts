@@ -1,6 +1,6 @@
 /**
  * The consoles' boot screens need each console's BIOS / boot ROM. RetroStick never downloads one: the user
- * uploads their own here (Stick → Pantallas de inicio) to Retro/Config/bios, and the stick copies them to
+ * uploads their own here (Stick → BIOS de consolas) to Retro/Config/bios, and the stick copies them to
  * RetroArch/system. Same table as android/.../Bios.kt.
  */
 export interface BiosEntry {

@@ -46,7 +46,7 @@ private const val SETTINGS_COLUMNS = 5
 private const val SOUNDS_SETTING = 11
 /** Index of the "Inicio" card (after Sonidos): view, «Seguir jugando» and which consoles show as tabs. */
 private const val VIEW_SETTING = 12
-/** Index of the "Pantallas de inicio" card (the consoles' boot screens, from the user's BIOS). */
+/** Index of the "BIOS de consolas" card (the consoles' boot screens, from the user's BIOS). */
 private const val BOOT_SETTING = 13
 /** Index of the "Mis logros" card (RetroAchievements account and profile). */
 private const val RA_SETTING = 14
@@ -1986,7 +1986,7 @@ class MainActivity : Activity() {
     private fun showBootScreens() {
         val on = Bios.enabled(this)
         val text = buildString {
-            appendLine("Antes de cada juego se ve la pantalla de inicio de su consola (el logo de Nintendo en Game Boy, el de Sony en PlayStation…). Cada una necesita la BIOS de tu propia consola: súbela desde la app del móvil, en Stick → Pantallas de inicio.")
+            appendLine("Antes de cada juego se ve la pantalla de inicio de su consola (el logo de Nintendo en Game Boy, el de Sony en PlayStation…). Cada una necesita la BIOS de tu propia consola: súbela desde la app del móvil, en Stick → BIOS de consolas.")
             appendLine()
             Bios.states().forEach { (e, s) ->
                 appendLine(when (s) {
