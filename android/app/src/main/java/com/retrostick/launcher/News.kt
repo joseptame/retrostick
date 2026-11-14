@@ -13,6 +13,10 @@ object News {
 
     /** Newest first. */
     val RELEASES = listOf(
+        Release(95, "1.28.0", listOf(
+            Item(R.drawable.ic_news, "Juegos traducidos al español",
+                "En la ficha de muchos juegos de NES, Super Nintendo, Game Boy, Mega Drive y Master System aparece «Idioma»: elige una traducción de aficionados y el juego se abre en español. Puedes volver al original cuando quieras."),
+        )),
         Release(94, "1.27.4", listOf(
             Item(R.drawable.ic_settings, "PlayStation sin tramado",
                 "En la ficha de cada juego de PlayStation puedes quitar el tramado, esa rejilla de puntos sobre los colores: la imagen se ve más limpia."),

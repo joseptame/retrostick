@@ -308,7 +308,8 @@ fun launchInRetroArch(context: Context, game: Game, resume: Resume = Resume.TITL
     }
     val intent = Intent(Intent.ACTION_MAIN)
         .setComponent(ComponentName(RETROARCH_PACKAGE, RETROARCH_ACTIVITY))
-        .putExtra("ROM", game.file.absolutePath)
+        // A Spanish translation chosen in Detalles → Idioma (Translations): same name, so same saves and cheats
+        .putExtra("ROM", (Translations.romFor(context, game) ?: game.file).absolutePath)
         // A stick set up by the assistant: the cores of «RetroStick Núcleos» (Setup.kt); otherwise RetroArch's own
         .putExtra("LIBRETRO", coreFor(context, game.console, dataDir))
         .putExtra("CONFIGFILE", retroArchCfg().path)

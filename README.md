@@ -568,6 +568,17 @@ emojis como iconos (decisión del usuario):
   mostrar cuando ya está al día (Retro Ajustes tiene 15 tarjetas: no caben más sin desplazamiento).
 - **Al publicar una versión con algo que contar, añadir su `Release` en `News.RELEASES`.**
 
+### 8.2j Traducciones al español (launcher 1.28)
+- Detalles → **Idioma** (`TranslationsActivity`, diseño https://claude.ai/artifact/MonZppVqKizExqBcoxdndv): las
+  traducciones de aficionados de archive.org «Compilaciones Traducciones al Español (2024/08)», ROM ya parcheada en
+  un zip por traducción. La webapp sirve la lista por consola (`pwa/public/db/trans-<consola>.json`, se regenera con
+  `npx tsx scripts/build-translations.ts`); el juego encuentra las suyas por título (`looseKey(displayTitle)`).
+  NES, SNES, GB, GBC, Mega Drive y Master System; completas («T+») primero.
+- Elegir una baja la ROM traducida a `Traducciones/<consola>/<nombre del juego>.<ext>`: mismo nombre que el
+  original, así RetroArch usa las mismas partidas, estados y trucos; la ROM de `ROMs/` y Drive no se tocan.
+  `launchInRetroArch` abre `Translations.romFor()` si hay una. «Original» la borra. Los logros solo cuentan en las
+  versiones que RetroAchievements conoce (casi nunca las traducciones).
+
 ### 8.2i Teles Android y gráficas modernas (launcher 1.27.1)
 - El asistente se ejecuta si falta la configuración de RetroStick (`RetroArch/config/FCEUmm/nes.cfg`), aunque
   RetroArch tenga su propio `retroarch.cfg`: en una Mi TV con Android 10 no se ejecutaba y todo salía en negro.

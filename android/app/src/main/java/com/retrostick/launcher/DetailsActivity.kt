@@ -46,6 +46,9 @@ class DetailsActivity : Activity() {
     private lateinit var finishedAction: TextView
     /** The Trucos on for this game (their names), read on each build */
     private var cheatNames = listOf<String>()
+    /** Spanish translations of this game (Translations), null while the list isn't on the stick; and the one in use */
+    private var translations: List<Translations.Translation>? = null
+    private var translation: Translations.Translation? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -56,12 +59,23 @@ class DetailsActivity : Activity() {
         build()
         col = cards.indexOfFirst { it.enabled }.coerceAtLeast(0)
         render()
+        // The list of translations, fetched the first time (or a week later): the Idioma button shows once it's known
+        if (Translations.supports(game.console)) Thread {
+            Translations.refreshIndex(this, game.console)
+            runOnUiThread {
+                if (isDestroyed || Translations.cachedFor(this, game).orEmpty().map { it.file } == translations.orEmpty().map { it.file }) return@runOnUiThread
+                val (r, c) = row to col
+                build(); row = r; col = c.coerceAtMost(if (r == 0) cards.size - 1 else actions.size - 1); render()
+            }
+        }.start()
     }
 
     // ---- Layout ----
 
     private fun build() {
         cheatNames = if (Cheats.supports(game.console)) Cheats.chosenNames(this, game) else emptyList()
+        translations = Translations.cachedFor(this, game)
+        translation = Translations.chosen(this, game)?.let { f -> translations?.firstOrNull { it.file == f } }
         val info = Fichas.cached(this, game.title, game.console.id)?.info
         val ra = RetroAchievements.cached(game)?.takeIf { RetroAchievements.supports(game.console) && RetroAchievements.account(this) != null }
 
@@ -86,6 +100,7 @@ class DetailsActivity : Activity() {
             game.region?.let { first.addView(chip(it, "#12FFFFFF", R.color.text)) }
             val langs = Languages.of(game.file.name)
             if (langs.contains("Español")) first.addView(chip("Español", "#244ADE80", R.color.ok))
+            else if (translation != null) first.addView(chip("Traducido al español", "#244ADE80", R.color.ok))
             addView(first)
             if (cheatNames.isNotEmpty()) addView(LinearLayout(this@DetailsActivity).apply {
                 addView(chip(if (cheatNames.size == 1) "1 truco activo" else "${cheatNames.size} trucos activos", "#29EAB308", R.color.cheat))
@@ -154,6 +169,19 @@ class DetailsActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             addView(section("Jugar"))
             addView(cardRow, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
+            // Played translated: said where you choose how to play
+            translation?.let { t ->
+                addView(text(10f, R.color.text).apply {
+                    text = android.text.SpannableStringBuilder("Se juega en español:  ").apply {
+                        setSpan(android.text.style.StyleSpan(Typeface.BOLD), 0, length, 0)
+                        val s = length; append("traducción de ${t.by}  ·  ${if (t.complete) "completa" else "antigua o parcial"}")
+                        setSpan(android.text.style.ForegroundColorSpan(getColor(R.color.text_2)), s, length, 0)
+                    }
+                    maxLines = 1; ellipsize = TextUtils.TruncateAt.END; gravity = Gravity.CENTER_VERTICAL
+                    setPadding(dp(10), dp(6), dp(10), dp(6))
+                    background = round(Color.parseColor("#1A4ADE80"), 7).apply { setStroke(1, Color.parseColor("#404ADE80")) }
+                }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(9) })
+            }
             // Trucos on: said where you choose how to play
             if (cheatNames.isNotEmpty()) addView(text(10f, R.color.text).apply {
                 text = android.text.SpannableStringBuilder("Trucos al jugar:  ").apply {
@@ -184,6 +212,9 @@ class DetailsActivity : Activity() {
         if (Cheats.supports(game.console)) {
             val n = cheatNames.size
             actionList += Action(actionView(if (n == 0) "Trucos" else "Trucos · $n ${if (n == 1) "activo" else "activos"}", R.drawable.ic_star)) { openCheats() }
+        }
+        if (!translations.isNullOrEmpty()) {
+            actionList += Action(actionView(translation?.let { "Español · ${it.by}" } ?: "Idioma: original", null)) { openTranslations() }
         }
         if (game.console.id == "psx") {
             ditherAction = actionView(ditherLabel(), null)
@@ -410,11 +441,19 @@ class DetailsActivity : Activity() {
             .putExtra(CheatsActivity.EXTRA_FILE, game.file.path))
     }
 
-    /** Back from Trucos: the chip, the line under Jugar and the button say what's on now. */
+    private fun openTranslations() {
+        Sounds.play(Sounds.Sound.OPEN)
+        startActivity(Intent(this, TranslationsActivity::class.java)
+            .putExtra(TranslationsActivity.EXTRA_CONSOLE, game.console.id)
+            .putExtra(TranslationsActivity.EXTRA_FILE, game.file.path))
+    }
+
+    /** Back from Trucos or Idioma: the chips, the lines under Jugar and the buttons say what's on now. */
     override fun onRestart() {
         super.onRestart()
         val before = cheatNames
-        if ((if (Cheats.supports(game.console)) Cheats.chosenNames(this, game) else emptyList()) == before) return
+        val sameCheats = (if (Cheats.supports(game.console)) Cheats.chosenNames(this, game) else emptyList()) == before
+        if (sameCheats && Translations.chosen(this, game) == translation?.file) return
         val (r, c) = row to col
         build()
         row = r; col = c.coerceAtMost(if (r == 0) cards.size - 1 else actions.size - 1)
