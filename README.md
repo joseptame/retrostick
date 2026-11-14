@@ -551,7 +551,10 @@ emojis como iconos (decisión del usuario):
   sirve la lista de archivos de cada consola (`pwa/public/db/cheats-<consola>.json`, se regenera con
   `npx tsx scripts/build-cheats.ts`); el stick la guarda una semana, busca los del juego (mismo nombre No-Intro /
   Redump y sus variantes «(Game Genie)», «(Code Breaker)»…; si no hay, los de otra versión del mismo título, con
-  aviso) y los baja de GitHub una vez (`files/cheats/<consola>/<juego>.json`). Neo Geo no tiene (FinalBurn Neo usa
+  aviso, prefiriendo una región que comparta país, p. ej. «Europe» → «Europe, Australia»). Las demos, betas,
+  prototipos y revisiones solo valen para ese mismo disco: «Tekken 3 (Europe) (Demo)» es un disco de demos con
+  trucos de Tony Hawk's Pro Skater 2 y otros, y salía en Tekken 3 hasta la 1.27.1. Lo que se guardó antes se vuelve
+  a buscar (`MATCH_VERSION`). Los baja de GitHub una vez (`files/cheats/<consola>/<juego>.json`). Neo Geo no tiene (FinalBurn Neo usa
   los suyos).
 - Los elegidos se guardan por juego (preferencias `cheats`, solo en ese stick). Al abrir el juego, `Cheats.apply`
   escribe `RetroArch/cheats/<núcleo>/<rom>.cht` solo con esos activados (y los códigos maestro de GBA), con
