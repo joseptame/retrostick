@@ -561,7 +561,8 @@ emojis como iconos (decisión del usuario):
 
 ### 8.2f Novedades (launcher 1.26)
 - `News.kt` tiene, por versión, 3–4 líneas de lo que trae. La primera vez que se abre el inicio tras actualizar,
-  `NewsActivity` las enseña (nunca en un stick recién instalado). Retro Ajustes → Novedades las vuelve a mostrar.
+  `NewsActivity` las enseña (nunca en un stick recién instalado). Retro Ajustes → Actualizar launcher las vuelve a
+  mostrar cuando ya está al día (Retro Ajustes tiene 15 tarjetas: no caben más sin desplazamiento).
 - **Al publicar una versión con algo que contar, añadir su `Release` en `News.RELEASES`.**
 
 ### 8.2g Sticks con Android 11 y el botón Home (launcher 1.26)
@@ -573,7 +574,9 @@ emojis como iconos (decisión del usuario):
 - **Home durante un juego vuelve al juego** (`RetroArchCmd.kt`): Android se queda con Home (el del Pro Controller en
   Android 11, el del mando a distancia en todos), así que RetroStick, como pantalla de inicio, vuelve a poner
   RetroArch delante y avisa de que el menú está en Captura (Switch) o PS (DualSense). RetroStick pide una vez ser la
-  pantalla de inicio; «Otras apps» abre el launcher que hubiera. No se puede abrir el menú de RetroArch desde fuera:
+  pantalla de inicio; Retro Ajustes → Inicio → «Arrancar con RetroStick» lo cambia (si es la pantalla de inicio,
+  abre la de Android para elegir otra; si no, activa o quita que se abra solo al encender, `BootReceiver`).
+  «Otras apps» abre FLauncher o, si no está, el launcher que haya. No se puede abrir el menú de RetroArch desde fuera:
   su versión de Android no trae órdenes por red, y un servicio de accesibilidad que captura Home rompe la cruceta.
 
 ### 8.3 `status.json`

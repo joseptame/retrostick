@@ -5,7 +5,7 @@ import android.content.Context
 /**
  * Novedades: what each launcher version brings, in a few plain lines. NewsActivity shows the ones not seen yet
  * the first time the home screen opens after an update (never on a brand-new stick), and Retro Ajustes →
- * Novedades shows the latest ones again. Add a Release here with each version that brings something to tell.
+ * Actualizar launcher shows the latest ones again when there is nothing to update. Add a Release here with each version that brings something to tell.
  */
 object News {
     class Item(val icon: Int, val title: String, val text: String)
@@ -13,6 +13,14 @@ object News {
 
     /** Newest first. */
     val RELEASES = listOf(
+        Release(87, "1.26.2", listOf(
+            Item(R.drawable.ic_resume, "Home durante un juego",
+                "Te devuelve al juego en vez de sacarte. El menú del juego está en Captura (mando de Switch) o PS (DualSense)."),
+            Item(R.drawable.ic_settings, "Arrancar con RetroStick o con otro launcher",
+                "Lo eliges en Retro Ajustes → Inicio. Otras apps abre el launcher que tengas."),
+            Item(R.drawable.ic_gamepad, "Sticks con Android 11",
+                "El mando de Switch funciona como en los demás, y los juegos van sin retraso en teles a 59,94 Hz."),
+        )),
         Release(85, "1.26.0", listOf(
             Item(R.drawable.ic_star, "Trucos",
                 "En la ficha de cada juego: vidas infinitas, invencible, tiempo infinito… Eliges cuáles y se activan al jugar. Los logros siguen contando."),
@@ -21,7 +29,7 @@ object News {
             Item(R.drawable.ic_cloud_down, "Sigue la partida en otro stick",
                 "Antes de abrir un juego, el stick trae de Drive la partida que guardaste en el otro."),
             Item(R.drawable.ic_news, "Novedades",
-                "Después de cada actualización verás esta pantalla. Vuelve a verla cuando quieras en Retro Ajustes → Novedades."),
+                "Después de cada actualización verás esta pantalla. Vuelve a verla cuando quieras en Retro Ajustes → Actualizar launcher."),
         )),
     )
 

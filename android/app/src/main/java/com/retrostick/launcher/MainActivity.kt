@@ -652,15 +652,23 @@ class MainActivity : Activity() {
     /** Retro Ajustes → Inicio: the view (covers / list), «Seguir jugando» and which consoles show as tabs. */
     private fun showHomeSetup() {
         // The tabs, then (last) whether RetroStick opens by itself when the stick starts (BootReceiver)
-        val labels = arrayOf("Seguir jugando") + CONSOLES.map { it.name }.toTypedArray() + "Abrir RetroStick al encender el stick"
+        // Starting with RetroStick: it's the home screen (Android's choice), or it opens itself over the other one
+        val home = isHome()
+        val labels = arrayOf("Seguir jugando") + CONSOLES.map { it.name }.toTypedArray() +
+            (if (home) "Arrancar con RetroStick (es la pantalla de inicio)" else "Arrancar con RetroStick al encender el stick")
         val hidden = homePrefs.getStringSet("hiddenConsoles", emptySet()).orEmpty()
         val checked = booleanArrayOf(homePrefs.getBoolean("recentTab", true)) + CONSOLES.map { it.id !in hidden }.toBooleanArray() +
-            BootReceiver.enabled(this)
+            (home || BootReceiver.enabled(this))
         AlertDialog.Builder(this, R.style.Dialog_RetroStick)
             .setTitle("Inicio · pestañas y arranque")
             .setMultiChoiceItems(labels, checked) { _, which, on -> checked[which] = on }
             .setPositiveButton("Guardar") { _, _ ->
                 BootReceiver.setEnabled(this, checked.last())
+                // Off while RetroStick is the home screen: only Android can change that, in its own screen
+                if (home && !checked.last()) {
+                    Toast.makeText(this, "Elige el otro launcher como aplicación de inicio", Toast.LENGTH_LONG).show()
+                    runCatching { open(Intent(Settings.ACTION_HOME_SETTINGS)) }
+                }
                 if (checked.drop(1).dropLast(1).none { it }) {
                     Toast.makeText(this, "Deja al menos una consola", Toast.LENGTH_SHORT).show()
                     return@setPositiveButton
@@ -1151,7 +1159,7 @@ class MainActivity : Activity() {
             Setting("👾", getString(R.string.set_retroarch), getString(R.string.set_retroarch_sub)) {
                 launchIntent(RETROARCH_PACKAGE)?.let(::open) ?: toast(R.string.retroarch_missing)
             },
-            Setting("📱", getString(R.string.set_other_apps), getString(R.string.set_other_apps_sub)) {
+            Setting("📱", getString(R.string.set_other_apps), otherAppsLabel()) {
                 (launchIntent(FLAUNCHER_PACKAGE) ?: otherLauncher())?.let(::open) ?: toast(R.string.app_missing)
             },
             Setting("☁️", getString(R.string.set_account), "") {
@@ -1173,7 +1181,11 @@ class MainActivity : Activity() {
                             main.post {
                                 refreshStatus()
                                 if (found) Updater.available?.let(::installUpdate)
-                                else Toast.makeText(this, getString(R.string.update_current, BuildConfig.VERSION_NAME), Toast.LENGTH_SHORT).show()
+                                else {
+                                    // Up to date: what this version brought (Novedades)
+                                    Toast.makeText(this, getString(R.string.update_current, BuildConfig.VERSION_NAME), Toast.LENGTH_SHORT).show()
+                                    open(Intent(this, NewsActivity::class.java).putExtra(NewsActivity.EXTRA_ALL, true))
+                                }
                             }
                         }
                     }
@@ -1191,15 +1203,6 @@ class MainActivity : Activity() {
             Setting("🏆", getString(R.string.set_trophies), trophiesLabel()) {
                 // Signed in: straight to Mis logros (signing out is in there); else the login screen (keyboard or QR)
                 open(Intent(this, if (RetroAchievements.account(this) != null) ProfileActivity::class.java else RaLoginActivity::class.java))
-            },
-            // Which app the stick starts with and Home opens: Android's own «Aplicación de inicio» screen (the TV's
-            // settings don't show it). RetroStick as home: Home during a game comes back to it (RetroArchCmd)
-            Setting("📺", "Pantalla de inicio", homeLabel2()) {
-                runCatching { open(Intent(Settings.ACTION_HOME_SETTINGS)) }.onFailure { toast(R.string.app_missing) }
-            },
-            // What the last updates brought (News.kt), the screen shown once after each update
-            Setting("🆕", "Novedades", "Versión ${BuildConfig.VERSION_NAME}") {
-                open(Intent(this, NewsActivity::class.java).putExtra(NewsActivity.EXTRA_ALL, true))
             },
         )
         settings.forEach { s ->
@@ -1259,7 +1262,6 @@ class MainActivity : Activity() {
         settings[VIEW_SETTING].subtitle = homeLabel()
         settings[BOOT_SETTING].subtitle = bootLabel()
         settings[RA_SETTING].subtitle = trophiesLabel()
-        settings.firstOrNull { it.title == "Pantalla de inicio" }?.subtitle = homeLabel2()
         settings[10].subtitle = Updater.available?.let { getString(R.string.update_available_sub, it.versionName) }
             ?: getString(R.string.update_current, BuildConfig.VERSION_NAME)
         settings[2].subtitle = net?.let { "Conectado por $it" } ?: getString(R.string.offline)
@@ -2222,7 +2224,13 @@ class MainActivity : Activity() {
 
     // ---- Helpers ----
 
-    private fun homeLabel2() = if (isHome()) "RetroStick" else "Otro launcher"
+    /** «Abre FLauncher», or the stick's other launcher by name */
+    private fun otherAppsLabel(): String {
+        if (launchIntent(FLAUNCHER_PACKAGE) != null) return getString(R.string.set_other_apps_sub)
+        val other = otherLauncher()?.component ?: return getString(R.string.set_other_apps_sub)
+        val name = runCatching { packageManager.getApplicationLabel(packageManager.getApplicationInfo(other.packageName, 0)) }.getOrNull()
+        return "Abre ${name ?: "el otro launcher"}"
+    }
 
     private fun isHome(): Boolean =
         packageManager.resolveActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), PackageManager.MATCH_DEFAULT_ONLY)

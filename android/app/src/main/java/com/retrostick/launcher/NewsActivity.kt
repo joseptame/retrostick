@@ -15,7 +15,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 
 /**
- * Novedades (News): what the update brings, once after updating, or again from Retro Ajustes ([EXTRA_ALL]).
+ * Novedades (News): what the update brings, once after updating, or again from Retro Ajustes → Actualizar launcher when up to date ([EXTRA_ALL]).
  * Three at a time, ▲ ▼ for more; OK closes. Design: https://claude.ai/artifact/Tfrr7L7WGvjXJHAov2dHX3
  * (1 · Novedades tras actualizar). Sizes in dp for the 960×540 dp screen.
  */
@@ -65,7 +65,7 @@ class NewsActivity : Activity() {
         val footer = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
             addView(ok, LinearLayout.LayoutParams(-2, dp(38)))
-            addView(text(10f, R.color.text_3).apply { text = "Vuelve a verlas cuando quieras en Retro Ajustes → Novedades" },
+            addView(text(10f, R.color.text_3).apply { text = "Vuelve a verlas cuando quieras en Retro Ajustes → Actualizar launcher" },
                 LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(14) })
         }
         val column = LinearLayout(this).apply {
