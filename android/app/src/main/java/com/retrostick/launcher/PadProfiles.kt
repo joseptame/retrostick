@@ -20,8 +20,12 @@ object PadProfiles {
     private const val DIR = "$SDCARD/RetroArch/autoconfig/android"
     private const val DISABLED = "$SDCARD/RetroArch/autoconfig/disabled"
 
-    /** Android 11 or later: standard codes for the Pro Controller and the DualSense. */
-    val standardCodes get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+    /**
+     * Standard codes for the Pro Controller and the DualSense: asked to the connected pad (StickStatus.viaGenericKl),
+     * as some Android 10 TVs already have them; without one, Android 11 or later.
+     */
+    val standardCodes: Boolean
+        get() = StickStatus.connectedPadViaGenericKl()?.not() ?: (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
 
     /** RetroArch shortcuts, hold Create / − plus L1 = quick save, R1 = load it, R2 = fast-forward (docs/mandos.md). */
     fun hotkeys(): Map<String, String> = if (standardCodes) mapOf(

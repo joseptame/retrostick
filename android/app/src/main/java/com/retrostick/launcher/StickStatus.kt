@@ -104,10 +104,10 @@ object StickStatus {
      */
     fun standardKey(device: InputDevice?, code: Int): Int {
         if (device == null) return code
-        val oldAndroid = Build.VERSION.SDK_INT < Build.VERSION_CODES.R
+        val generic = viaGenericKl(device)
         return when {
-            oldAndroid && device.vendorId == VENDOR_SONY && device.productId == PRODUCT_DUALSENSE -> DUALSENSE_GENERIC_KL[code] ?: code
-            oldAndroid && device.vendorId == VENDOR_NINTENDO && device.productId == PRODUCT_PRO_CONTROLLER -> PRO_CONTROLLER_GENERIC_KL[code] ?: code
+            generic && device.vendorId == VENDOR_SONY && device.productId == PRODUCT_DUALSENSE -> DUALSENSE_GENERIC_KL[code] ?: code
+            generic && device.vendorId == VENDOR_NINTENDO && device.productId == PRODUCT_PRO_CONTROLLER -> PRO_CONTROLLER_GENERIC_KL[code] ?: code
             device.vendorId == VENDOR_NINTENDO -> when (code) {
                 KeyEvent.KEYCODE_BUTTON_A -> KeyEvent.KEYCODE_BUTTON_B
                 KeyEvent.KEYCODE_BUTTON_B -> KeyEvent.KEYCODE_BUTTON_A
@@ -116,6 +116,20 @@ object StickStatus {
             else -> code
         }
     }
+
+    /**
+     * A DualSense or Pro Controller whose buttons come through Generic.kl in HID order (the Mi TV Stick's Android 9)
+     * rather than with the standard codes (Android 11, and some Android 10 TVs: a Mi TV, where ✕ and ○ came out
+     * swapped, 2026-11-15). Told by the pad itself, not by the Android version: only Generic.kl gives it BUTTON_C
+     * (○ on the DualSense, X on the Pro Controller); the standard layout has no C button.
+     */
+    fun viaGenericKl(device: InputDevice): Boolean =
+        runCatching { device.hasKeys(KeyEvent.KEYCODE_BUTTON_C)[0] }.getOrDefault(Build.VERSION.SDK_INT < Build.VERSION_CODES.R)
+
+    /** The connected DualSense / Pro Controller, if any: whether its buttons come through Generic.kl. */
+    fun connectedPadViaGenericKl(): Boolean? = InputDevice.getDeviceIds().asSequence().mapNotNull { InputDevice.getDevice(it) }
+        .firstOrNull { (it.vendorId == VENDOR_SONY && it.productId == PRODUCT_DUALSENSE) || (it.vendorId == VENDOR_NINTENDO && it.productId == PRODUCT_PRO_CONTROLLER) }
+        ?.let { viaGenericKl(it) }
 
     fun shortControllerName(name: String) = when {
         name.startsWith("DualSense") -> "DualSense"
