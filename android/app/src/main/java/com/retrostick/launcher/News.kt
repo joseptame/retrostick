@@ -13,6 +13,10 @@ object News {
 
     /** Newest first. */
     val RELEASES = listOf(
+        Release(101, "1.30.3", listOf(
+            Item(R.drawable.ic_news, "Las descargas siguen mientras juegas",
+                "Si empiezas a jugar mientras RetroShop descarga un juego (o pasa uno de tu Drive al stick), la descarga ya no se para: sigue por detrás y el juego aparece en el inicio al acabar."),
+        )),
         Release(98, "1.30.0", listOf(
             Item(R.drawable.ic_news, "Traducciones para Nintendo 64 y Game Boy Advance",
                 "En la ficha de muchos juegos de N64 y GBA aparece «Idioma»: GoldenEye, Banjo-Kazooie, Golden Sun y muchos más, traducidos al español por aficionados."),

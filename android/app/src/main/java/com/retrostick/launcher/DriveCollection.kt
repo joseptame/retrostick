@@ -130,6 +130,7 @@ object DriveCollection {
             Job(item).also { jobs[item.key] = it }
         }
         notifyListeners()
+        KeepAlive.begin(app)
         DriveSync.runExclusive {
             try {
                 val c = item.console
@@ -174,6 +175,8 @@ object DriveCollection {
                 job.error = e.message ?: e.toString()
                 job.state = State.ERROR
                 Sounds.play(Sounds.Sound.ERROR)
+            } finally {
+                KeepAlive.end(app)
             }
             notifyListeners()
         }

@@ -290,6 +290,8 @@ object ShopDownloads {
         jobs += job
         notifyListeners()
         val app = context.applicationContext
+        // Alive while a game is played meanwhile (KeepAlive): from the queue until it's done
+        KeepAlive.begin(app)
         executor.execute {
             job.state = State.RUNNING
             notifyListeners()
@@ -305,6 +307,8 @@ object ShopDownloads {
                 job.error = e.message ?: e.javaClass.simpleName
                 job.state = State.ERROR
                 Sounds.play(Sounds.Sound.ERROR)
+            } finally {
+                KeepAlive.end(app)
             }
             notifyListeners()
         }
