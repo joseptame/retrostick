@@ -45,6 +45,8 @@ function releases(files: { name: string; size: number }[], ext: RegExp, rank: (r
 
 const rev = (r: string) => Number(r.match(/\(Rev (\d+)\)/i)?.[1] ?? 0)
 const es = releases(await itemFiles(ES_ITEM), /\.zip$/i, (r) => (/\(Spain/.test(r) ? 0 : /\(Europe/.test(r) ? 100 : 200) - rev(r))
+  // Only releases that say they're in Spanish (Redump: «(Spain)» or «Es» in the languages); one USA one in English slipped in
+  .filter((e) => /\(Spain/.test(e.r) || /\((?:[^)]*,)?Es(?:,[^)]*)?\)/.test(e.r))
 const tr = releases(await itemFiles(TR_ITEM), /\.chd$/i, (r) => (/\((E|Europe)\)/.test(r) ? 0 : /\((U|USA|UE)\)/.test(r) ? 1 : 2))
 writeFileSync('public/db/psx-es.json', JSON.stringify({ generated: new Date().toISOString().slice(0, 10), es, tr }))
 console.log(`psx-es.json: ${es.length} en español, ${tr.length} traducciones`)

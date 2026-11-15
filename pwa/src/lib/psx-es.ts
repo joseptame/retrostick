@@ -17,7 +17,6 @@ export const ES_TITLES: Record<string, string> = {
   '007 - El Mundo Nunca es Suficiente': '007 - The World Is Not Enough',
   '50 por 15 - Quiere Ser Millonario': 'Who Wants to Be a Millionaire',
   'A Sangre Fria': 'In Cold Blood',
-  'Adventures of Lomax, The': 'Lomax',
   'Amerzone - El Legado del Explorador': "Amerzone - The Explorer's Legacy",
   'Ape Escape - La Invasion de los Monos': 'Ape Escape',
   'Broken Sword - La Leyenda de los Templarios': 'Broken Sword - The Shadow of the Templars',
