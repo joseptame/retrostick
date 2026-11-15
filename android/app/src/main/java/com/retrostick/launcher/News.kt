@@ -13,6 +13,12 @@ object News {
 
     /** Newest first. */
     val RELEASES = listOf(
+        Release(96, "1.29.0", listOf(
+            Item(R.drawable.ic_news, "PlayStation en español",
+                "En RetroShop, los juegos de PlayStation que salieron en España aparecen en español. En muchos otros puedes elegir una versión hecha por aficionados: con voces y textos, solo textos o mejorada."),
+            Item(R.drawable.ic_settings, "Mando de PlayStation en más teles",
+                "En algunas teles la ✕ y el ○ salían cambiados: ahora RetroStick mira cómo llegan los botones de tu mando."),
+        )),
         Release(95, "1.28.0", listOf(
             Item(R.drawable.ic_news, "Juegos traducidos al español",
                 "En la ficha de muchos juegos de NES, Super Nintendo, Game Boy, Mega Drive y Master System aparece «Idioma»: elige una traducción de aficionados y el juego se abre en español. Puedes volver al original cuando quieras. En RetroShop, la ficha de cada juego te dice si tiene traducción al español antes de descargarlo."),

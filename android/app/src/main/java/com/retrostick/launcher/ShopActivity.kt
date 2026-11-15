@@ -362,7 +362,7 @@ class ShopActivity : Activity() {
             addView(fichaBar, FrameLayout.LayoutParams(0, -1))
         }
         fichaButtonsRow = LinearLayout(this)
-        repeat(3) {
+        repeat(5) {
             val b = text(12.5f, R.color.text).apply {
                 typeface = resources.getFont(R.font.inter_bold)
                 gravity = Gravity.CENTER
@@ -523,10 +523,37 @@ class ShopActivity : Activity() {
 
     /** A Spanish fan translation exists and this release has no Spanish of its own. */
     private fun hasTranslation(g: ShopGame) =
-        g.translation != null || g.looseTitle in translatable && "Español" !in Languages.of(g.file).ifEmpty { Languages.of(g.name) }
+        g.alternatives.any { it.kind != "mej" } || g.looseTitle in translatable && "Español" !in Languages.of(g.file).ifEmpty { Languages.of(g.name) }
 
     /** The game's download, or its translation's (PlayStation: «Descargar traducido»). */
-    private fun jobOf(g: ShopGame) = ShopDownloads.jobFor(g) ?: g.translation?.let { ShopDownloads.jobFor(it) }
+    private fun jobOf(g: ShopGame) = ShopDownloads.jobFor(g) ?: g.alternatives.firstNotNullOfOrNull { ShopDownloads.jobFor(it.game) }
+
+    /** The button of a fan version: «Voces y textos», «Solo textos» (or «Descargar traducido» alone), «Versión mejorada». */
+    private fun altLabel(g: ShopGame, a: ShopAlt) = when (a.kind) {
+        "voz" -> VOICES
+        "mej" -> IMPROVED
+        else -> if (g.alternatives.any { it.kind == "voz" }) TEXTS else DOWNLOAD_TRANSLATED
+    }
+
+    private fun altFor(g: ShopGame, label: String?) = g.alternatives.firstOrNull { altLabel(g, it) == label }
+
+    /** What the button under the cursor downloads, said below the buttons. */
+    private fun choiceNote(g: ShopGame): String {
+        val save = "Se guarda en el stick y se copia a tu Drive."
+        val label = fichaLabels(DOWNLOAD).getOrNull(fichaButton)
+        val alt = altFor(g, label)
+        val langs = Languages.of(g.file).ifEmpty { Languages.of(g.name) }
+        return when {
+            g.alternatives.isEmpty() || label == BACK -> save
+            alt == null && g.alternatives.all { it.kind == "mej" } -> "La versión española original, tal cual salió. $save"
+            alt == null -> "El juego tal cual salió" + (if (langs.isEmpty()) "" else ", en ${langs.joinToString(", ").lowercase()}") + ". $save"
+            alt.kind == "voz" -> "Voces y textos en castellano hechos por aficionados. No es el doblaje oficial."
+            alt.kind == "mej" && alt.voices -> "La versión española con los textos corregidos y voces nuevas hechas por aficionados. Los logros no la reconocen."
+            alt.kind == "mej" -> "La versión española con los textos corregidos por aficionados. Mismas voces. Los logros no la reconocen."
+            g.alternatives.any { it.kind == "voz" } -> "Textos en español hechos por aficionados; las voces se quedan en ${langs.firstOrNull()?.lowercase() ?: "el idioma original"}."
+            else -> "Traducción al español hecha por aficionados. $save"
+        }
+    }
 
     private fun refreshOwned() {
         val files = console.romDir.listFiles()?.filter { it.isFile && !it.name.startsWith(".") }.orEmpty()
@@ -951,7 +978,7 @@ class ShopActivity : Activity() {
             }
             // No Spanish of its own but a fan translation: said here, chosen after downloading (Detalles → Idioma)
             if (hasTranslation(g)) {
-                if (g.translation != null || !Translations.cachedFor(this@ShopActivity, console, g.title, g.name).isNullOrEmpty()) {
+                if (g.alternatives.any { it.kind != "mej" } || !Translations.cachedFor(this@ShopActivity, console, g.title, g.name).isNullOrEmpty()) {
                     append("   ·   ")
                     val start = length
                     append("Traducción al español disponible")
@@ -1033,8 +1060,7 @@ class ShopActivity : Activity() {
                 val have = if (cat != null) ShopDownloads.partialBytes(cat, g) else 0L
                 val total = ShopDownloads.totalBytes(g)
                 if (have > 0) DOWNLOAD to "Descarga a medias: seguirá donde se quedó (${Formatter.formatShortFileSize(this, have)} de ${Formatter.formatShortFileSize(this, total)})."
-                else if (g.translation != null) DOWNLOAD to "«Descargar traducido»: traducción al español hecha por aficionados. Se guarda en el stick y se copia a tu Drive."
-                else DOWNLOAD to "Se guarda en el stick y se copia a tu Drive."
+                else DOWNLOAD to choiceNote(g)
             }
         }
         fichaStatus.text = status
@@ -1056,7 +1082,7 @@ class ShopActivity : Activity() {
             }
             b.setTextColor(if (focus) getColor(R.color.button_text) else getColor(R.color.text))
             val icon = when (labels[i]) {
-                DOWNLOAD, DOWNLOAD_ORIGINAL, DOWNLOAD_TRANSLATED, PASS -> R.drawable.ic_shop_download
+                DOWNLOAD, DOWNLOAD_ORIGINAL, in ALT_LABELS, PASS -> R.drawable.ic_shop_download
                 PLAY -> R.drawable.ic_shop_play
                 OWNED -> R.drawable.ic_shop_check
                 RETRY -> R.drawable.ic_shop_retry
@@ -1108,8 +1134,10 @@ class ShopActivity : Activity() {
         val item = driveItem
         val s = item?.let { DriveCollection.jobFor(it)?.state }
         return if (item != null && s != DriveCollection.State.RUNNING && s != DriveCollection.State.DONE) listOf(first, DELETE_DRIVE, BACK)
-        // A PlayStation game with a fan translation: either one
-        else if (first == DOWNLOAD && ficha?.translation != null) listOf(DOWNLOAD_ORIGINAL, DOWNLOAD_TRANSLATED, BACK)
+        // A PlayStation game with fan versions: the original or any of them
+        else if (first == DOWNLOAD && !ficha?.alternatives.isNullOrEmpty()) ficha!!.let { g ->
+            listOf(if (g.alternatives.any { it.kind != "mej" }) DOWNLOAD_ORIGINAL else DOWNLOAD) + g.alternatives.map { altLabel(g, it) } + BACK
+        }
         else listOf(first, BACK)
     }
 
@@ -1157,7 +1185,7 @@ class ShopActivity : Activity() {
                 when (labels.getOrNull(fichaButton)) {
                     BACK -> return closeFicha()
                     DELETE_DRIVE -> return confirmDeleteFromDrive()
-                    DOWNLOAD_TRANSLATED -> g.translation?.let { download(it) }
+                    in ALT_LABELS -> altFor(g, labels.getOrNull(fichaButton))?.let { download(it.game) }
                     else -> download(g)
                 }
             }
@@ -1361,6 +1389,10 @@ class ShopActivity : Activity() {
         private const val DOWNLOAD = "Descargar"
         private const val DOWNLOAD_ORIGINAL = "Descargar original"
         private const val DOWNLOAD_TRANSLATED = "Descargar traducido"
+        private const val VOICES = "Voces y textos"
+        private const val TEXTS = "Solo textos"
+        private const val IMPROVED = "Versión mejorada"
+        private val ALT_LABELS = setOf(DOWNLOAD_TRANSLATED, VOICES, TEXTS, IMPROVED)
         private const val OWNED = "En el stick"
         private const val RETRY = "Reintentar"
         private const val BACK = "Volver"

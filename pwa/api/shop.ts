@@ -26,7 +26,7 @@ import { baseName, bestVariants, coverUrl, displayTitle, isDemo, looseKey, safeT
 import { DEFAULT_COLLECTIONS } from '../src/lib/recents.js'
 import { genreEs } from '../src/lib/genres.js'
 import { coverFor, loadDb, romsetName, romsetTitle } from '../src/lib/romdb.js'
-import { ES_ITEM, ES_TITLES, TR_ITEM } from '../src/lib/psx-es.js'
+import { ES_ITEM, ES_TITLES, LC_ITEM, TR_ITEM } from '../src/lib/psx-es.js'
 
 // Node.js, not edge: Vercel's edge adds a "Forwarded" header to outgoing requests and archive.org answers
 // those with 400. (Imports carry .js: Node resolves ES modules by exact file name.)
@@ -63,8 +63,11 @@ interface ShopGame {
   i?: string
   /** PlayStation in Spanish: what to download instead of f / d (psx-es.ts) */
   x?: Part[]
-  /** A Spanish fan translation offered besides the original: by whom, total size, its pieces */
-  tr?: { by: string; s: number; x: Part[] }
+  /**
+   * Fan versions offered besides it (psx-es.ts): k «voz» voices and texts, «txt» texts only, «mej» the Spanish
+   * release with its texts corrected (v: voices redone too); total size, its pieces
+   */
+  alt?: { k: string; v?: 1; s: number; x: Part[] }[]
 }
 
 /**
@@ -207,12 +210,26 @@ const fileName = (p: string) => p.slice(p.lastIndexOf('/') + 1)
 interface PsxRelease {
   t: string
   r: string
+  /** eur: RetroShop's own collection; lc / tr / zip: an item of their own (zip: .cue + .bin to unzip) */
+  src: 'eur' | 'lc' | 'tr' | 'zip'
   d: [string, number][]
 }
 
+interface PsxAlt {
+  t: string
+  k: 'voz' | 'txt' | 'mej'
+  v?: 1
+  r: string
+  n: number
+  d: [string, number][]
+  z?: 1
+}
+
+const SRC_ITEM = { lc: LC_ITEM, tr: TR_ITEM, zip: ES_ITEM } as const
+
 /**
- * The European PlayStation list with the Spanish releases instead of the same games (and the Spain-only ones
- * added), and the fan translations offered on the European games that have no Spanish release.
+ * The European PlayStation list with the Spanish releases instead of the same games (the Spain-only ones added),
+ * as CHD wherever there is one, and the fan versions offered besides each game.
  */
 async function spanishPsx(
   games: ShopGame[],
@@ -220,7 +237,7 @@ async function spanishPsx(
   genreIndex: (g: string) => number,
   players: Record<string, number>,
 ) {
-  const db = await fetchData<{ es: PsxRelease[]; tr: PsxRelease[] }>('db/psx-es.json')
+  const db = await fetchData<{ es: PsxRelease[]; alt: PsxAlt[] }>('db/psx-es.json')
   const byKey = new Map(games.map((g) => [looseKey(g.t), g]))
   const spanish = new Set<ShopGame>()
   const sizeOf = (d: [string, number][]) => d.reduce((n, [, s]) => n + s, 0)
@@ -228,19 +245,21 @@ async function spanishPsx(
   // 1. Spanish releases. Spain's last: when two map to one European game, Spain's stays.
   const es = [...db.es].sort((a, b) => Number(/\(Spain/.test(a.r)) - Number(/\(Spain/.test(b.r)))
   const covers = await Promise.all(es.map((e) => coverFor('psx', e.r).catch(() => null)))
-  es.forEach(({ t, r, d }, n) => {
-    const x: Part[] = d.map(([f, s]) => ({ i: ES_ITEM, f, s, z: 1 }))
+  es.forEach(({ t, r, src, d }, n) => {
+    // Where it comes from: the collection's own CHD (as any other game), or pieces from another item
+    const how: Partial<ShopGame> = src === 'eur'
+      ? { f: d[0][0], s: sizeOf(d), ...(d.length > 1 ? { d: d.map(([f, s]) => ({ f, s })) } : {}) }
+      : { f: d[0][0], s: sizeOf(d), i: SRC_ITEM[src], x: d.map(([f, s]) => ({ i: SRC_ITEM[src], f, s, ...(src === 'zip' ? { z: 1 as const } : {}) })) }
     const euro = byKey.get(looseKey(ES_TITLES[t] ?? t))
     if (euro) {
       // Same game: its IGDB data and players stay, the rest is the Spanish release
-      Object.assign(euro, { t, n: r, f: d[0][0], s: sizeOf(d), i: ES_ITEM, x })
-      delete euro.p
-      delete euro.d
+      for (const k of ['p', 'd', 'i', 'x'] as const) delete euro[k]
+      Object.assign(euro, { t, n: r }, how)
       if (covers[n]) euro.c = covers[n]!
       spanish.add(euro)
       return
     }
-    const game: ShopGame = { t, f: d[0][0], s: sizeOf(d), n: r, i: ES_ITEM, x }
+    const game = { t, n: r, ...how } as ShopGame
     const info = lookup(r)
     if (info?.rating != null) game.r = info.rating
     if (info?.genres.length) game.g = info.genres.map((g) => genreIndex(genreEs(g)))
@@ -252,19 +271,21 @@ async function spanishPsx(
     spanish.add(game)
   })
 
-  // 2. Fan translations of the European games still without Spanish
-  for (const { t, r, d } of db.tr) {
-    const g = byKey.get(looseKey(t))
-    if (!g || spanish.has(g)) continue
-    // Saved under the European discs' names: the stick sees the same game (cover, ficha, saves)
-    const names = g.d ? g.d.map((x) => fileName(x.f)) : [fileName(g.f)]
-    if (names.length !== d.length) continue
-    const words = (r.match(/[([]T-Spa\s+([^)\]]+)[)\]]/)?.[1] ?? '').split(/\s+/)
-    if (words.length > 1 && /^v?\d[\w.-]*$/i.test(words[words.length - 1])) words.pop()
-    g.tr = {
-      by: words.join(' ').replace(/_/g, ' ').trim() || 'aficionados',
-      s: sizeOf(d),
-      x: d.map(([f, s], i) => ({ i: TR_ITEM, f, s, a: names[i] })),
-    }
+  // 2. Fan versions: corrected Spanish releases on the Spanish games, translations on the others
+  for (const a of db.alt) {
+    const g = byKey.get(looseKey(a.t))
+    if (!g || (a.k === 'mej') !== spanish.has(g)) continue
+    // Saved under the game's own discs' names (a .cue becomes a .chd): the stick sees the same game
+    const names = g.d ? g.d.map((x) => fileName(x.f))
+      : g.x ? g.x.map((p) => fileName(p.f).replace(/\.zip$/i, '.chd'))
+      : [fileName(g.f)]
+    if (names.length !== a.n) continue
+    // A zip holding every disc: saved under the inner names, the stick renames a single one
+    const x: Part[] = a.z
+      ? [{ i: TR_ITEM, f: a.d[0][0], s: a.d[0][1], z: 1, ...(a.n === 1 ? { a: names[0] } : {}) }]
+      : a.d.map(([f, s], i) => ({ i: TR_ITEM, f, s, a: names[i] }))
+    ;(g.alt ??= []).push({ k: a.k, ...(a.v ? { v: 1 as const } : {}), s: sizeOf(a.d), x })
   }
+  // Voices and texts first, then texts only
+  for (const g of games) g.alt?.sort((a, b) => ['mej', 'voz', 'txt'].indexOf(a.k) - ['mej', 'voz', 'txt'].indexOf(b.k))
 }

@@ -49,6 +49,8 @@ class DetailsActivity : Activity() {
     /** Spanish translations of this game (Translations), null while the list isn't on the stick; and the one in use */
     private var translations: List<Translations.Translation>? = null
     private var translation: Translations.Translation? = null
+    /** Downloaded from RetroShop as a fan version (FanVersions): its kind and whether its voices were redone */
+    private var fan: Pair<String, Boolean>? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -76,6 +78,7 @@ class DetailsActivity : Activity() {
         cheatNames = if (Cheats.supports(game.console)) Cheats.chosenNames(this, game) else emptyList()
         translations = Translations.cachedFor(this, game)
         translation = Translations.chosen(this, game)?.let { f -> translations?.firstOrNull { it.file == f } }
+        fan = FanVersions.of(this, game)
         val info = Fichas.cached(this, game.title, game.console.id)?.info
         val ra = RetroAchievements.cached(game)?.takeIf { RetroAchievements.supports(game.console) && RetroAchievements.account(this) != null }
 
@@ -105,6 +108,16 @@ class DetailsActivity : Activity() {
             if (!langs.contains("Español") && translation != null) addView(LinearLayout(this@DetailsActivity).apply {
                 addView(chip("Traducido al español", "#244ADE80", R.color.ok))
             }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(5) })
+            // Downloaded as a fan version (RetroShop): which one, so it's never taken for the official release
+            fan?.let { (kind, voices) ->
+                val label = when {
+                    kind == "voz" || (kind == "mej" && voices) -> "Doblaje de fans"
+                    kind == "mej" -> "Mejorado por fans"
+                    else -> "Traducido por fans"
+                }
+                addView(LinearLayout(this@DetailsActivity).apply { addView(chip(label, "#244ADE80", R.color.ok)) },
+                    LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(5) })
+            }
             if (cheatNames.isNotEmpty()) addView(LinearLayout(this@DetailsActivity).apply {
                 addView(chip(if (cheatNames.size == 1) "1 truco activo" else "${cheatNames.size} trucos activos", "#29EAB308", R.color.cheat))
             }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(5) })
@@ -165,7 +178,7 @@ class DetailsActivity : Activity() {
                 game.file.name,
                 Formatter.formatShortFileSize(this@DetailsActivity, game.file.length()),
                 // With a translation RetroArch opens another ROM: the original's check doesn't apply
-                if (translation != null) "Con la traducción los logros no suelen contar"
+                if (translation != null || fan != null) "Con la traducción los logros no suelen contar"
                 else ra?.let { if (it.supported) "Versión válida para logros" else "Versión no válida para logros" },
             ).joinToString("   ·   ")
         }
@@ -180,6 +193,25 @@ class DetailsActivity : Activity() {
                     text = android.text.SpannableStringBuilder("Se juega en español:  ").apply {
                         setSpan(android.text.style.StyleSpan(Typeface.BOLD), 0, length, 0)
                         val s = length; append("traducción de ${t.by}")
+                        setSpan(android.text.style.ForegroundColorSpan(getColor(R.color.text_2)), s, length, 0)
+                    }
+                    maxLines = 1; ellipsize = TextUtils.TruncateAt.END; gravity = Gravity.CENTER_VERTICAL
+                    setPadding(dp(10), dp(6), dp(10), dp(6))
+                    background = round(Color.parseColor("#1A4ADE80"), 7).apply { setStroke(1, Color.parseColor("#404ADE80")) }
+                }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(9) })
+            }
+            // A fan version: said where you choose how to play, never taken for the official one
+            fan?.let { (kind, voices) ->
+                val (head, rest) = when {
+                    kind == "voz" -> "Voces y textos en castellano:  " to "doblaje de aficionados, no el oficial"
+                    kind == "mej" && voices -> "Versión mejorada por fans:  " to "textos corregidos y voces nuevas de aficionados"
+                    kind == "mej" -> "Versión mejorada por fans:  " to "la española con los textos corregidos"
+                    else -> "Se juega en español:  " to "textos traducidos por aficionados"
+                }
+                addView(text(10f, R.color.text).apply {
+                    text = android.text.SpannableStringBuilder(head).apply {
+                        setSpan(android.text.style.StyleSpan(Typeface.BOLD), 0, length, 0)
+                        val s = length; append(rest)
                         setSpan(android.text.style.ForegroundColorSpan(getColor(R.color.text_2)), s, length, 0)
                     }
                     maxLines = 1; ellipsize = TextUtils.TruncateAt.END; gravity = Gravity.CENTER_VERTICAL

@@ -25,6 +25,12 @@ import java.util.concurrent.Executors
  */
 class ShopPart(val item: String, val file: String, val size: Long, val saveAs: String?, val unzip: Boolean)
 
+/**
+ * A fan version of a game (catalog "alt"): [kind] «voz» voices and texts in Spanish, «txt» texts only, «mej» the
+ * Spanish release with its texts corrected ([voices]: its voices redone too). [game] is what gets downloaded.
+ */
+class ShopAlt(val kind: String, val voices: Boolean, val game: ShopGame)
+
 class ShopGame(
     val title: String,
     val file: String,
@@ -45,9 +51,11 @@ class ShopGame(
     val item: String? = null,
     /** PlayStation in Spanish: what is downloaded instead of [file] / [discs] (catalog "x") */
     val parts: List<ShopPart> = emptyList(),
-    /** The same game translated to Spanish by fans, offered besides it (catalog "tr"), and by whom */
-    val translation: ShopGame? = null,
-    val translatedBy: String? = null,
+    /** Fan versions offered besides it (PlayStation, catalog "alt"): translated, dubbed or corrected */
+    val alternatives: List<ShopAlt> = emptyList(),
+    /** On a fan version's own game: its kind (ShopAlt.kind) and whether its voices were redone, kept once downloaded */
+    val fanKind: String? = null,
+    val fanVoices: Boolean = false,
 ) {
     val looseTitle = looseKey(title)
 }
@@ -219,7 +227,7 @@ object ShopApi {
                     ShopPart(p.getString("i"), p.getString("f"), p.optLong("s"), p.optString("a").takeIf { it.isNotEmpty() }, p.optInt("z") == 1)
                 }
             }
-            val tr = g.optJSONObject("tr")
+            val alts = g.optJSONArray("alt")
             ShopGame(
                 title = g.getString("t"),
                 file = g.getString("f"),
@@ -234,11 +242,14 @@ object ShopApi {
                 players = g.optInt("m", 0),
                 item = g.optString("i").takeIf { it.isNotEmpty() },
                 parts = parts(g.optJSONArray("x")),
-                translation = tr?.let {
-                    ShopGame(g.getString("t"), g.getString("f"), it.optLong("s"), g.getString("n"), null, emptyList(),
-                        null, emptyList(), null, null, parts = parts(it.optJSONArray("x")))
+                alternatives = List(alts?.length() ?: 0) { k ->
+                    alts!!.getJSONObject(k).let {
+                        val kind = it.getString("k")
+                        val voices = it.optInt("v") == 1 || kind == "voz"
+                        ShopAlt(kind, voices, ShopGame(g.getString("t"), g.getString("f"), it.optLong("s"), g.getString("n"), null, emptyList(),
+                            null, emptyList(), null, null, parts = parts(it.optJSONArray("x")), fanKind = kind, fanVoices = voices))
+                    }
                 },
-                translatedBy = tr?.optString("by"),
             )
         }
         return ShopCatalog(
@@ -285,6 +296,7 @@ object ShopDownloads {
             try {
                 download(job)
                 job.state = State.DONE
+                FanVersions.record(app, job.catalog.console, job.game)
                 Sounds.play(Sounds.Sound.DONE)
                 // Backs the new ROM up to Retro/JugandoAhora: the webapp lists it as "en el stick".
                 main.post { DriveSync.sync(app) }
@@ -340,7 +352,13 @@ object ShopDownloads {
         // url, name to save as, size (a zip brings all its files: the .cue and its .bin tracks)
         val plan = game.parts.flatMap { p ->
             val base = "https://archive.org/download/${enc(p.item)}/${encPath(p.file)}"
-            if (p.unzip) zipFiles(base).map { (inner, size) -> Triple("$base/${encPath(inner)}", inner.substringAfterLast('/'), size) }
+            if (p.unzip) {
+                // Only the game's own files (a fan zip may carry notes or an emulator's cheats); a single one takes [saveAs]
+                val files = zipFiles(base).filter { it.first.substringAfterLast('.').lowercase() in GAME_FILES }
+                files.map { (inner, size) ->
+                    Triple("$base/${encPath(inner)}", if (files.size == 1 && p.saveAs != null) p.saveAs else inner.substringAfterLast('/'), size)
+                }
+            }
             else listOf(Triple(base, p.saveAs ?: p.file.substringAfterLast('/'), p.size))
         }
         job.total = plan.sumOf { it.third }
@@ -356,6 +374,8 @@ object ShopDownloads {
             File(dir, m3u).writeText(discs.joinToString("\n", postfix = "\n"))
         }
     }
+
+    private val GAME_FILES = setOf("chd", "cue", "bin", "iso", "img", "sub", "ccd")
 
     /** The files in a zip on archive.org and their sizes, from its listing page. */
     private fun zipFiles(url: String): List<Pair<String, Long>> {
@@ -563,4 +583,24 @@ object Languages {
         }
         return codes.distinct().sortedBy { if (it == "Es") 0 else 1 }.map { NAMES.getValue(it) }
     }
+}
+
+/**
+ * Which fan version a game on the stick came as (RetroShop: «Voces y textos», «Solo textos», «Versión mejorada»), for
+ * its Detalles. Downloading the original again forgets it.
+ */
+object FanVersions {
+    private fun prefs(context: Context) = context.getSharedPreferences("fanVersions", Context.MODE_PRIVATE)
+    private fun key(console: Console, title: String) = "${console.id}/${looseKey(title)}"
+
+    fun record(context: Context, console: Console, game: ShopGame) {
+        prefs(context).edit().apply {
+            val kind = game.fanKind
+            if (kind != null) putString(key(console, game.title), if (game.fanVoices) "$kind+v" else kind) else remove(key(console, game.title))
+        }.apply()
+    }
+
+    /** «voz», «txt» or «mej» and whether its voices were redone; null for the original. */
+    fun of(context: Context, game: Game): Pair<String, Boolean>? =
+        prefs(context).getString(key(game.console, game.title), null)?.let { it.removeSuffix("+v") to it.endsWith("+v") }
 }

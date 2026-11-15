@@ -12,6 +12,8 @@
  */
 export const ES_ITEM = 'ps1-recopilatorio-de-localizaciones-al-espanol'
 export const TR_ITEM = 'tales-of-destiny-ii-u-disc-3-t-spa-tales-translations-1.0.4'
+/** «PSX Redump CHD (libcrypt integrated)»: Spanish releases with LibCrypt protection, as CHD that already carries it */
+export const LC_ITEM = 'psx-redump-chd-libcrypt'
 
 export const ES_TITLES: Record<string, string> = {
   '007 - El Mundo Nunca es Suficiente': '007 - The World Is Not Enough',
