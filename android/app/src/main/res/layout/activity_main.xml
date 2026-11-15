@@ -285,15 +285,26 @@
         android:textSize="16sp"
         android:visibility="gone" />
 
-    <!-- Retro Ajustes tab -->
-    <GridLayout
-        android:id="@+id/settingsGrid"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="40dp"
+    <!-- Retro Ajustes tab: the rows below the screen's edge scroll up when the cursor gets there (renderSettings) -->
+    <ScrollView
+        android:id="@+id/settingsScroll"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
         android:layout_marginTop="165dp"
-        android:columnCount="5"
-        android:visibility="gone" />
+        android:descendantFocusability="blocksDescendants"
+        android:focusable="false"
+        android:overScrollMode="never"
+        android:scrollbars="none"
+        android:visibility="gone">
+
+        <GridLayout
+            android:id="@+id/settingsGrid"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="40dp"
+            android:paddingBottom="16dp"
+            android:columnCount="5" />
+    </ScrollView>
 
     <!-- Shelves: the stick's games, and below them the Drive collection (it slides up when focused).
          The window shows the first row and the title of the second. -->

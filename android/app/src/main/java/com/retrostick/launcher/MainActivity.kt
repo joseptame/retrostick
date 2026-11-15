@@ -29,6 +29,7 @@ import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.DecelerateInterpolator
 import android.view.animation.OvershootInterpolator
 import android.widget.GridLayout
+import android.widget.ScrollView
 import android.widget.HorizontalScrollView
 import android.widget.ImageView
 import android.widget.FrameLayout
@@ -177,6 +178,7 @@ class MainActivity : Activity() {
     private lateinit var driveCovers: LinearLayout
     private val driveViews = mutableListOf<View>()
     private lateinit var settingsGrid: GridLayout
+    private lateinit var settingsScroll: ScrollView
     private lateinit var hints: LinearLayout
     private val tabViews = mutableListOf<View>()
     private val coverViews = mutableListOf<View>()
@@ -290,6 +292,7 @@ class MainActivity : Activity() {
         driveScroll = findViewById(R.id.driveScroll)
         driveCovers = findViewById(R.id.driveCovers)
         settingsGrid = findViewById(R.id.settingsGrid)
+        settingsScroll = findViewById(R.id.settingsScroll)
         hints = findViewById(R.id.hints)
         hero.clipToOutline = true
         splash = findViewById(R.id.splash)
@@ -943,7 +946,7 @@ class MainActivity : Activity() {
         gamePanel.visibility = if (!settingsTab && game != null) View.VISIBLE else View.GONE
         emptyText.visibility = if (!settingsTab && game == null) View.VISIBLE else View.GONE
         shelf.visibility = if (settingsTab) View.GONE else View.VISIBLE
-        settingsGrid.visibility = if (settingsTab) View.VISIBLE else View.GONE
+        settingsScroll.visibility = if (settingsTab) View.VISIBLE else View.GONE
         if (settingsTab) return
 
         val console = tabConsole
@@ -1216,6 +1219,16 @@ class MainActivity : Activity() {
             val sel = i == settingIndex && zone == Zone.CONTENT && settingsTab
             v.setBackgroundResource(if (sel) R.drawable.bg_tab_sel else R.drawable.bg_tab)
             v.findViewById<TextView>(R.id.settingSub).text = settings[i].subtitle
+        }
+        // The chosen card whole on screen: the rows below the edge come up, the first ones go back down
+        settingViews.getOrNull(settingIndex)?.let { v ->
+            settingsScroll.post {
+                val top = v.top - dp(8)
+                val bottom = v.bottom + dp(16) - settingsScroll.height
+                val y = settingsScroll.scrollY
+                if (top < y) settingsScroll.smoothScrollTo(0, maxOf(0, top))
+                else if (bottom > y) settingsScroll.smoothScrollTo(0, bottom)
+            }
         }
     }
 
