@@ -1172,6 +1172,8 @@ class MainActivity : Activity() {
                 // Signed in: straight to Mis logros (signing out is in there); else the login screen (keyboard or QR)
                 open(Intent(this, if (RetroAchievements.account(this) != null) ProfileActivity::class.java else RaLoginActivity::class.java))
             },
+            // Something wrong on a friend's TV: what it is and how it's set up, to the admin (Report.kt, webapp Stick → Informes)
+            Setting("📨", "Enviar informe", "Si algo no va bien") { sendReport() },
         )
         settings.forEach { s ->
             val v = layoutInflater.inflate(R.layout.item_setting, settingsGrid, false)
@@ -1180,6 +1182,35 @@ class MainActivity : Activity() {
             settingsGrid.addView(v)
             settingViews += v
         }
+    }
+
+    /** «Enviar informe»: asked first, then sent; its code is shown to tell the admin. */
+    private fun sendReport() {
+        android.app.AlertDialog.Builder(this, R.style.Dialog_RetroStick)
+            .setTitle("Enviar informe")
+            .setMessage("Se envía al administrador de RetroStick qué aparato es, cómo está instalado, qué mandos ve y los últimos avisos. " +
+                "No lleva contraseñas ni partidas.")
+            .setPositiveButton("Enviar") { _, _ ->
+                android.widget.Toast.makeText(this, "Enviando informe…", android.widget.Toast.LENGTH_SHORT).show()
+                val app = applicationContext
+                Thread {
+                    val result = runCatching { Report.send(app) }
+                    main.post {
+                        if (isFinishing) return@post
+                        Sounds.play(if (result.isSuccess) Sounds.Sound.DONE else Sounds.Sound.ERROR)
+                        android.app.AlertDialog.Builder(this, R.style.Dialog_RetroStick)
+                            .setTitle(if (result.isSuccess) "Informe enviado" else "No se pudo enviar")
+                            .setMessage(result.fold(
+                                { "Dile al administrador este código: $it" },
+                                { if (it is NotPairedException) "Vincula antes RetroShop (Retro Ajustes → RetroShop)." else "${it.message}" },
+                            ))
+                            .setPositiveButton("Vale", null)
+                            .showForPad()
+                    }
+                }.start()
+            }
+            .setNegativeButton("Cancelar", null)
+            .showForPad()
     }
 
     private fun renderSettings() {
