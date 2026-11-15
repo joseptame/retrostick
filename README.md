@@ -120,10 +120,20 @@ Retro/
 Para el stick de otra persona (con su propio Google Drive y su usuario de la web), sin ADB:
 1. Instalar el launcher una vez (por ejemplo con la app «Downloader» y el enlace
    `https://github.com/joseptame/retrostick/releases/download/stick/launcher.apk`) y elegirlo como pantalla de inicio.
+   **Google Play Protect lo bloquea** («Aplicación no segura bloqueada», porque apunta a Android 9): pulsar
+   «Más detalles» → «Instalar igualmente». Lo mismo pasa luego con RetroArch y RetroStick Núcleos dentro del asistente,
+   que lo explica en pantalla. El instalador de Android deja el cursor en «Cancelar» y, al acabar, en «Abrir»: hay que
+   elegir «Instalar» y después «Listo» (comprobado en un Mi TV Stick con Android 11 el 2026-11-15).
 2. Al abrirse, el asistente (`SetupActivity`, `Setup.kt`) lo hace todo desde la versión «stick» de GitHub: instala
    RetroArch 1.22.2 y **RetroStick Núcleos**, abre RetroArch una vez para que cree su configuración, lo cierra y copia
    el paquete de configuración. Solo hay que pulsar A cuando Android pide confirmar una instalación o un permiso.
 3. Después, como siempre: conectar su Drive y vincular el stick con la web (Retro Ajustes).
+
+- **Android 10 y posteriores no dejan volver solo a RetroStick** tras el primer arranque de RetroArch (una app en
+  segundo plano no puede ponerse delante si no es la pantalla de inicio: «Background activity start» en el registro).
+  El asistente avisa sobre RetroArch durante unos dos minutos («Sal de RetroArch con el botón Inicio y abre
+  RetroStick»), y como recuerda que empezó (`Setup.markStarted`) al volver a abrir RetroStick sigue donde se quedó
+  hasta terminar (`Setup.needed`).
 
 - **Núcleos sin pasar por RetroArch:** RetroArch solo instala núcleos en su carpeta privada desde su menú. «RetroStick
   Núcleos» (`android/cores`) es una app sin código que lleva los núcleos como bibliotecas nativas (`lib<núcleo>.so`);
@@ -518,6 +528,9 @@ emojis como iconos (decisión del usuario):
 | 🗂️ **Vista del inicio** | Carátulas o lista (también con Options) |
 | ✨ **Pantallas de inicio** | Cuántas BIOS hay; activarlas o desactivarlas (8.2d) |
 | 🏆 **Mis logros** | Perfil de RetroAchievements (8.2c) |
+| 📨 **Enviar informe** | Manda al administrador qué aparato es, versiones, cómo quedó la instalación, BIOS, mandos (y si sus botones se corrigen), espacio, cuentas (sin contraseñas) y los últimos avisos (`Report.kt` → `api/report.ts`, Upstash 30 días). El stick enseña un código; el administrador lo ve en la webapp, Stick → Informes de sticks |
+
+En el inicio: **R2** abre los logros del juego, **▲** desde la estantería sube a la fila de tráiler y capturas.
 
 ### 8.2c Logros (RetroAchievements)
 - Cuenta: `Retro/Config/ra.json` (desde la app del móvil, 7.4), escrita en `retroarch.cfg` antes de cada partida
@@ -578,6 +591,25 @@ emojis como iconos (decisión del usuario):
   original, así RetroArch usa las mismas partidas, estados y trucos; la ROM de `ROMs/` y Drive no se tocan.
   `launchInRetroArch` abre `Translations.romFor()` si hay una. «Original» la borra. Los logros solo cuentan en las
   versiones que RetroAchievements conoce (casi nunca las traducciones).
+
+- **En RetroShop** la ficha de un juego sin español dice «Traducción al español disponible» si la hay (nunca en la
+  portada: decisión del usuario).
+
+### 8.2k PlayStation en español (launcher 1.29)
+- `pwa/scripts/build-psx-es.ts` → `pwa/public/db/psx-es.json` (las listas no cambian; se generan una vez):
+  - **Versión española primero:** si un juego está en «[PS1] Recopilatorio de Juegos Localizados al Español», la
+    tienda muestra esa versión en lugar de la europea (títulos traducidos emparejados a mano en `src/lib/psx-es.ts`).
+    Se baja en **CHD** siempre que el mismo disco exista así: la colección europea de la tienda (421), la de LibCrypt
+    `psx-redump-chd-libcrypt` (21, protegidos que en .bin/.cue normal fallarían) o la de traducciones (1); si no, en
+    .bin/.cue desde el zip (185, como La Amenaza Fantasma o los Final Fantasy VII–IX). Solo versiones que dicen ser en
+    español (Redump: «(Spain)» o «Es»).
+  - **Versiones de fans** («PSX - Compilación de Traducciones al Español»), botones aparte de la original:
+    «Voces y textos» (fandub), «Solo textos» (o «Descargar traducido» si no hay otra) y «Versión mejorada» (la española
+    con los textos corregidos). Sin doblaje latino, hacks ni texturas; nunca el nombre del traductor en pantalla. La línea
+    bajo los botones explica el que tiene el cursor; Detalles dice luego «Doblaje de fans», «Traducido por fans» o
+    «Mejorado por fans» (`FanVersions`). Se guardan con el nombre de los discos del juego, así el stick ve el mismo juego.
+- La webapp solo añade todo esto para el launcher que lo entiende (`/api/shop?extras=1`); también Dragon Ball Z -
+  Buu's Fury (USA) en la tienda de Game Boy Advance, desde otra colección (`EXTRAS` en `api/shop.ts`).
 
 ### 8.2i Teles Android y gráficas modernas (launcher 1.27.1)
 - El asistente se ejecuta si falta la configuración de RetroStick (`RetroArch/config/FCEUmm/nes.cfg`), aunque

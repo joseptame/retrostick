@@ -35,6 +35,11 @@ HID en su orden interno. Resultado medido con `adb shell getevent -lt /dev/input
 | Stick derecho | `ABS_Z/RZ` | `AXIS_Z/RZ` | ejes 2/3 |
 | L2/R2 analógicos | `ABS_RX/RY` | `AXIS_RX/RY` | RetroArch no los lee (usa L2/R2 digitales) |
 
+**Cómo sabe RetroStick si hace falta corregir (launcher 1.29):** se lo pregunta al propio mando, no a la versión de
+Android. Solo con `Generic.kl` el DualSense y el Pro Controller tienen botón `BUTTON_C` (○ / X); con la distribución
+estándar no existe (`StickStatus.viaGenericKl`, `InputDevice.hasKeys`). Una tele Mi con Android 10 ya traía la
+estándar y, al corregirla como si fuera Android 9, la ✕ y el ○ salían cambiados (2026-11-15).
+
 Sin root no se puede añadir un `.kl` al sistema (`/vendor` es de solo lectura), así que se corrige en cada app:
 
 - **Launcher:** `StickStatus.standardKey()` traduce estos códigos para que en el menú ✕ = Jugar, ○ = Atrás,

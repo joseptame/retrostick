@@ -214,7 +214,11 @@ class SetupActivity : Activity() {
             }
         }
         if (apk.isFile && apk.length() == asset.size) {
-            detail = "Android te pedirá confirmar la instalación: elige «Instalar». Si te pregunta, permite a RetroStick instalar apps."
+            // What Android shows, in order (measured on a Mi TV Stick with Android 11, 2026-11-15): the installer with the
+            // cursor on «Cancelar»; Google Play Protect blocking it («Aplicación no segura bloqueada»), whose way on is
+            // hidden under «Más detalles»; and at the end the cursor on «Abrir», which would leave the assistant.
+            detail = "Android te pedirá confirmar: muévete a «Instalar» y púlsalo. Si sale «Aplicación no segura bloqueada», " +
+                "pulsa «Más detalles» y luego «Instalar igualmente». Al terminar, elige «Listo» (no «Abrir»)."
             setAction("Instalar") { open() }
             render()
             if (autoOpened.add(step)) open()
@@ -253,11 +257,15 @@ class SetupActivity : Activity() {
                 startActivity(Intent(this, SetupActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
                 // Android 10+ doesn't let an app in the background come to the front (a TV whose home isn't
                 // RetroStick): RetroArch stays. A notice over it says how to go on; RetroStick picks up by itself.
-                main.postDelayed({
-                    if (!resumed && !isFinishing) android.widget.Toast.makeText(this,
+                // A notice lasts a few seconds: said again until RetroStick is back (or for about two minutes)
+                fun notice(times: Int) {
+                    if (resumed || isFinishing || times == 0) return
+                    android.widget.Toast.makeText(this,
                         "RetroArch ya está listo. Sal de RetroArch (botón Inicio del mando de la tele) y abre RetroStick para seguir.",
                         android.widget.Toast.LENGTH_LONG).show()
-                }, 2500)
+                    main.postDelayed({ notice(times - 1) }, 4000)
+                }
+                main.postDelayed({ notice(30) }, 2500)
             }, 3000)
         } else {
             main.postDelayed(::waitForRetroArch, 2000)
