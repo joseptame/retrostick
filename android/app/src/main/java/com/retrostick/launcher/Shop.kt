@@ -35,6 +35,8 @@ class ShopGame(
     val cover: String?,
     /** Players on one console when two or more (catalog "m"), else 0 */
     val players: Int = 0,
+    /** archive.org item to download it from when it isn't the collection's (a single game added to the list, catalog "i") */
+    val item: String? = null,
 ) {
     val looseTitle = looseKey(title)
 }
@@ -142,7 +144,7 @@ object ShopApi {
 
     /** Blocking: downloads the catalog from the webapp and keeps a copy. */
     fun fetch(context: Context, console: Console): ShopCatalog {
-        val conn = open("${BuildConfig.WEBAPP_URL}/api/shop?console=${console.id}")
+        val conn = open("${BuildConfig.WEBAPP_URL}/api/shop?console=${console.id}&extras=1")
         val text = try {
             if (conn.responseCode != 200) throw IllegalStateException("La webapp respondió ${conn.responseCode}")
             // The login page instead of JSON: the pass is missing or no longer valid.
@@ -213,6 +215,7 @@ object ShopApi {
                 year = if (g.has("y")) g.getInt("y") else null,
                 cover = g.optString("c").takeIf { it.isNotEmpty() },
                 players = g.optInt("m", 0),
+                item = g.optString("i").takeIf { it.isNotEmpty() },
             )
         }
         return ShopCatalog(
@@ -294,9 +297,10 @@ object ShopDownloads {
         }
         if (game.pack != null) {
             // One archive per game: the ROM inside is read from archive.org's listing of it.
-            val inner = packedRom(catalog, game.pack)
+            val item = game.item ?: catalog.collection
+            val inner = packedRom(item, catalog.console, game.pack)
             val ext = inner.substringAfterLast('.').lowercase()
-            val url = "https://archive.org/download/${enc(catalog.collection)}/${encPath(game.pack)}/${encPath(inner)}"
+            val url = "https://archive.org/download/${enc(item)}/${encPath(game.pack)}/${encPath(inner)}"
             get(url, File(dir, "${game.name}.$ext")) { job.done = it; tick() }
             return
         }
@@ -449,15 +453,15 @@ object ShopDownloads {
         }
     }
 
-    private fun packedRom(catalog: ShopCatalog, pack: String): String {
-        val conn = ShopApi.open("https://archive.org/download/${enc(catalog.collection)}/${encPath(pack)}/")
+    private fun packedRom(item: String, console: Console, pack: String): String {
+        val conn = ShopApi.open("https://archive.org/download/${enc(item)}/${encPath(pack)}/")
         val html = try {
             conn.inputStream.bufferedReader().readText()
         } finally {
             conn.disconnect()
         }
         val names = Regex("""<tr><td><a\b[^>]*>([^<]*)</a>""").findAll(html).map { decode(it.groupValues[1]) }.toList()
-        return names.firstOrNull { it.substringAfterLast('.').lowercase() in catalog.console.extensions }
+        return names.firstOrNull { it.substringAfterLast('.').lowercase() in console.extensions }
             ?: throw IllegalStateException("$pack no contiene ninguna ROM")
     }
 

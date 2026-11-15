@@ -10,8 +10,11 @@
  *   genres: string[],
  *   games: [{ t: title, f: file, s: size, n: name to save as (no extension), p?: per-game archive,
  *             d?: [{ f, s }] discs, r?: rating 0..10, g?: genre indexes, y?: year,
- *             c?: box art URL (resized WebP, chosen like the webapp's covers) }]
+ *             c?: box art URL (resized WebP, chosen like the webapp's covers),
+ *             i?: archive.org item to download it from instead of the collection (see EXTRAS) }]
  * }
+ *
+ * &extras=1 (launcher 1.28.0 on): also the console's EXTRAS, which older launchers couldn't download.
  *
  * Only reachable with the stick's pass (x-stick-token, see api/pair.ts and middleware.ts). Cached per console for a few hours.
  */
@@ -43,6 +46,21 @@ interface ShopGame {
   /** Players on one console when two or more (scripts/build-players.ts): RetroShop's «Para dos» filter */
   m?: number
   c?: string
+  /** archive.org item holding it, when not the collection's (EXTRAS) */
+  i?: string
+}
+
+/**
+ * Single games the console's default collection lacks (gba-pal has only European releases), each from its own
+ * archive.org item: added one by one when asked for, with the No-Intro name and the size of the ROM inside.
+ */
+const EXTRAS: Partial<Record<ConsoleId, { item: string; entry: ArchiveEntry }[]>> = {
+  gba: [
+    {
+      item: 'theentiregameboyadvancecollection',
+      entry: { name: "Dragon Ball Z - Buu's Fury (USA).gba", size: 8388608, pack: "Dragon Ball Z - Buu's Fury (USA).zip" },
+    },
+  ],
 }
 
 const cache = new Map<string, { at: number; body: Promise<string> }>()
@@ -61,7 +79,7 @@ async function namesIndex(id: ConsoleId): Promise<{ exact: Set<string>; byKey: M
   return { exact: new Set(db.names), byKey: index }
 }
 
-async function build(id: ConsoleId, collection: string): Promise<string> {
+async function build(id: ConsoleId, collection: string, withExtras: boolean): Promise<string> {
   const [{ entries, archive, title, restricted }, lookup, names] = await Promise.all([
     listItemFiles(collection, id),
     loadLookup(id),
@@ -71,6 +89,16 @@ async function build(id: ConsoleId, collection: string): Promise<string> {
   const list: ArchiveEntry[] = romsets
     ? entries
     : bestVariants(groupDiscs(entries).filter((e) => consoleForFile(e.name) === id && !isDemo(e.name)))
+  // Extras only on the console's own collection, and only when the collection doesn't have that game already
+  const extraItem = new Map<ArchiveEntry, string>()
+  if (withExtras && collection === DEFAULT_COLLECTIONS[id]) {
+    const have = new Set(list.map((e) => looseKey(baseName(e.name))))
+    for (const x of EXTRAS[id] ?? []) {
+      if (have.has(looseKey(baseName(x.entry.name)))) continue
+      list.push(x.entry)
+      extraItem.set(x.entry, x.item)
+    }
+  }
   // Neo Geo: each romset's long name ("mslug" → "Metal Slug - Super Vehicle-001"), for the title, ficha and box art
   const allNames = romsets ? await Promise.all(list.map((e) => romsetName(id, baseName(e.name)))) : []
   // Only the romsets FinalBurn Neo knows as Neo Geo games (others wouldn't start)
@@ -99,6 +127,8 @@ async function build(id: ConsoleId, collection: string): Promise<string> {
       n: !names || names.exact.has(base) ? base : (names.byKey.get(looseKey(base)) ?? base),
     }
     if (e.pack) game.p = e.pack
+    const item = extraItem.get(e)
+    if (item) game.i = item
     if (e.discs) game.d = e.discs.map((d) => ({ f: d.name, s: d.size }))
     if (info?.rating != null) game.r = info.rating
     // Spanish names, as in the webapp ("Racing" -> "Carreras")
@@ -133,10 +163,11 @@ export async function GET(request: Request): Promise<Response> {
   configureData(url.origin, { 'x-stick-token': request.headers.get('x-stick-token') ?? '' })
   // Say who is asking (archive.org asks API clients to identify themselves).
   configureArchive({ 'User-Agent': 'RetroStick/1.0 (+https://retrostick.vercel.app)', Accept: 'application/json, text/html' })
-  const key = `${id}/${collection}`
+  const withExtras = url.searchParams.get('extras') === '1'
+  const key = `${id}/${collection}/${withExtras ? 'x' : ''}`
   let hit = cache.get(key)
   if (!hit || Date.now() - hit.at > CACHE_MS) {
-    hit = { at: Date.now(), body: build(id, collection) }
+    hit = { at: Date.now(), body: build(id, collection, withExtras) }
     hit.body.catch(() => cache.delete(key))
     cache.set(key, hit)
   }
