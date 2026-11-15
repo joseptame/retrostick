@@ -75,18 +75,28 @@ object Translations {
     }
 
     /** The game's translations from the list kept on the stick (complete ones first); null if there's no list yet. */
-    fun cachedFor(context: Context, game: Game): List<Translation>? {
-        if (!supports(game.console)) return emptyList()
-        val entries = runCatching { JSONObject(indexFile(context, game.console).readText()).getJSONArray("entries") }.getOrNull() ?: return null
-        val key = looseKey(game.title)
+    fun cachedFor(context: Context, game: Game): List<Translation>? = cachedFor(context, game.console, game.title, game.baseName)
+
+    /** Same for a game not on the stick yet (RetroShop): its title and No-Intro name. */
+    fun cachedFor(context: Context, console: Console, title: String, baseName: String): List<Translation>? {
+        if (!supports(console)) return emptyList()
+        val entries = runCatching { JSONObject(indexFile(context, console).readText()).getJSONArray("entries") }.getOrNull() ?: return null
+        val key = looseKey(title)
         val all = (0 until entries.length()).map { entries.getJSONObject(it) }.filter { it.optString("k") == key }
         // The ones made on this ROM's revision («(Rev 1)»); every revision only when none was
-        val mine = Regex("""\(Rev\s*(\d+)\)""", RegexOption.IGNORE_CASE).find(game.baseName)?.groupValues?.get(1)?.toInt() ?: 0
+        val mine = Regex("""\(Rev\s*(\d+)\)""", RegexOption.IGNORE_CASE).find(baseName)?.groupValues?.get(1)?.toInt() ?: 0
         val same = all.filter { it.optInt("rev") == mine }
         return (same.ifEmpty { all }).map {
             Translation(it.getString("f"), it.optLong("s"), it.optBoolean("c"), it.optString("by"), it.optString("v"),
                 it.optString("x").takeIf { x -> x.isNotBlank() }, it.optInt("rev"), otherRevision = same.isEmpty() && it.optInt("rev") != mine)
         }.sortedByDescending { it.complete }
+    }
+
+    /** Loose titles with at least one translation in the list kept on the stick (RetroShop's «Traducción» badge). */
+    fun cachedTitles(context: Context, console: Console): Set<String> {
+        if (!supports(console)) return emptySet()
+        val entries = runCatching { JSONObject(indexFile(context, console).readText()).getJSONArray("entries") }.getOrNull() ?: return emptySet()
+        return (0 until entries.length()).mapTo(HashSet()) { entries.getJSONObject(it).optString("k") }
     }
 
     /** Blocking: as [cachedFor], fetching the list first when needed. */

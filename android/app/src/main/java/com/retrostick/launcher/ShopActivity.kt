@@ -31,6 +31,8 @@ class ShopActivity : Activity() {
     private enum class Sort(val label: String) { RATING("Mejor valorados"), NAME("A–Z"), YEAR("Más nuevos") }
 
     private val io = Executors.newSingleThreadExecutor()
+    /** Loose titles of this console with a Spanish fan translation (Translations): badge and ficha line */
+    private var translatable: Set<String> = emptySet()
     private val covers by lazy { CoverLoader(this) }
 
     private var consoleIndex = 0
@@ -476,6 +478,7 @@ class ShopActivity : Activity() {
         catalog = null
         error = null
         loading = true
+        translatable = emptySet()
         applyFilters(resetSelection = true)
         io.execute {
             // The last copy first (parsing the PlayStation one takes a moment: never on the UI thread)
@@ -498,8 +501,16 @@ class ShopActivity : Activity() {
                 }
                 applyFilters(resetSelection = catalog == null || result.isFailure)
             }
+            // Which games have a Spanish translation (the list is fetched once a week, as Detalles does)
+            Translations.refreshIndex(this, c)
+            val titles = Translations.cachedTitles(this, c)
+            runOnUiThread { if (c == console) { translatable = titles; renderGrid() } }
         }
     }
+
+    /** A Spanish fan translation exists and this release has no Spanish of its own. */
+    private fun hasTranslation(g: ShopGame) =
+        g.looseTitle in translatable && "Español" !in Languages.of(g.file).ifEmpty { Languages.of(g.name) }
 
     private fun refreshOwned() {
         val files = console.romDir.listFiles()?.filter { it.isFile && !it.name.startsWith(".") }.orEmpty()
@@ -611,6 +622,7 @@ class ShopActivity : Activity() {
                 job?.state == ShopDownloads.State.RUNNING -> badge(card, "${(job.progress * 100).toInt()} %", Color.WHITE)
                 job?.state == ShopDownloads.State.QUEUED -> badge(card, "En cola", Color.WHITE)
                 job?.state == ShopDownloads.State.ERROR -> badge(card, "Error", Color.parseColor("#F87171"))
+                hasTranslation(g) -> badge(card, "Traducción", getColor(R.color.ok))
                 else -> card.badge.visibility = View.GONE
             }
             val running = job?.state == ShopDownloads.State.RUNNING
@@ -922,7 +934,20 @@ class ShopActivity : Activity() {
                     setSpan(android.text.style.StyleSpan(Typeface.BOLD), start, length, 0)
                 }
             }
+            // No Spanish of its own but a fan translation: said here, chosen after downloading (Detalles → Idioma)
+            if (hasTranslation(g)) {
+                val n = Translations.cachedFor(this@ShopActivity, console, g.title, g.name)?.size ?: 0
+                if (n > 0) {
+                    append("   ·   ")
+                    val start = length
+                    append(if (n == 1) "Hay 1 traducción al español" else "Hay $n traducciones al español")
+                    setSpan(android.text.style.ForegroundColorSpan(getColor(R.color.ok)), start, length, 0)
+                    setSpan(android.text.style.StyleSpan(Typeface.BOLD), start, length, 0)
+                    append(" (al descargarlo, elígela en Detalles → Idioma)")
+                }
+            }
         }
+        if (hasTranslation(g)) fichaLangs.visibility = View.VISIBLE
         fichaDesc.text = ""
         fichaDesc.visibility = View.GONE
         fichaLoading.show(true)
