@@ -77,6 +77,15 @@ const es = [...byTitle(esFiles, /\.zip$/i)].flatMap(([t, rels]) => {
   }
   return [{ t, r, src: 'zip', d: zips.map((z) => [z.name, z.size]) }]
 })
+// The stick takes the game's files out of those zips (Shop.kt downloadParts): their size is what it downloads and
+// what the game takes (Spider-Man: a 435 MB zip, 729 MB of .bin)
+const GAME_FILES = /\.(chd|cue|bin|iso|img|sub|ccd)$/i
+for (const e of es.filter((e) => e.src === 'zip')) {
+  for (const disc of e.d) {
+    const inner = (await zipFiles(ES_ITEM, disc[0] as string)).filter((f) => GAME_FILES.test(f.name))
+    if (inner.length) disc[1] = inner.reduce((n, f) => n + f.size, 0)
+  }
+}
 
 // ---- Fan versions ----
 const SKIP = /latin|hack|trainer|texturas|hardtype/i
