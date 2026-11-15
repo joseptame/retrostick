@@ -17,9 +17,10 @@ import java.util.zip.ZipInputStream
  * translations aren't among them.
  */
 object Translations {
-    private const val ITEM_URL = "https://archive.org/download/compilaciones-traducciones-al-espanol-2024-08/"
+    private const val ITEM = "compilaciones-traducciones-al-espanol-2024-08"
     private const val INDEX_DAYS = 7L
-    private val CONSOLES = setOf("nes", "snes", "gb", "gbc", "md", "sms")
+    // N64 and GBA come from compilations of their own (.7z; the index names the item and the ROM inside)
+    private val CONSOLES = setOf("nes", "snes", "gb", "gbc", "md", "sms", "n64", "gba")
 
     class Translation(
         /** The zip in the archive.org item (also the id kept as chosen) */
@@ -35,6 +36,10 @@ object Translations {
         val rev: Int = 0,
         /** Made on another revision than this stick's ROM (shown only when its own has none) */
         val otherRevision: Boolean = false,
+        /** archive.org item holding it */
+        val item: String = ITEM,
+        /** The ROM inside a .7z, downloaded by itself (archive.org serves it); null: [file] is a zip to unpack */
+        val inner: String? = null,
     ) {
         val name get() = "Español - Traducido por $by"
         val details: String
@@ -51,8 +56,8 @@ object Translations {
     fun supports(console: Console) = console.id in CONSOLES
 
     private fun dir(context: Context) = File(context.filesDir, "translations")
-    // «v2»: lists before the revision field (2026-11-15) are fetched again
-    private fun indexFile(context: Context, console: Console) = File(dir(context), "index-v2-${console.id}.json")
+    // «v3»: lists before the item / ROM-inside fields (N64, GBA; 2026-11-15) are fetched again
+    private fun indexFile(context: Context, console: Console) = File(dir(context), "index-v3-${console.id}.json")
     private fun romDir(console: Console) = File("$SDCARD/Traducciones/${console.id}")
 
     /** Blocking: the console's list, downloaded again after a week. Null without one. */
@@ -80,7 +85,9 @@ object Translations {
     /** Same for a game not on the stick yet (RetroShop): its title and No-Intro name. */
     fun cachedFor(context: Context, console: Console, title: String, baseName: String): List<Translation>? {
         if (!supports(console)) return emptyList()
-        val entries = runCatching { JSONObject(indexFile(context, console).readText()).getJSONArray("entries") }.getOrNull() ?: return null
+        val index = runCatching { JSONObject(indexFile(context, console).readText()) }.getOrNull() ?: return null
+        val entries = index.optJSONArray("entries") ?: return null
+        val item = index.optString("item").ifEmpty { ITEM }
         val key = looseKey(title)
         val all = (0 until entries.length()).map { entries.getJSONObject(it) }.filter { it.optString("k") == key }
         // The ones made on this ROM's revision («(Rev 1)»); every revision only when none was
@@ -88,7 +95,8 @@ object Translations {
         val same = all.filter { it.optInt("rev") == mine }
         return (same.ifEmpty { all }).map {
             Translation(it.getString("f"), it.optLong("s"), it.optBoolean("c"), it.optString("by"), it.optString("v"),
-                it.optString("x").takeIf { x -> x.isNotBlank() }, it.optInt("rev"), otherRevision = same.isEmpty() && it.optInt("rev") != mine)
+                it.optString("x").takeIf { x -> x.isNotBlank() }, it.optInt("rev"), otherRevision = same.isEmpty() && it.optInt("rev") != mine,
+                item = item, inner = it.optString("in").takeIf { x -> x.isNotBlank() })
         }.sortedByDescending { it.complete }
     }
 
@@ -129,7 +137,39 @@ object Translations {
 
     /** Blocking: downloads [t] and makes it the game's ROM from now on. [progress]: bytes so far of [Translation.size]. */
     fun use(context: Context, game: Game, t: Translation, progress: (Long) -> Unit) {
-        val url = ITEM_URL + t.file.split('/').joinToString("/") { URLEncoder.encode(it, "UTF-8").replace("+", "%20") }
+        val enc = { p: String -> p.split('/').joinToString("/") { URLEncoder.encode(it, "UTF-8").replace("+", "%20") } }
+        val base = "https://archive.org/download/${enc(t.item)}/${enc(t.file)}"
+        val dir = romDir(game.console).apply { mkdirs() }
+        // The ROM inside a .7z: straight to its place, named like the game (same saves, states and cheats)
+        t.inner?.let { inner ->
+            val out = File(dir, "${game.baseName}.${inner.substringAfterLast('.').lowercase()}")
+            val tmp = File(dir, ".${out.name}.part")
+            val conn = ShopApi.open("$base/${enc(inner)}")
+            try {
+                if (conn.responseCode !in 200..299) throw IllegalStateException("archive.org respondió ${conn.responseCode}")
+                conn.inputStream.use { input ->
+                    tmp.outputStream().use { output ->
+                        val buf = ByteArray(64 * 1024)
+                        var done = 0L
+                        while (true) {
+                            val n = input.read(buf)
+                            if (n < 0) break
+                            output.write(buf, 0, n)
+                            done += n
+                            progress(done)
+                        }
+                    }
+                }
+            } finally {
+                conn.disconnect()
+            }
+            out.delete()
+            if (!tmp.renameTo(out)) throw IllegalStateException("No se pudo guardar la traducción")
+            chosenEntry(context, game)?.second?.takeIf { it != out }?.delete()
+            prefs(context).edit().putString(key(game), JSONObject().put("f", t.file).put("path", out.path).toString()).apply()
+            return
+        }
+        val url = base
         val zip = File(context.cacheDir, "translation.zip")
         val conn = ShopApi.open(url)
         try {
@@ -150,7 +190,6 @@ object Translations {
         } finally {
             conn.disconnect()
         }
-        val dir = romDir(game.console).apply { mkdirs() }
         var target: File? = null
         ZipInputStream(zip.inputStream()).use { z ->
             while (true) {

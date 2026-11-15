@@ -30,7 +30,16 @@ const FOLDERS: Record<string, string> = {
 const key = (s: string) =>
   s.normalize('NFD').toLowerCase().replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '')
 
-interface Entry { k: string; f: string; s: number; c: boolean; by: string; v: string; r: string; rev?: number; x?: string }
+interface Entry { k: string; f: string; s: number; c: boolean; by: string; v: string; r: string; rev?: number; x?: string; in?: string }
+
+/**
+ * Consoles from compilations of their own, one .7z per translated ROM at the item's root: archive.org serves the ROM
+ * inside a .7z by itself, so «in» names it and the stick downloads just that (no unpacking on the stick).
+ */
+const SEVEN_ZIP_ITEMS: Record<string, { item: string; rom: RegExp }> = {
+  n64: { item: 'n64-compilacion-de-traducciones-en-espanol_202609', rom: /\.(z64|n64|v64)$/i },
+  gba: { item: 'gba-compilacion-de-traducciones-en-espanol_202609', rom: /\.gba$/i },
+}
 
 const res = await fetch(`https://archive.org/metadata/${ITEM}/files`)
 if (!res.ok) throw new Error(`archive.org ${res.status}`)
@@ -43,9 +52,15 @@ for (const f of files) {
   const consoleId = FOLDERS[f.name.slice(0, slash).replace(PREFIX, '')]
   if (!consoleId) continue
   const name = f.name.slice(slash + 1).replace(/\.zip$/i, '')
+  const entry = parse(name, f.name, Number(f.size ?? 0))
+  if (entry) out[consoleId].push(entry)
+}
+
+/** An entry from a GoodTools name with a «T+Spa» / «T-Spa» tag, or null. */
+function parse(name: string, file: string, size: number): Entry | null {
   // [T+Spa100%_Gogito], [T-Spa1.0v_Wave], (T-Spa Magno 101), (T-Spa jackic 1.0)
   const tag = /[[(]T([+-])Spa([^\])]*)[\])]/i.exec(name)
-  if (!tag) continue
+  if (!tag) return null
   const rest = tag[2].trim()
   let by: string
   let v: string
@@ -65,11 +80,31 @@ for (const f of files) {
   const rev = revM ? Number(revM[1] ?? revM[2]) : 0
   const region = /\(([A-Z]{1,4})\)/.exec(name)?.[1] ?? ''
   const extra = name.slice(tag.index + tag[0].length).match(/[[(]([^\])]+)[\])]/g)?.map((g) => g.slice(1, -1)).join(', ')
-  out[consoleId].push({ k: key(displayTitle(name)), f: f.name, s: Number(f.size ?? 0), c: tag[1] === '+', by: by || 'Anónimo', v, r: region, ...(rev ? { rev } : {}), ...(extra ? { x: extra } : {}) })
+  return { k: key(displayTitle(name)), f: file, s: size, c: tag[1] === '+', by: by || 'Anónimo', v, r: region, ...(rev ? { rev } : {}), ...(extra ? { x: extra } : {}) }
+}
+
+const items: Record<string, string> = Object.fromEntries(Object.keys(out).map((c) => [c, ITEM]))
+for (const [consoleId, { item, rom }] of Object.entries(SEVEN_ZIP_ITEMS)) {
+  const r = await fetch(`https://archive.org/metadata/${item}/files`)
+  if (!r.ok) throw new Error(`archive.org ${r.status} (${item})`)
+  const list = ((await r.json()) as { result: { name: string; size?: string }[] }).result.filter((f) => /\.7z$/i.test(f.name))
+  out[consoleId] = []
+  items[consoleId] = item
+  for (const f of list) {
+    const name = f.name.replace(/\.7z$/i, '')
+    const entry = parse(name, f.name, Number(f.size ?? 0))
+    if (!entry) continue
+    // The ROM inside, from archive.org's listing of the .7z
+    const page = await (await fetch(`https://archive.org/download/${item}/${encodeURIComponent(f.name)}/`)).text()
+    const inner = [...page.matchAll(/<tr><td><a\b[^>]*>([^<]*)<\/a>.*?<td id="size">(\d+)/g)]
+      .map((m) => ({ name: m[1].replace(/&amp;/g, '&').replace(/&#0?39;/g, "'"), size: Number(m[2]) })).find((x) => rom.test(x.name))
+    if (!inner) { process.stdout.write(`  ${consoleId}: sin ROM dentro de ${f.name}\n`); continue }
+    out[consoleId].push({ ...entry, s: inner.size, in: inner.name })
+  }
 }
 
 for (const [id, entries] of Object.entries(out)) {
   entries.sort((a, b) => a.k.localeCompare(b.k) || Number(b.c) - Number(a.c))
-  writeFileSync(`public/db/trans-${id}.json`, JSON.stringify({ generated: new Date().toISOString(), item: ITEM, entries }))
+  writeFileSync(`public/db/trans-${id}.json`, JSON.stringify({ generated: new Date().toISOString(), item: items[id], entries }))
   process.stdout.write(`${id}: ${entries.length} traducciones\n`)
 }
