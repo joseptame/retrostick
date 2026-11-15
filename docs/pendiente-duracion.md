@@ -1,44 +1,85 @@
-# Pendiente: duración de los juegos (HowLongToBeat)
+# Pendiente: duración de los juegos
 
-Idea aparcada el 2026-11-15. Para retomarla, abre Claude Code en esta carpeta del proyecto y pega el prompt de abajo.
+Idea aparcada el 2026-11-15 porque no había de dónde sacar los datos de forma permitida.
+Para retomarla: abre Claude Code en la carpeta del proyecto (`retrostick`), copia todo el bloque de abajo y pégalo
+como mensaje.
 
 ## Prompt
 
 ```
-Quiero retomar la duración de los juegos en RetroStick (docs/pendiente-duracion.md).
+Retomamos una idea aparcada de RetroStick: mostrar cuánto dura cada juego. Háblame siempre en castellano.
 
-Antes de programar nada, comprueba si ya hay una forma permitida de sacar los tiempos de HowLongToBeat
-(«Historia», «Con extras», «Al 100 %») para los juegos de la tienda, en este orden:
-1. ¿HowLongToBeat tiene ya una API pública u oficial, o permite usar sus datos para un proyecto personal?
-2. ¿Qué cuesta y qué condiciones tiene el acceso con licencia de TollBit
-   (https://tollbit.com/marketplace/how-long-to-beat/)? ¿Acepta proyectos personales y deja guardar los datos?
-3. ¿Hay alguna recopilación pública y con licencia libre más completa que PlayMyData (Zenodo 10797761), que
-   en 2026-11 solo cubría el 1–13 % de los juegos de la tienda (32 % en N64)?
-4. ¿IGDB (game_time_to_beats) ya tiene datos suficientes de juegos antiguos?
+## Qué quiero
+Tres tiempos por juego, como los de HowLongToBeat: «Historia» (acabarlo sin desviarse), «Con extras» y
+«Al 100 %», en la tienda de la tele (RetroShop), en Detalles y en un filtro de la tienda.
 
-Para cada opción, mide la cobertura contra los juegos de la tienda (pwa/public/db/<consola>.json, títulos
-con looseKey de src/lib/names.ts), con ejemplos: Super Mario Bros. 3, A Link to the Past, Golden Sun,
-Sonic the Hedgehog, Pokémon Rojo, Super Mario 64, Final Fantasy VII.
-No te saltes ninguna protección de HowLongToBeat (su buscador pide un token anti-bots): si la única vía es esa,
-para y dímelo. Respóndeme en castellano con lo que hay y tu recomendación, y espera a que elija.
+## Por qué se aparcó (2026-11-15)
+No había ninguna fuente permitida con buena cobertura de juegos antiguos:
+- HowLongToBeat no tiene API; su buscador (/api/search/site) pide un token anti-bots.
+- IGDB (game_time_to_beats, la misma API que ya usan las fichas): casi sin datos de juegos antiguos
+  (A Link to the Past con 1 voto; Super Mario 64, Sonic y Golden Sun, nada).
+- PlayMyData (Zenodo 10797761, CC BY 4.0, IGDB + HowLongToBeat, solo juegos desde 1993): cubría de los
+  juegos de la tienda NES 1 %, Master System 1 %, GB 2 %, GBC 3 %, GBA 3 %, Mega Drive 4 %, Neo Geo 9 %,
+  SNES 10 %, PlayStation 13 %, N64 32 %.
+- TollBit (https://tollbit.com/marketplace/how-long-to-beat/) vende el acceso a HowLongToBeat, sin precio
+  publicado.
 
-Si hay una fuente buena, el diseño ya aprobado es https://claude.ai/artifact/EGWXYSy2CQ4nmbSb9xyWav:
-- Ficha de la tienda: tres recuadros «7 h Historia», «11 h Con extras», «15 h Al 100 %» y debajo
-  «Tiempos aproximados, según los jugadores de HowLongToBeat» (o la fuente que sea). Sin datos, nada.
-- Detalles: tarjeta «Duración aproximada · 23 h» junto al tiempo jugado (nunca «unas 23 h»), barra
-  «Vas por el 42 % de la historia · te quedan 13 h», «Con extras: 29 h · Al 100 %: 38 h» y la línea de la
-  fuente. Con «Lo he terminado», sin barra.
-- RetroShop: filtro «⏱ Duración» (Todas / Cortos hasta 5 h / Medios 5 a 15 h / Largos más de 15 h) por el
-  tiempo de «Historia»; con el filtro puesto, cada portada dice su duración; «Restablecer» lo quita.
-- Los datos se generan una vez con un script en pwa/scripts (como build-players.ts) a
-  pwa/public/db/time-<consola>.json, y la tienda y el stick los leen de ahí.
+## Reglas
+- No te saltes ninguna protección de ningún sitio (tokens anti-bots, límites, inicio de sesión) ni uses
+  scrapers de terceros que lo hagan. Si la única vía es esa, para y dímelo.
+- Solo fuentes cuyas condiciones permitan un proyecto personal y guardar los datos.
+- No publiques nada, no instales nada en los sticks y no hagas push sin preguntarme.
+- Sin datos de un juego no se muestra nada: nunca inventes ni estimes tiempos.
+
+## Paso 1: investigar (sin programar)
+Mira qué ha cambiado y mide cada opción:
+1. HowLongToBeat: ¿API oficial, exportación o permiso para proyectos personales?
+2. TollBit: precio y condiciones (¿proyectos personales?, ¿se pueden guardar los datos?).
+3. Recopilaciones públicas con licencia libre más completas que PlayMyData (Kaggle, Zenodo, Hugging Face,
+   GitHub…). Comprueba fecha, licencia y que los datos vengan de verdad de HowLongToBeat.
+4. IGDB game_time_to_beats: ¿tiene ya datos de juegos antiguos? Credenciales en pwa/.env.local
+   (IGDB_CLIENT_ID / IGDB_CLIENT_SECRET); ver pwa/scripts/build-players.ts.
+5. Cualquier otra fuente seria que encuentres.
+
+Para cada fuente útil, mide la cobertura por consola contra los títulos de la tienda: los nombres de
+pwa/public/db/<consola>.json (nes, snes, gb, gbc, gba, md, sms, n64, neogeo, psx), sin lo que va entre
+paréntesis, emparejados con looseKey de pwa/src/lib/names.ts. Comprueba también estos juegos y si los tiempos
+cuadran con los de HowLongToBeat: Super Mario Bros. 3, The Legend of Zelda: A Link to the Past, Pokémon Rojo,
+Sonic the Hedgehog, Golden Sun, Super Mario 64, Final Fantasy VII.
+
+Termina el paso 1 con una tabla (fuente · licencia/condiciones · coste · cobertura por consola · pega) y tu
+recomendación. Si ninguna pasa del 50 % en la mayoría de consolas, dilo y propón seguir aparcándolo.
+Espera a que yo elija.
+
+## Paso 2: hacerlo (solo si elijo una fuente)
+Diseño aprobado: https://claude.ai/artifact/EGWXYSy2CQ4nmbSb9xyWav (léelo con la herramienta de artifacts).
+- Datos: un script en pwa/scripts (como build-players.ts) genera una vez pwa/public/db/time-<consola>.json:
+  { generated, source, games: { [looseKey]: [historia, extras, completo] } } en horas, con un decimal.
+  Se emparejan los títulos como en players-*.json. Los juegos de PlayStation en español (db/psx-es.json)
+  usan el título europeo.
+- Ficha de RetroShop (android/.../ShopActivity.kt), debajo de la línea de información: tres recuadros
+  «7 h Historia», «11 h Con extras», «15 h Al 100 %» y debajo, en pequeño, «Tiempos aproximados, según los
+  jugadores de <fuente>». Si falta uno de los tres, solo los que haya.
+- Detalles (DetailsActivity.kt), junto a «Tiempo jugado»: tarjeta «Duración aproximada» con «23 h» (nunca
+  «unas 23 h»); debajo, una barra «Vas por el 42 % de la historia · te quedan 13 h» (tiempo jugado frente a
+  «Historia»), «Con extras: 29 h · Al 100 %: 38 h» y la línea de la fuente. Pasado el tiempo de la
+  historia: «Ya has jugado más de lo que suele durar». Con «Lo he terminado», sin barra.
+- Filtro de RetroShop: «⏱ Duración», que se elige en una ventana como «Género»: Todas / Cortos (hasta 5 h) /
+  Medios (5 a 15 h) / Largos (más de 15 h), por el tiempo de «Historia». Con el filtro puesto, cada portada
+  dice «⏱ 4 h» en lugar del tamaño; los juegos sin datos solo salen con «Todas»; «↺ Restablecer» lo quita.
+- El stick baja time-<consola>.json de la webapp y lo guarda una semana, como cheats-<consola>.json (Cheats.kt).
+- Webapp (pwa/src/components/GameSheet.tsx): los tres tiempos en la ficha, con la misma línea de la fuente.
+- Respeta la licencia de la fuente (cita o atribución donde haga falta).
+- Sube versionCode/versionName en android/app/build.gradle.kts, añade su Release en News.kt y documenta en el
+  README (sección 8.2l RetroShop y Detalles en 8.2m). Compila con
+  JAVA_HOME="C:/Users/Josep 2/tools/jdk-17" ./gradlew assembleDebug en android/.
+- Cuando compile, enséñame cómo queda y pídeme permiso antes de publicar
+  (node stick/publish-stick.mjs --launcher).
 ```
 
 ## Lo que se probó (2026-11-15)
 
-- **IGDB** (`game_time_to_beats`): casi nada de juegos antiguos (A Link to the Past con 1 voto; Super Mario 64,
-  Sonic y Golden Sun sin datos).
-- **HowLongToBeat**: sin API; su buscador (`/api/search/site`) pide un token anti-bots. No se usó.
-- **PlayMyData** (CC BY 4.0, IGDB + HowLongToBeat, juegos desde 1993): cobertura de la tienda NES 1 %, SMS 1 %,
-  GB 2 %, GBC 3 %, GBA 3 %, MD 4 %, Neo Geo 9 %, SNES 10 %, PS1 13 %, N64 32 %.
-- **TollBit** vende el acceso a HowLongToBeat; sin precio publicado (hay que pedir acceso o una demo).
+- **IGDB** (`game_time_to_beats`): casi nada de juegos antiguos.
+- **HowLongToBeat**: sin API; su buscador pide un token anti-bots. No se usó.
+- **PlayMyData** (CC BY 4.0): cobertura de la tienda entre el 1 % (NES) y el 32 % (N64).
+- **TollBit**: vende el acceso a HowLongToBeat; sin precio publicado.
