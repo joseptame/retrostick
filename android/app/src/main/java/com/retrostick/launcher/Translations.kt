@@ -31,12 +31,18 @@ object Translations {
         val version: String,
         /** What follows the tag in the name («25th Aniversary»…), or null */
         val extra: String?,
+        /** Revision of the game it was made on (0: the first release) */
+        val rev: Int = 0,
+        /** Made on another revision than this stick's ROM (shown only when its own has none) */
+        val otherRevision: Boolean = false,
     ) {
         val name get() = "Español - Traducido por $by"
         val details: String
             get() = listOfNotNull(
-                if (complete) "Completa" else "Antigua o parcial",
+                // GoodTools «T+»: the newest version of that translation («T-»: an earlier one)
+                if (complete) "Versión más reciente" else null,
                 version.takeIf { it.isNotBlank() }?.let { if (it.endsWith("%")) it else "v$it" },
+                if (otherRevision) "para la revisión ${if (rev == 0) "original" else "1.$rev"} del juego" else null,
                 extra,
                 "%.1f MB".format(java.util.Locale("es", "ES"), size / 1e6),
             ).joinToString(" · ")
@@ -45,7 +51,8 @@ object Translations {
     fun supports(console: Console) = console.id in CONSOLES
 
     private fun dir(context: Context) = File(context.filesDir, "translations")
-    private fun indexFile(context: Context, console: Console) = File(dir(context), "index-${console.id}.json")
+    // «v2»: lists before the revision field (2026-11-15) are fetched again
+    private fun indexFile(context: Context, console: Console) = File(dir(context), "index-v2-${console.id}.json")
     private fun romDir(console: Console) = File("$SDCARD/Traducciones/${console.id}")
 
     /** Blocking: the console's list, downloaded again after a week. Null without one. */
@@ -72,13 +79,14 @@ object Translations {
         if (!supports(game.console)) return emptyList()
         val entries = runCatching { JSONObject(indexFile(context, game.console).readText()).getJSONArray("entries") }.getOrNull() ?: return null
         val key = looseKey(game.title)
-        return (0 until entries.length()).map { entries.getJSONObject(it) }
-            .filter { it.optString("k") == key }
-            .map {
-                Translation(it.getString("f"), it.optLong("s"), it.optBoolean("c"), it.optString("by"), it.optString("v"),
-                    it.optString("x").takeIf { x -> x.isNotBlank() })
-            }
-            .sortedByDescending { it.complete }
+        val all = (0 until entries.length()).map { entries.getJSONObject(it) }.filter { it.optString("k") == key }
+        // The ones made on this ROM's revision («(Rev 1)»); every revision only when none was
+        val mine = Regex("""\(Rev\s*(\d+)\)""", RegexOption.IGNORE_CASE).find(game.baseName)?.groupValues?.get(1)?.toInt() ?: 0
+        val same = all.filter { it.optInt("rev") == mine }
+        return (same.ifEmpty { all }).map {
+            Translation(it.getString("f"), it.optLong("s"), it.optBoolean("c"), it.optString("by"), it.optString("v"),
+                it.optString("x").takeIf { x -> x.isNotBlank() }, it.optInt("rev"), otherRevision = same.isEmpty() && it.optInt("rev") != mine)
+        }.sortedByDescending { it.complete }
     }
 
     /** Blocking: as [cachedFor], fetching the list first when needed. */

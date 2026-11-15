@@ -100,8 +100,11 @@ class DetailsActivity : Activity() {
             game.region?.let { first.addView(chip(it, "#12FFFFFF", R.color.text)) }
             val langs = Languages.of(game.file.name)
             if (langs.contains("Español")) first.addView(chip("Español", "#244ADE80", R.color.ok))
-            else if (translation != null) first.addView(chip("Traducido al español", "#244ADE80", R.color.ok))
             addView(first)
+            // Its own row: next to the console and region it doesn't fit and breaks into three lines
+            if (!langs.contains("Español") && translation != null) addView(LinearLayout(this@DetailsActivity).apply {
+                addView(chip("Traducido al español", "#244ADE80", R.color.ok))
+            }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(5) })
             if (cheatNames.isNotEmpty()) addView(LinearLayout(this@DetailsActivity).apply {
                 addView(chip(if (cheatNames.size == 1) "1 truco activo" else "${cheatNames.size} trucos activos", "#29EAB308", R.color.cheat))
             }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(5) })
@@ -161,7 +164,9 @@ class DetailsActivity : Activity() {
             text = listOfNotNull(
                 game.file.name,
                 Formatter.formatShortFileSize(this@DetailsActivity, game.file.length()),
-                ra?.let { if (it.supported) "Versión válida para logros" else "Versión no válida para logros" },
+                // With a translation RetroArch opens another ROM: the original's check doesn't apply
+                if (translation != null) "Con la traducción los logros no suelen contar"
+                else ra?.let { if (it.supported) "Versión válida para logros" else "Versión no válida para logros" },
             ).joinToString("   ·   ")
         }
 
@@ -174,7 +179,7 @@ class DetailsActivity : Activity() {
                 addView(text(10f, R.color.text).apply {
                     text = android.text.SpannableStringBuilder("Se juega en español:  ").apply {
                         setSpan(android.text.style.StyleSpan(Typeface.BOLD), 0, length, 0)
-                        val s = length; append("traducción de ${t.by}  ·  ${if (t.complete) "completa" else "antigua o parcial"}")
+                        val s = length; append("traducción de ${t.by}")
                         setSpan(android.text.style.ForegroundColorSpan(getColor(R.color.text_2)), s, length, 0)
                     }
                     maxLines = 1; ellipsize = TextUtils.TruncateAt.END; gravity = Gravity.CENTER_VERTICAL

@@ -184,10 +184,10 @@ class TranslationsActivity : Activity() {
                 t == null -> originalLanguages
                 else -> t.details
             }
-            r.name.setTextColor(getColor(if (t == null || t.complete) R.color.text else R.color.text_2))
+            r.name.setTextColor(getColor(R.color.text))
             r.badge.text = if (inUse) "En uso" else ""
             r.badge.background = if (inUse) round(Color.parseColor("#294ADE80"), 6) else null
-            r.view.background = round(Color.parseColor(if (selected) "#1FFFFFFF" else if (t != null && !t.complete) "#08FFFFFF" else "#0FFFFFFF"), 8).apply {
+            r.view.background = round(Color.parseColor(if (selected) "#1FFFFFFF" else "#0FFFFFFF"), 8).apply {
                 if (selected) setStroke(dp(2), Color.WHITE) else setStroke(1, Color.parseColor("#14FFFFFF"))
             }
             r.view.elevation = if (selected) dp(6).toFloat() else 0f
