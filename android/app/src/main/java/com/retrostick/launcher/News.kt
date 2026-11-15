@@ -13,6 +13,10 @@ object News {
 
     /** Newest first. */
     val RELEASES = listOf(
+        Release(98, "1.30.0", listOf(
+            Item(R.drawable.ic_news, "Traducciones para Nintendo 64 y Game Boy Advance",
+                "En la ficha de muchos juegos de N64 y GBA aparece «Idioma»: GoldenEye, Banjo-Kazooie, Golden Sun y muchos más, traducidos al español por aficionados."),
+        )),
         Release(97, "1.29.1", listOf(
             Item(R.drawable.ic_settings, "Enviar informe",
                 "Si algo no va bien, en Retro Ajustes → Enviar informe mandas al administrador cómo está tu stick o tu tele, para que pueda ayudarte sin tenerla delante."),
