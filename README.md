@@ -119,7 +119,9 @@ Retro/
 ### 5.0 Stick nuevo sin PC: el asistente de bienvenida (launcher 1.24)
 Para el stick de otra persona (con su propio Google Drive y su usuario de la web), sin ADB:
 1. Instalar el launcher una vez (por ejemplo con la app «Downloader» y el enlace
-   `https://github.com/joseptame/retrostick/releases/download/stick/launcher.apk`) y elegirlo como pantalla de inicio.
+   `https://github.com/joseptame/retrostick/releases/download/stick/launcher.apk`). Desde la 1.30.1 instalarlo **no cambia la pantalla de inicio** ni hace que Android pregunte
+   «¿qué launcher?»: el filtro HOME está en el alias `HomeAlias` (`HomeApp.kt`), que se apaga en el primer arranque si
+   RetroStick no era ya la pantalla de inicio. Se elige en Retro Ajustes → Inicio → «Pantalla de inicio».
    **Google Play Protect lo bloquea** («Aplicación no segura bloqueada», porque apunta a Android 9): pulsar
    «Más detalles» → «Instalar igualmente». Lo mismo pasa luego con RetroArch y RetroStick Núcleos dentro del asistente,
    que lo explica en pantalla. El instalador de Android deja el cursor en «Cancelar» y, al acabar, en «Abrir»: hay que

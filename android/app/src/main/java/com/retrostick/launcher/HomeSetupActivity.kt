@@ -66,9 +66,12 @@ class HomeSetupActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        // Back from Android's home-app window
+        // Back from Android's home-app window: not chosen, so RetroStick stops being offered as home again
+        if (choosingHome) { choosingHome = false; HomeApp.settle(this) }
         if (::homeRow.isInitialized) render()
     }
+
+    private var choosingHome = false
 
     private val tiles get() = listOf<Console?>(null) + order
 
@@ -407,9 +410,7 @@ class HomeSetupActivity : Activity() {
 
     // ---- Home screen ----
 
-    private fun isHome(): Boolean =
-        packageManager.resolveActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), PackageManager.MATCH_DEFAULT_ONLY)
-            ?.activityInfo?.packageName == packageName
+    private fun isHome() = HomeApp.isHome(this)
 
     private fun otherLauncherName(): String {
         val info = packageManager.resolveActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo
@@ -418,16 +419,28 @@ class HomeSetupActivity : Activity() {
         return runCatching { packageManager.getApplicationLabel(packageManager.getApplicationInfo(info.packageName, 0)).toString() }.getOrDefault("otro launcher")
     }
 
-    /** Only Android changes the home app: its «make RetroStick the home app» window, or its home-app screen. */
+    /**
+     * To RetroStick: offered as home (HomeApp) and Android's own window to choose it (Android 10+), or its home-app
+     * screen, or its «which launcher?» window. Back to the other launcher: no longer offered, Android goes back to it.
+     */
     private fun toggleHome() {
         Sounds.play(Sounds.Sound.OPEN)
         val toRetroStick = !isHome()
         BootReceiver.setEnabled(this, toRetroStick)
-        val role = if (toRetroStick && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
+        if (!toRetroStick) {
+            HomeApp.setOffered(this, false)
+            Toast.makeText(this, "La pantalla de inicio vuelve a ser ${otherLauncherName()}", Toast.LENGTH_SHORT).show()
+            render()
+            return
+        }
+        HomeApp.setOffered(this, true)
+        choosingHome = true
+        val role = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
             getSystemService(android.app.role.RoleManager::class.java)?.takeIf { it.isRoleAvailable(android.app.role.RoleManager.ROLE_HOME) }
                 ?.createRequestRoleIntent(android.app.role.RoleManager.ROLE_HOME) else null
-        runCatching { if (role != null) startActivityForResult(role, 0) else startActivity(Intent(Settings.ACTION_HOME_SETTINGS)) }
-            .onFailure { Toast.makeText(this, R.string.app_missing, Toast.LENGTH_SHORT).show() }
+        val ok = runCatching { if (role != null) startActivityForResult(role, 0) else startActivity(Intent(Settings.ACTION_HOME_SETTINGS)) }.isSuccess ||
+            runCatching { startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)) }.isSuccess
+        if (!ok) { choosingHome = false; HomeApp.settle(this); Toast.makeText(this, R.string.app_missing, Toast.LENGTH_SHORT).show() }
     }
 
     // ---- Helpers ----
