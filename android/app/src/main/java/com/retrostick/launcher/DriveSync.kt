@@ -439,11 +439,15 @@ object DriveSync {
 
         private fun syncRoms(console: Console) {
             val folderId = dir("Retro/JugandoAhora/${console.id}")
-            val remote = drive.list(folderId).filter { !it.isFolder }.associateBy { it.name }
+            var remote = drive.list(folderId).filter { !it.isFolder }.associateBy { it.name }
             val local = localFiles(console.romDir)
             val manifest = prefs.getStringSet("roms", emptySet())!!.toMutableSet()
             fun save() = prefs.edit().putStringSet("roms", manifest.toSet()).apply()
             val auto = autoRoms(context)
+            if (console.id == "psx" && replaceWithChd(console, folderId, remote, local, manifest)) {
+                save()
+                remote = drive.list(folderId).filter { !it.isFolder }.associateBy { it.name }
+            }
 
             for (r in remote.values) {
                 checkCancel()
@@ -476,6 +480,45 @@ object DriveSync {
                 }
                 save()
             }
+        }
+
+        /**
+         * PlayStation discs turned into CHD on the stick (stick/psx-to-chd.mjs): «X.chd» here while Drive still has
+         * «X.cue» and its tracks («X.bin», «X (Track 2).bin»…). The CHD takes their place in Drive too: they go to
+         * Drive's bin (recoverable for 30 days) and the CHD is uploaded by the usual pass; a disc list (.m3u) now
+         * naming the CHDs replaces Drive's. Without this the stick would download the .bin/.cue again. True if
+         * anything changed.
+         */
+        private fun replaceWithChd(console: Console, folderId: String, remote: Map<String, DriveClient.RemoteFile>,
+                                   local: Map<String, File>, manifest: MutableSet<String>): Boolean {
+            var changed = false
+            for (chd in local.values.filter { it.extension.equals("chd", true) }) {
+                val base = chd.nameWithoutExtension
+                if ("$base.cue" !in remote) continue
+                checkCancel()
+                val old = remote.values.filter { r ->
+                    val ext = r.name.substringAfterLast('.', "").lowercase()
+                    val stem = r.name.substringBeforeLast('.')
+                    ext in setOf("cue", "bin") && (stem == base || stem.startsWith("$base (Track "))
+                }
+                for (r in old) {
+                    drive.trash(r.id)
+                    manifest -= "${console.id}/${r.name}"
+                    local[r.name]?.delete()
+                }
+                changed = true
+            }
+            // A disc list that now names .chd discs wins over Drive's older one (it named the .cue)
+            for (m3u in local.values.filter { it.extension.equals("m3u", true) }) {
+                val r = remote[m3u.name] ?: continue
+                if (r.size == m3u.length()) continue
+                val discs = runCatching { m3u.readLines().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("#") } }.getOrNull() ?: continue
+                if (discs.isEmpty() || !discs.all { it.endsWith(".chd", true) }) continue
+                checkCancel()
+                drive.upload(m3u, folderId, r.id)
+                changed = true
+            }
+            return changed
         }
     }
 }
