@@ -26,12 +26,25 @@ import { baseName, bestVariants, coverUrl, displayTitle, isDemo, looseKey, safeT
 import { DEFAULT_COLLECTIONS } from '../src/lib/recents.js'
 import { genreEs } from '../src/lib/genres.js'
 import { coverFor, loadDb, romsetName, romsetTitle } from '../src/lib/romdb.js'
+import { ES_ITEM, ES_TITLES, TR_ITEM } from '../src/lib/psx-es.js'
 
 // Node.js, not edge: Vercel's edge adds a "Forwarded" header to outgoing requests and archive.org answers
 // those with 400. (Imports carry .js: Node resolves ES modules by exact file name.)
 export const config = { runtime: 'nodejs', maxDuration: 60 }
 
 const CACHE_MS = 6 * 3600_000
+
+/**
+ * A piece downloaded from its own archive.org item (launcher 1.28.0 on): i item, f file, s size, a name to save it
+ * under (else its own), z: a zip whose files (a .cue and its .bin) are all saved.
+ */
+interface Part {
+  i: string
+  f: string
+  s: number
+  a?: string
+  z?: 1
+}
 
 interface ShopGame {
   t: string
@@ -48,6 +61,10 @@ interface ShopGame {
   c?: string
   /** archive.org item holding it, when not the collection's (EXTRAS) */
   i?: string
+  /** PlayStation in Spanish: what to download instead of f / d (psx-es.ts) */
+  x?: Part[]
+  /** A Spanish fan translation offered besides the original: by whom, total size, its pieces */
+  tr?: { by: string; s: number; x: Part[] }
 }
 
 /**
@@ -148,6 +165,9 @@ async function build(id: ConsoleId, collection: string, withExtras: boolean): Pr
     const p = players.games[looseKey(g.t)] ?? players.games[looseKey(displayTitle(g.n))]
     if (p) g.m = p
   }
+  if (id === 'psx' && withExtras && collection === DEFAULT_COLLECTIONS[id]) {
+    await spanishPsx(games, lookup, genreIndex, players?.games ?? {}).catch((e) => console.error('PS1 en español', e))
+  }
   games.sort((a, b) => (b.r ?? -1) - (a.r ?? -1) || a.t.localeCompare(b.t, 'es'))
   return JSON.stringify({ console: id, collection, title, restricted, archive, genres, games })
 }
@@ -177,5 +197,74 @@ export async function GET(request: Request): Promise<Response> {
     })
   } catch (e) {
     return new Response(e instanceof Error ? e.message : String(e), { status: 502 })
+  }
+}
+
+// ---- PlayStation in Spanish (psx-es.ts, public/db/psx-es.json) ----
+
+const fileName = (p: string) => p.slice(p.lastIndexOf('/') + 1)
+
+interface PsxRelease {
+  t: string
+  r: string
+  d: [string, number][]
+}
+
+/**
+ * The European PlayStation list with the Spanish releases instead of the same games (and the Spain-only ones
+ * added), and the fan translations offered on the European games that have no Spanish release.
+ */
+async function spanishPsx(
+  games: ShopGame[],
+  lookup: (name: string) => { genres: string[]; rating: number | null; year: number | null } | null,
+  genreIndex: (g: string) => number,
+  players: Record<string, number>,
+) {
+  const db = await fetchData<{ es: PsxRelease[]; tr: PsxRelease[] }>('db/psx-es.json')
+  const byKey = new Map(games.map((g) => [looseKey(g.t), g]))
+  const spanish = new Set<ShopGame>()
+  const sizeOf = (d: [string, number][]) => d.reduce((n, [, s]) => n + s, 0)
+
+  // 1. Spanish releases. Spain's last: when two map to one European game, Spain's stays.
+  const es = [...db.es].sort((a, b) => Number(/\(Spain/.test(a.r)) - Number(/\(Spain/.test(b.r)))
+  const covers = await Promise.all(es.map((e) => coverFor('psx', e.r).catch(() => null)))
+  es.forEach(({ t, r, d }, n) => {
+    const x: Part[] = d.map(([f, s]) => ({ i: ES_ITEM, f, s, z: 1 }))
+    const euro = byKey.get(looseKey(ES_TITLES[t] ?? t))
+    if (euro) {
+      // Same game: its IGDB data and players stay, the rest is the Spanish release
+      Object.assign(euro, { t, n: r, f: d[0][0], s: sizeOf(d), i: ES_ITEM, x })
+      delete euro.p
+      delete euro.d
+      if (covers[n]) euro.c = covers[n]!
+      spanish.add(euro)
+      return
+    }
+    const game: ShopGame = { t, f: d[0][0], s: sizeOf(d), n: r, i: ES_ITEM, x }
+    const info = lookup(r)
+    if (info?.rating != null) game.r = info.rating
+    if (info?.genres.length) game.g = info.genres.map((g) => genreIndex(genreEs(g)))
+    if (info?.year) game.y = info.year
+    if (players[looseKey(t)]) game.m = players[looseKey(t)]
+    game.c = covers[n] ?? coverUrl(CONSOLES.find((c) => c.id === 'psx')!.thumbs, safeThumbName(r), 'Named_Titles')
+    games.push(game)
+    byKey.set(looseKey(t), game)
+    spanish.add(game)
+  })
+
+  // 2. Fan translations of the European games still without Spanish
+  for (const { t, r, d } of db.tr) {
+    const g = byKey.get(looseKey(t))
+    if (!g || spanish.has(g)) continue
+    // Saved under the European discs' names: the stick sees the same game (cover, ficha, saves)
+    const names = g.d ? g.d.map((x) => fileName(x.f)) : [fileName(g.f)]
+    if (names.length !== d.length) continue
+    const words = (r.match(/[([]T-Spa\s+([^)\]]+)[)\]]/)?.[1] ?? '').split(/\s+/)
+    if (words.length > 1 && /^v?\d[\w.-]*$/i.test(words[words.length - 1])) words.pop()
+    g.tr = {
+      by: words.join(' ').replace(/_/g, ' ').trim() || 'aficionados',
+      s: sizeOf(d),
+      x: d.map(([f, s], i) => ({ i: TR_ITEM, f, s, a: names[i] })),
+    }
   }
 }

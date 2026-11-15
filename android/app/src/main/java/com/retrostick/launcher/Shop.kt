@@ -19,6 +19,12 @@ import java.util.concurrent.Executors
  * and the next Drive sync backs them up to Retro/JugandoAhora (DriveSync.syncRoms uploads files it didn't put
  * there), so they show up in the webapp too.
  */
+/**
+ * A piece of a game kept in its own archive.org [item] (catalog "x"): a [file] saved as [saveAs] (else its own
+ * name), or with [unzip] a zip whose files are all saved (a PlayStation .cue and its .bin tracks).
+ */
+class ShopPart(val item: String, val file: String, val size: Long, val saveAs: String?, val unzip: Boolean)
+
 class ShopGame(
     val title: String,
     val file: String,
@@ -37,6 +43,11 @@ class ShopGame(
     val players: Int = 0,
     /** archive.org item to download it from when it isn't the collection's (a single game added to the list, catalog "i") */
     val item: String? = null,
+    /** PlayStation in Spanish: what is downloaded instead of [file] / [discs] (catalog "x") */
+    val parts: List<ShopPart> = emptyList(),
+    /** The same game translated to Spanish by fans, offered besides it (catalog "tr"), and by whom */
+    val translation: ShopGame? = null,
+    val translatedBy: String? = null,
 ) {
     val looseTitle = looseKey(title)
 }
@@ -203,6 +214,12 @@ object ShopApi {
                 List(d.length()) { d.getJSONObject(it).let { x -> x.getString("f") to x.getLong("s") } }
             }.orEmpty()
             val gi = g.optJSONArray("g")
+            fun parts(a: org.json.JSONArray?) = List(a?.length() ?: 0) { k ->
+                a!!.getJSONObject(k).let { p ->
+                    ShopPart(p.getString("i"), p.getString("f"), p.optLong("s"), p.optString("a").takeIf { it.isNotEmpty() }, p.optInt("z") == 1)
+                }
+            }
+            val tr = g.optJSONObject("tr")
             ShopGame(
                 title = g.getString("t"),
                 file = g.getString("f"),
@@ -216,6 +233,12 @@ object ShopApi {
                 cover = g.optString("c").takeIf { it.isNotEmpty() },
                 players = g.optInt("m", 0),
                 item = g.optString("i").takeIf { it.isNotEmpty() },
+                parts = parts(g.optJSONArray("x")),
+                translation = tr?.let {
+                    ShopGame(g.getString("t"), g.getString("f"), it.optLong("s"), g.getString("n"), null, emptyList(),
+                        null, emptyList(), null, null, parts = parts(it.optJSONArray("x")))
+                },
+                translatedBy = tr?.optString("by"),
             )
         }
         return ShopCatalog(
@@ -279,6 +302,7 @@ object ShopDownloads {
         val catalog = job.catalog
         val game = job.game
         val dir = catalog.console.romDir.apply { mkdirs() }
+        if (game.parts.isNotEmpty()) return downloadParts(job, dir)
         if (game.discs.isNotEmpty()) {
             // PS1 multi-disc: every disc keeps its name, a .m3u ties them together (as the webapp does).
             job.total = game.discs.sumOf { it.second }
@@ -308,6 +332,44 @@ object ShopDownloads {
         val target = File(dir, if (catalog.console.id == "psx") game.file.substringAfterLast('/') else "${game.name}.$ext")
         fetchTo(catalog, game.file, game.size, target) { job.done = it; tick() }
         if (catalog.console.id == "neogeo") neoGeoBios(catalog, game.file, dir)
+    }
+
+    /** [ShopGame.parts]: each one from its item; several discs get a .m3u, as the European ones. */
+    private fun downloadParts(job: Job, dir: File) {
+        val game = job.game
+        // url, name to save as, size (a zip brings all its files: the .cue and its .bin tracks)
+        val plan = game.parts.flatMap { p ->
+            val base = "https://archive.org/download/${enc(p.item)}/${encPath(p.file)}"
+            if (p.unzip) zipFiles(base).map { (inner, size) -> Triple("$base/${encPath(inner)}", inner.substringAfterLast('/'), size) }
+            else listOf(Triple(base, p.saveAs ?: p.file.substringAfterLast('/'), p.size))
+        }
+        job.total = plan.sumOf { it.third }
+        var before = 0L
+        for ((url, name, size) in plan) {
+            val target = File(dir, name)
+            if (!(target.isFile && size > 0 && target.length() == size)) get(url, target) { job.done = before + it; tick() }
+            before += size
+        }
+        val discs = plan.map { it.second }.filter { it.substringAfterLast('.').lowercase() in setOf("cue", "chd") }
+        if (discs.size > 1) {
+            val m3u = discs.first().replace(Regex("""\s*\(Disc \d+\)""", RegexOption.IGNORE_CASE), "").substringBeforeLast('.') + ".m3u"
+            File(dir, m3u).writeText(discs.joinToString("\n", postfix = "\n"))
+        }
+    }
+
+    /** The files in a zip on archive.org and their sizes, from its listing page. */
+    private fun zipFiles(url: String): List<Pair<String, Long>> {
+        val conn = ShopApi.open("$url/")
+        val html = try {
+            if (conn.responseCode != 200) throw IllegalStateException("archive.org respondió ${conn.responseCode}")
+            conn.inputStream.bufferedReader().readText()
+        } finally {
+            conn.disconnect()
+        }
+        val rows = Regex("""<tr><td><a\b[^>]*>([^<]*)</a>.*?<td id="size">(\d+)""").findAll(html)
+            .map { decode(it.groupValues[1]) to it.groupValues[2].toLong() }.filter { !it.first.endsWith("/") }.toList()
+        if (rows.isEmpty()) throw IllegalStateException("No se pudo leer el contenido de la descarga")
+        return rows
     }
 
     /**
@@ -395,6 +457,7 @@ object ShopDownloads {
     fun partialBytes(catalog: ShopCatalog, game: ShopGame): Long {
         val dir = catalog.console.romDir
         fun part(name: String) = File(dir, ".$name.part").let { if (it.isFile) it.length() else 0L }
+        if (game.parts.isNotEmpty()) return game.parts.sumOf { p -> p.saveAs?.let { part(it) } ?: 0L }
         if (game.discs.isNotEmpty()) return game.discs.sumOf { (file, size) ->
             val name = file.substringAfterLast('/')
             File(dir, name).let { if (it.isFile && it.length() == size) size else part(name) }
@@ -407,7 +470,7 @@ object ShopDownloads {
     }
 
     /** Full size of the download (all discs). */
-    fun totalBytes(game: ShopGame) = if (game.discs.isNotEmpty()) game.discs.sumOf { it.second } else game.size
+    fun totalBytes(game: ShopGame) = if (game.parts.isNotEmpty()) game.parts.sumOf { it.size } else if (game.discs.isNotEmpty()) game.discs.sumOf { it.second } else game.size
 
     /** Restricted items (PS1 set): 8 MiB pieces through api/download.ts, which adds the archive.org keys. */
     private fun viaWebapp(catalog: ShopCatalog, file: String, size: Long, target: File, progress: (Long) -> Unit) {

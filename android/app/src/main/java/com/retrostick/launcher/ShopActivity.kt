@@ -510,7 +510,10 @@ class ShopActivity : Activity() {
 
     /** A Spanish fan translation exists and this release has no Spanish of its own. */
     private fun hasTranslation(g: ShopGame) =
-        g.looseTitle in translatable && "Español" !in Languages.of(g.file).ifEmpty { Languages.of(g.name) }
+        g.translation != null || g.looseTitle in translatable && "Español" !in Languages.of(g.file).ifEmpty { Languages.of(g.name) }
+
+    /** The game's download, or its translation's (PlayStation: «Descargar traducido»). */
+    private fun jobOf(g: ShopGame) = ShopDownloads.jobFor(g) ?: g.translation?.let { ShopDownloads.jobFor(it) }
 
     private fun refreshOwned() {
         val files = console.romDir.listFiles()?.filter { it.isFile && !it.name.startsWith(".") }.orEmpty()
@@ -616,7 +619,7 @@ class ShopActivity : Activity() {
             card.meta.text = listOfNotNull(sizeOf(g), g.year?.toString(), g.genres.firstOrNull()).joinToString(" · ")
             card.rating.visibility = if (g.rating != null) View.VISIBLE else View.GONE
             card.rating.text = g.rating?.let { "★ " + String.format("%.1f", it).replace('.', ',') }
-            val job = ShopDownloads.jobFor(g)
+            val job = jobOf(g)
             when {
                 isOwned(g) -> badge(card, "En el stick", getColor(R.color.ok), R.drawable.ic_shop_check)
                 job?.state == ShopDownloads.State.RUNNING -> badge(card, "${(job.progress * 100).toInt()} %", Color.WHITE)
@@ -935,7 +938,7 @@ class ShopActivity : Activity() {
             }
             // No Spanish of its own but a fan translation: said here, chosen after downloading (Detalles → Idioma)
             if (hasTranslation(g)) {
-                if (!Translations.cachedFor(this@ShopActivity, console, g.title, g.name).isNullOrEmpty()) {
+                if (g.translation != null || !Translations.cachedFor(this@ShopActivity, console, g.title, g.name).isNullOrEmpty()) {
                     append("   ·   ")
                     val start = length
                     append("Traducción al español disponible")
@@ -994,7 +997,7 @@ class ShopActivity : Activity() {
     /** Buttons and download progress of the open sheet; also called on every download update. */
     private fun renderFicha() {
         val g = ficha ?: return
-        val job = ShopDownloads.jobFor(g)
+        val job = jobOf(g)
         val state = job?.state
         val item = driveItem
         val passing = item?.let { DriveCollection.jobFor(it) }
@@ -1017,6 +1020,7 @@ class ShopActivity : Activity() {
                 val have = if (cat != null) ShopDownloads.partialBytes(cat, g) else 0L
                 val total = ShopDownloads.totalBytes(g)
                 if (have > 0) DOWNLOAD to "Descarga a medias: seguirá donde se quedó (${Formatter.formatShortFileSize(this, have)} de ${Formatter.formatShortFileSize(this, total)})."
+                else if (g.translation != null) DOWNLOAD to "«Descargar traducido»: la traducción al español de ${g.translatedBy}. Se guarda en el stick y se copia a tu Drive."
                 else DOWNLOAD to "Se guarda en el stick y se copia a tu Drive."
             }
         }
@@ -1039,7 +1043,7 @@ class ShopActivity : Activity() {
             }
             b.setTextColor(if (focus) getColor(R.color.button_text) else getColor(R.color.text))
             val icon = when (labels[i]) {
-                DOWNLOAD, PASS -> R.drawable.ic_shop_download
+                DOWNLOAD, DOWNLOAD_ORIGINAL, DOWNLOAD_TRANSLATED, PASS -> R.drawable.ic_shop_download
                 PLAY -> R.drawable.ic_shop_play
                 OWNED -> R.drawable.ic_shop_check
                 RETRY -> R.drawable.ic_shop_retry
@@ -1079,6 +1083,8 @@ class ShopActivity : Activity() {
         val item = driveItem
         val s = item?.let { DriveCollection.jobFor(it)?.state }
         return if (item != null && s != DriveCollection.State.RUNNING && s != DriveCollection.State.DONE) listOf(first, DELETE_DRIVE, BACK)
+        // A PlayStation game with a fan translation: either one
+        else if (first == DOWNLOAD && ficha?.translation != null) listOf(DOWNLOAD_ORIGINAL, DOWNLOAD_TRANSLATED, BACK)
         else listOf(first, BACK)
     }
 
@@ -1126,6 +1132,7 @@ class ShopActivity : Activity() {
                 when (labels.getOrNull(fichaButton)) {
                     BACK -> return closeFicha()
                     DELETE_DRIVE -> return confirmDeleteFromDrive()
+                    DOWNLOAD_TRANSLATED -> g.translation?.let { download(it) }
                     else -> download(g)
                 }
             }
@@ -1327,6 +1334,8 @@ class ShopActivity : Activity() {
         private const val FICHA_BAR_DP = 320
         private const val MAX_SHOTS = 6
         private const val DOWNLOAD = "Descargar"
+        private const val DOWNLOAD_ORIGINAL = "Descargar original"
+        private const val DOWNLOAD_TRANSLATED = "Descargar traducido"
         private const val OWNED = "En el stick"
         private const val RETRY = "Reintentar"
         private const val BACK = "Volver"
