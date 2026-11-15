@@ -265,8 +265,8 @@ class ShopActivity : Activity() {
 
         filters = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         col.addView(filters, LinearLayout.LayoutParams(-1, dp(30)).apply { topMargin = dp(12) })
-        // 🔍 Buscar · the sorts · Género
-        repeat(Sort.values().size + 3) {
+        // 🔍 Buscar · the sorts · Género · Para dos · Restablecer
+        repeat(Sort.values().size + 4) {
             val v = text(10f, R.color.chip_text).apply {
                 gravity = Gravity.CENTER
                 setPadding(dp(13), 0, dp(13), 0)
@@ -609,14 +609,16 @@ class ShopActivity : Activity() {
             }
             v.alpha = if (selected) 1f else 0.75f
         }
-        val labels = listOf(query?.let { "«$it»" } ?: "Buscar") + Sort.values().map { it.label } + "Género: ${genre ?: "Todos"}" + "Para dos"
+        val labels = listOf(query?.let { "«$it»" } ?: "Buscar") + Sort.values().map { it.label } + "Género: ${genre ?: "Todos"}" + "Para dos" + "↺  Restablecer"
+        val canReset = filtered()
         filterViews.forEachIndexed { i, v ->
             v.text = labels[i]
             val on = when {
                 i == 0 -> query != null
                 i <= Sort.values().size -> Sort.values()[i - 1] == sort
                 i == Sort.values().size + 1 -> genre != null
-                else -> twoPlayers
+                i == Sort.values().size + 2 -> twoPlayers
+                else -> false
             }
             val focus = zone == Zone.FILTERS && i == filterIndex
             v.background = round(if (on) getColor(R.color.accent_start) else getColor(R.color.surface), 13).apply {
@@ -624,7 +626,9 @@ class ShopActivity : Activity() {
             }
             v.setTextColor(if (on || focus) Color.WHITE else getColor(R.color.chip_text))
             if (i == 0) v.icon(R.drawable.ic_shop_search, 13, v.currentTextColor)
-            if (i == filterViews.lastIndex) v.icon(R.drawable.ic_players, 13, v.currentTextColor)
+            if (i == Sort.values().size + 2) v.icon(R.drawable.ic_players, 13, v.currentTextColor)
+            // Restablecer: dimmed while there's nothing to undo
+            if (i == filterViews.lastIndex) v.alpha = if (canReset || focus) 1f else 0.45f
         }
         message.visibility = if (shown.isEmpty()) View.VISIBLE else View.GONE
         message.text = when {
@@ -817,10 +821,20 @@ class ShopActivity : Activity() {
         loadCatalog()
     }
 
+    /** Anything chosen in the filters row (Restablecer puts it all back) */
+    private fun filtered() = query != null || sort != Sort.RATING || genre != null || twoPlayers
+
     private fun chooseFilter() {
         if (filterIndex == 0) return askSearch()
         if (filterIndex <= Sort.values().size) {
             sort = Sort.values()[filterIndex - 1]
+            applyFilters(resetSelection = true)
+            return
+        }
+        if (filterIndex == Sort.values().size + 3) {
+            if (!filtered()) return
+            query = null; sort = Sort.RATING; genre = null; twoPlayers = false
+            Sounds.play(Sounds.Sound.BACK)
             applyFilters(resetSelection = true)
             return
         }
