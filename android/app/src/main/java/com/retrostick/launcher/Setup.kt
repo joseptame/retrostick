@@ -51,6 +51,7 @@ object Setup {
      */
     fun checkUpdates(context: Context): Boolean {
         if (!usesCoresApp(context)) return false
+        dropPackPsxButtons(context)
         val now = System.currentTimeMillis()
         if (now - lastCheck < 30 * 60_000L) return false
         lastCheck = now
@@ -87,6 +88,24 @@ object Setup {
         // installed has one, without cores: every game stayed black; seen on a Mi TV, 2026-11-14)
         val pack = File("$SDCARD/RetroArch/config/FCEUmm/nes.cfg").isFile
         return storage && (!retroArchCfg().isFile || !File("$SDCARD/RetroArch/config").isDirectory || !pack)
+    }
+
+    /**
+     * Once: the PlayStation buttons of the 2026-11-13 pack (the admin's own choice in Botones, Cross and Circle
+     * swapped) go away on a stick that never changed them, which then plays with PCSX-ReARMed's own layout.
+     * The packs since leave out the buttons chosen on a stick (config-pack.mjs).
+     */
+    private fun dropPackPsxButtons(context: Context) {
+        val prefs = prefs(context)
+        if (prefs.getBoolean("psxButtonsFixed", false)) return
+        runCatching {
+            val name = "RetroArch/config/remaps/PCSX-ReARMed/psx.rmp"
+            val file = File(SDCARD, name)
+            val written = JSONObject(writtenFile(context).readText()).optString(name)
+            if (file.isFile && written.isNotEmpty() && sha256(file.readBytes()) == written && file.delete())
+                android.util.Log.i("RetroStick", "Config pack: removed the pack's PlayStation buttons")
+        }
+        prefs.edit().putBoolean("psxButtonsFixed", true).apply()
     }
 
     private fun writtenFile(context: Context) = File(context.filesDir, "config-files.json")

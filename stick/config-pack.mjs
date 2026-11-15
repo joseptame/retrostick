@@ -7,7 +7,7 @@
 //   retroarch-keys.cfg              the keys of retroarch.cfg that differ from RetroArch's own defaults
 //                                   (diff against retroarch.cfg.orig, saved by install.ps1), minus personal ones
 //   pack.json                       { version, created }
-// Nothing personal: no RetroAchievements account, no Drive or web sessions, no saves, BIOS or games.
+// Nothing personal: no buttons chosen in Retro Ajustes → Botones, no RetroAchievements account, no Drive or web sessions, no saves, BIOS or games.
 //
 //   node stick/config-pack.mjs [adb serial]      → stick/dist/retrostick-config.zip
 import { execFileSync } from 'node:child_process'
@@ -46,6 +46,13 @@ for (const f of files(configRoot)) {
   const base = parts.at(-1).replace(/\.(cfg|opt|rmp)$/, '')
   if (!(base === coreDir || CONSOLES.includes(base))) {
     console.log(`  (fuera, es de un juego) ${rel}`)
+    continue
+  }
+  // Buttons chosen in Retro Ajustes → Botones are that stick's owner's taste, not RetroStick's: a new stick starts
+  // from the core's remap (its .rmp in stick/retroarch/remaps). The 2026-11-13 pack carried the admin's PlayStation
+  // one with Cross and Circle swapped, and new sticks got it.
+  if (parts[0] === 'remaps' && readFileSync(f, 'utf8').includes('buttons chosen in RetroStick')) {
+    console.log(`  (fuera, botones elegidos en ese stick) ${rel}`)
     continue
   }
   cpSync(f, join(work, 'RetroArch/config', rel))
