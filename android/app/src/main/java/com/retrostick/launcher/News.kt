@@ -13,6 +13,10 @@ object News {
 
     /** Newest first. */
     val RELEASES = listOf(
+        Release(97, "1.29.1", listOf(
+            Item(R.drawable.ic_settings, "Enviar informe",
+                "Si algo no va bien, en Retro Ajustes → Enviar informe mandas al administrador cómo está tu stick o tu tele, para que pueda ayudarte sin tenerla delante."),
+        )),
         Release(96, "1.29.0", listOf(
             Item(R.drawable.ic_news, "PlayStation en español",
                 "En RetroShop, los juegos de PlayStation que salieron en España aparecen en español. En muchos otros puedes elegir una versión hecha por aficionados: con voces y textos, solo textos o mejorada."),
