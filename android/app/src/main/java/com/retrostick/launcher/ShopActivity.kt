@@ -82,6 +82,8 @@ class ShopActivity : Activity() {
     private lateinit var fichaButtonsRow: LinearLayout
     private lateinit var fichaShotsTitle: TextView
     private lateinit var fichaShotsRow: LinearLayout
+    /** The screenshots row scrolls by itself so the one chosen is always whole on screen */
+    private lateinit var fichaShotsScroll: android.widget.HorizontalScrollView
     private lateinit var viewer: FrameLayout
     private lateinit var viewerImage: ImageView
     private lateinit var viewerCount: TextView
@@ -397,6 +399,17 @@ class ShopActivity : Activity() {
             fichaShotsRow.addView(v, LinearLayout.LayoutParams(dp(150), dp(84)).apply { marginEnd = dp(10) })
             fichaShotViews += v
         }
+        fichaShotsScroll = android.widget.HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            overScrollMode = View.OVER_SCROLL_NEVER
+            isFocusable = false
+            descendantFocusability = android.view.ViewGroup.FOCUS_BLOCK_DESCENDANTS
+            clipChildren = false
+            clipToPadding = false
+            // Room for the chosen one's zoom and border, above and below
+            setPadding(0, dp(6), 0, dp(6))
+            addView(fichaShotsRow)
+        }
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             clipChildren = false
@@ -404,7 +417,7 @@ class ShopActivity : Activity() {
             setPadding(dp(56), dp(36), dp(48), dp(20))
             addView(top)
             addView(fichaShotsTitle, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(18) })
-            addView(fichaShotsRow, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
+            addView(fichaShotsScroll, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(2) })
         }
         // Full-screen screenshot
         viewerImage = ImageView(this).apply { scaleType = ImageView.ScaleType.FIT_CENTER }
@@ -1020,7 +1033,7 @@ class ShopActivity : Activity() {
                 val have = if (cat != null) ShopDownloads.partialBytes(cat, g) else 0L
                 val total = ShopDownloads.totalBytes(g)
                 if (have > 0) DOWNLOAD to "Descarga a medias: seguirá donde se quedó (${Formatter.formatShortFileSize(this, have)} de ${Formatter.formatShortFileSize(this, total)})."
-                else if (g.translation != null) DOWNLOAD to "«Descargar traducido»: la traducción al español de ${g.translatedBy}. Se guarda en el stick y se copia a tu Drive."
+                else if (g.translation != null) DOWNLOAD to "«Descargar traducido»: traducción al español hecha por aficionados. Se guarda en el stick y se copia a tu Drive."
                 else DOWNLOAD to "Se guarda en el stick y se copia a tu Drive."
             }
         }
@@ -1072,6 +1085,18 @@ class ShopActivity : Activity() {
             }
             v.scaleX = if (focus) 1.08f else 1f
             v.scaleY = v.scaleX
+        }
+        // The chosen screenshot whole on screen (with a little of the next one showing); back to the start up top
+        fichaShotsScroll.post {
+            if (fichaRow != 1) return@post fichaShotsScroll.smoothScrollTo(0, 0)
+            val v = fichaShotViews.getOrNull(fichaShot) ?: return@post
+            val pad = dp(24)
+            val x = fichaShotsScroll.scrollX
+            val w = fichaShotsScroll.width
+            when {
+                v.left - pad < x -> fichaShotsScroll.smoothScrollTo((v.left - pad).coerceAtLeast(0), 0)
+                v.right + pad > x + w -> fichaShotsScroll.smoothScrollTo(v.right + pad - w, 0)
+            }
         }
     }
 
