@@ -65,6 +65,9 @@ object Setup {
         return true
     }
 
+    /** The assistant has begun on this stick: until [markDone], opening RetroStick always goes back to it. */
+    fun markStarted(context: Context) = prefs(context).edit().putBoolean("started", true).apply()
+
     fun markDone(context: Context, config: String) =
         prefs(context).edit().putBoolean("done", true).putBoolean("coresApp", true).putString("config", config).apply()
 
@@ -74,6 +77,9 @@ object Setup {
      */
     fun needed(context: Context): Boolean {
         if (prefs(context).getBoolean("done", false)) return false
+        // Begun and not finished (RetroArch closed by hand, the configuration cut halfway…): whatever files are
+        // already there, the configuration isn't complete (seen on a Mi TV with Android 10, 2026-11-14)
+        if (prefs(context).getBoolean("started", false)) return true
         if (versionCode(context, RETROARCH_PACKAGE) == null) return true
         val storage = context.checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
         // RetroStick's configuration missing: no config file, or no per-console settings from the pack. RetroArch's

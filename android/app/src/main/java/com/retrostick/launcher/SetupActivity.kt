@@ -56,6 +56,7 @@ class SetupActivity : Activity() {
     /** Installers and RetroArch are opened by themselves only once per step; after that, A opens them again. */
     private val autoOpened = mutableSetOf<Step>()
     private var waitingForRetroArch = false
+    private var resumed = false
 
     private lateinit var rows: LinearLayout
     private lateinit var hint: TextView
@@ -100,11 +101,18 @@ class SetupActivity : Activity() {
         col.addView(foot, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(14) })
         root.addView(col, FrameLayout.LayoutParams(dp(760), -2, Gravity.CENTER))
         setContentView(root)
+        Setup.markStarted(this)
     }
 
     override fun onResume() {
         super.onResume()
+        resumed = true
         advance()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        resumed = false
     }
 
     override fun onDestroy() {
@@ -228,7 +236,7 @@ class SetupActivity : Activity() {
             main.postDelayed(::waitForRetroArch, 2000)
         }
         detail = "Se abrirá RetroArch. Si pide permiso para acceder a los archivos, acepta. En cuanto haya creado sus " +
-            "carpetas lo cierro y vuelvo aquí solo."
+            "carpetas vuelvo aquí solo; si no vuelve, sal de RetroArch con el botón Inicio y abre RetroStick: seguirá donde se quedó."
         setAction("Abrir RetroArch") { open() }
         render()
         if (autoOpened.add(Step.FIRST_RUN)) main.postDelayed({ open() }, 1500)
@@ -243,6 +251,13 @@ class SetupActivity : Activity() {
             // A moment for RetroArch to finish writing, then this screen comes back to the front
             main.postDelayed({
                 startActivity(Intent(this, SetupActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
+                // Android 10+ doesn't let an app in the background come to the front (a TV whose home isn't
+                // RetroStick): RetroArch stays. A notice over it says how to go on; RetroStick picks up by itself.
+                main.postDelayed({
+                    if (!resumed && !isFinishing) android.widget.Toast.makeText(this,
+                        "RetroArch ya está listo. Sal de RetroArch (botón Inicio del mando de la tele) y abre RetroStick para seguir.",
+                        android.widget.Toast.LENGTH_LONG).show()
+                }, 2500)
             }, 3000)
         } else {
             main.postDelayed(::waitForRetroArch, 2000)
