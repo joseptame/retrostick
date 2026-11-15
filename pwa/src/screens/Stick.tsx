@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { AppState } from '../App'
 import { BiosSection } from '../components/BiosSection'
 import { UsersSection } from '../components/UsersSection'
+import { ReportsSection } from '../components/ReportsSection'
 import { PairSheet } from '../components/PairSheet'
 import { RaSection } from '../components/RaSection'
 import { Icon, type IconName } from '../components/icons'
@@ -56,6 +57,8 @@ export function Stick({ state, onSignOut }: { state: AppState; onSignOut: () => 
       <RaSection state={state} />
 
       <BiosSection state={state} />
+
+      <ReportsSection state={state} />
 
       <h3 className="sec2">Cuenta</h3>
       <div className="rows">

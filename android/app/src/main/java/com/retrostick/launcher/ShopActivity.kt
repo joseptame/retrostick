@@ -96,6 +96,8 @@ class ShopActivity : Activity() {
     private var fichaShot = 0
     private var viewerIndex = -1
     private var fichaButton = 0
+    /** The buttons the ficha shows now (renderFicha): the pad moves and presses through these */
+    private var shownLabels: List<String> = emptyList()
     /** Drive mode (EXTRA_DRIVE_FILE): only the ficha of a game in the Drive collection, to pass it to the stick. */
     private var driveItem: DriveCollection.Item? = null
     /** Stick mode (EXTRA_STICK_FILE): the ficha of a game already on the stick, whose first button plays it. */
@@ -1071,6 +1073,7 @@ class ShopActivity : Activity() {
             width = (dp(FICHA_BAR_DP) * ((if (item != null) passing?.progress else job?.progress) ?: 0f)).toInt()
         }
         val labels = fichaLabels(first)
+        shownLabels = labels
         fichaButton = fichaButton.coerceAtMost(labels.size - 1)
         fichaButtons.forEachIndexed { i, b ->
             b.visibility = if (i < labels.size) View.VISIBLE else View.GONE
@@ -1168,7 +1171,8 @@ class ShopActivity : Activity() {
         }
         if (viewerIndex >= 0) return viewerKey(code)
         val g = ficha ?: return
-        val labels = fichaLabels("")
+        // The ones on screen: «Descargar original», «Voces y textos», «Solo textos», «Volver»… (not just two)
+        val labels = shownLabels.ifEmpty { fichaLabels("") }
         when (code) {
             KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_BUTTON_B -> return closeFicha()
             KeyEvent.KEYCODE_DPAD_LEFT ->
