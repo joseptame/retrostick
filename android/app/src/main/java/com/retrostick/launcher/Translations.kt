@@ -32,7 +32,7 @@ object Translations {
         /** What follows the tag in the name («25th Aniversary»…), or null */
         val extra: String?,
     ) {
-        val name get() = "Español · $by"
+        val name get() = "Español - Traducido por $by"
         val details: String
             get() = listOfNotNull(
                 if (complete) "Completa" else "Antigua o parcial",
