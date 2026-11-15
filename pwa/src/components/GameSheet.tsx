@@ -1,7 +1,26 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import type { ConsoleId } from '../lib/consoles'
 import type { IgdbGame } from '../lib/igdb'
-import { languages } from '../lib/names'
+import { displayTitle, languages } from '../lib/names'
+
+/** Consoles with Spanish fan translations (public/db/trans-<console>.json, scripts/build-translations.ts). */
+const TRANSLATED = new Set(['nes', 'snes', 'gb', 'gbc', 'md', 'sms', 'n64', 'gba'])
+const translatedCache = new Map<string, Promise<Set<string>>>()
+
+/** The title keys with a translation on [consoleId] (as the stick's Translations.kt matches them). */
+function translatedTitles(consoleId: string): Promise<Set<string>> {
+  let p = translatedCache.get(consoleId)
+  if (!p) {
+    p = fetch(`/db/trans-${consoleId}.json`)
+      .then((r) => (r.ok ? r.json() : { entries: [] }))
+      .then((j: { entries?: { k: string }[] }) => new Set((j.entries ?? []).map((e) => e.k)))
+      .catch(() => new Set<string>())
+    translatedCache.set(consoleId, p)
+  }
+  return p
+}
+
+const titleKey = (name: string) => displayTitle(name).normalize('NFD').toLowerCase().replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '')
 import { Banner, Cover, fitWideArt, useCoverUrl } from './ui'
 
 const EXIT_MS = 280
@@ -107,6 +126,15 @@ export function GameSheet(p: Props) {
   const d = p.data
   const title = d?.name || p.fallbackTitle
   const langs = languages(p.fileName)
+  // No Spanish of its own but a fan translation: said here, chosen on the stick (Detalles → Idioma)
+  const [translated, setTranslated] = useState(false)
+  useEffect(() => {
+    setTranslated(false)
+    if (langs.spanish || !TRANSLATED.has(p.consoleId)) return
+    let live = true
+    void translatedTitles(p.consoleId).then((keys) => { if (live) setTranslated(keys.has(titleKey(p.fileName))) })
+    return () => { live = false }
+  }, [p.consoleId, p.fileName, langs.spanish])
   const heroImg = d?.screenshots?.[0] ?? d?.coverUrl ?? null
   const longDesc = (d?.description?.length ?? 0) > 220
   const sheetStyle: CSSProperties = drag
@@ -170,8 +198,10 @@ export function GameSheet(p: Props) {
                       {l}
                     </b>
                   ))}
+                  {translated && <b className="es">Traducción al español disponible</b>}
                 </div>
               )}
+              {translated && <p className="gs-trans-hint">Se elige en el stick: en la ficha del juego, «Idioma».</p>}
             </div>
           </div>
 
