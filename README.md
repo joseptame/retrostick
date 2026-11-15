@@ -1,11 +1,13 @@
 # RetroStick
 
-Convertir un **Xiaomi Mi TV Stick** en una consola retro para jugar a **mis propios juegos originales dumpeados** (Game Boy, Game Boy Color, Game Boy Advance y PlayStation 1), con:
+Convertir un **Xiaomi Mi TV Stick** (o una tele Android) en una consola retro para jugar a **mis propios juegos originales dumpeados**: NES, Super Nintendo, Game Boy, Game Boy Color, Game Boy Advance, Mega Drive, Master System, Nintendo 64, Neo Geo y PlayStation. Con:
 
-- Un **menú de inicio en la TV propio** (*RetroStick Launcher*), que es la pantalla de inicio del stick: arranca al encenderlo, con secciones por consola, logos y portadas (diseño: `docs/maquetas/inicio-stick.png`).
-- La colección guardada en **Google Drive**, sincronizada automáticamente con el stick.
-- Una **PWA en el móvil** para subir copias, elegir qué juegos están en el stick y gestionar las partidas guardadas.
-- **Retro Ajustes**, integrado en el launcher como una pestaña más, para emparejar mandos, forzar la sincronización y abrir los ajustes.
+- Un **menú de la TV propio** (*RetroStick Launcher*): pestañas por consola y «Seguir jugando», portadas, fichas con tráiler y capturas, partidas, tiempo jugado y logros (diseño: `docs/maquetas/inicio-stick.png`). Puede ser la pantalla de inicio del stick, si se elige (5.5).
+- La colección guardada en **Google Drive**, sincronizada automáticamente con el stick (juegos y partidas).
+- Una **webapp en el móvil** (PWA) para subir copias, elegir qué juegos están en cada stick, gestionar las partidas y la cuenta de RetroAchievements.
+- **RetroShop** en la tele: el catálogo de cada consola para bajar juegos con el mando (8.2l).
+- **Retro Ajustes**: mandos, sincronización, espacio, botones, actualizaciones, informe al administrador…
+- **Sticks de otras personas**: cada una con su Google Drive y su usuario de la webapp (invitación del administrador); un asistente instala todo en un stick nuevo sin PC (5.0).
 
 > **Cambio de especificación (2026-11-03):** el menú de la TV ya no es Daijishō sino un launcher propio que replica la maqueta. Retro Ajustes deja de ser una app aparte y pasa a ser parte del launcher.
 
@@ -21,7 +23,7 @@ Convertir un **Xiaomi Mi TV Stick** en una consola retro para jugar a **mis prop
 5. [Stick: instalación y configuración](#5-stick-instalación-y-configuración)
 6. [Emuladores (RetroArch)](#6-emuladores-retroarch)
 7. [PWA del móvil](#7-pwa-del-móvil)
-8. [Mini app "Retro Ajustes" (Android TV)](#8-mini-app-retro-ajustes-android-tv)
+8. [RetroStick Launcher (Android TV)](#8-retrostick-launcher-android-tv)
 9. [Plan de trabajo por fases](#9-plan-de-trabajo-por-fases)
 10. [Estructura del repositorio](#10-estructura-del-repositorio)
 11. [Diseño visual](#11-diseño-visual)
@@ -52,14 +54,15 @@ Convertir un **Xiaomi Mi TV Stick** en una consola retro para jugar a **mis prop
 | GPU | Mali-450: **solo OpenGL ES 2.0, sin Vulkan** |
 | RAM | 1 GB |
 | Almacenamiento | 8 GB (unos 4–5 GB libres) |
-| Sistema | **Android TV 9**, espacio de usuario de **32 bits (armeabi-v7a)** ⚠️ VERIFICAR con `adb shell getprop ro.product.cpu.abilist` |
+| Sistema | **Android TV 9**, espacio de usuario de **32 bits (armeabi-v7a)** (comprobado) |
 | Conectividad | Wi-Fi ac, Bluetooth 4.2, un micro-USB que también sirve de alimentación (OTG con adaptador alimentado) |
 
 **Consecuencias:**
 - Hay que instalar las **builds de 32 bits** de RetroArch y de los núcleos (`armeabi-v7a`).
 - Nada que necesite GLES 3 o Vulkan. Shaders solo ligeros (GLSL, de una pasada).
-- **Consolas incluidas:** GB, GBC, GBA y PS1. **Excluidas a propósito:** N64, NDS, PSP y Dreamcast, por rendimiento.
+- **Consolas:** NES, SNES, GB, GBC, GBA, Mega Drive, Master System, N64 (a velocidad completa con el núcleo GLES2 y el renderizado en un hilo, 6.1), Neo Geo y PS1. **Excluidas por rendimiento:** NDS, PSP y Dreamcast.
 - Mandos del usuario: **DualSense (PS5)** y **Switch Pro Controller**. En Android 9 se emparejan por Bluetooth pero no tienen mapeo nativo, así que necesitan *autoconfig* o reasignación en RetroArch. DualShock 4 y los mandos de Xbox funcionan sin configuración.
+- **Otros aparatos probados:** Mi TV Stick y Mi TV Stick 4K con **Android 11** (mandos con otros códigos, 8.2g) y una tele Xiaomi con **Android 10** (Mali-G52, OpenGL ES 3, 8.2i). Lo que cambia entre ellos lo detecta el launcher en el propio aparato, no por la versión de Android.
 
 ---
 
@@ -80,7 +83,8 @@ Convertir un **Xiaomi Mi TV Stick** en una consola retro para jugar a **mis prop
    ├── RetroStick Launcher (app propia = pantalla de inicio de Android)
    │     ├── secciones por consola, portadas, partidas, tiempo jugado
    │     └── pestaña Retro Ajustes (mando, sincronización, Wi-Fi, ajustes)
-   └── RetroArch 32 bits (com.retroarch.ra32) + núcleos: Gambatte, mGBA, PCSX ReARMed
+   └── RetroArch 32 bits (com.retroarch.ra32) + núcleos (6.1): FCEUmm, Snes9x 2010, Gambatte, mGBA,
+         Genesis Plus GX, Mupen64Plus-Next, FinalBurn Neo, PCSX ReARMed
 ```
 
 - **La PWA no habla con el stick.** Solo ordena archivos en Drive. El stick se pone al día en su próxima sincronización.
@@ -95,21 +99,24 @@ Convertir un **Xiaomi Mi TV Stick** en una consola retro para jugar a **mis prop
 ```
 Retro/
 ├── Coleccion/
-│   ├── gb/   gbc/   gba/   psx/
+│   ├── nes/ snes/ gb/ gbc/ gba/ md/ sms/ n64/ neogeo/ psx/
 ├── JugandoAhora/
-│   ├── gb/   gbc/   gba/   psx/
+│   ├── (las mismas consolas)
 ├── Partidas/
 │   ├── saves/          ← RetroArch savefile_directory  (*.srm)
 │   ├── states/         ← RetroArch savestate_directory (*.state, *.state.auto)
 │   └── .stick/status.json
+├── Copias/             ← copias del stick (Backup.kt, 8.2m), las 4 últimas de cada stick
 └── Config/
+    ├── ra.json         ← cuenta de RetroAchievements (8.2c)
+    ├── stick/          ← pedidos de la webapp a cada stick
     └── bios/           ← BIOS del usuario (gb_bios.bin, gbc_bios.bin, gba_bios.bin, scph5502.bin, bios_E.sms, bios_MD.bin), subidas desde la app (Stick → Pantallas de inicio); el stick las copia a RetroArch/system
 ```
 
-- Los nombres de carpeta de consola (`gb`, `gbc`, `gba`, `psx`) son fijos. Los usan la PWA y el launcher.
+- Los nombres de carpeta de consola (`nes`, `snes`, `gb`, `gbc`, `gba`, `md`, `sms`, `n64`, `neogeo`, `psx`) son fijos. Los usan la PWA y el launcher.
 - Los archivos de juego se nombran según **No-Intro** (cartuchos) o **Redump** (PS1). Así funcionan las portadas automáticas.
   Ejemplo: `Pokemon - Edicion Esmeralda (Spain).gba`.
-- **PS1:** formato preferido `.chd`. Para juegos de varios discos, `.m3u` + discos en la misma carpeta.
+- **PS1:** formato preferido `.chd` (un archivo por disco, 30–50 % más pequeño que el .bin/.cue, el mismo juego). Para juegos de varios discos, `.m3u` + discos en la misma carpeta. Para pasar a CHD los que están en .bin/.cue, ver 5.6.
 - La PWA crea esta estructura la primera vez que se usa, si no existe, y guarda los IDs de las carpetas (en `appProperties` de la carpeta `Retro` y en caché en `localStorage`).
 
 ---
@@ -145,6 +152,10 @@ Para el stick de otra persona (con su propio Google Drive y su usuario de la web
 - **Paquete de configuración:** `node stick/config-pack.mjs` lo saca del stick del administrador (solo lectura): la
   carpeta `RetroArch/config` sin los archivos de un juego concreto, los perfiles de mando, los marcos y las claves de
   `retroarch.cfg` que difieren de `retroarch.cfg.orig`, sin nada personal (cuenta de RetroAchievements, contraseñas).
+  **Los botones** son los del repositorio (`stick/retroarch/remaps`, uno por núcleo), nunca los que el administrador
+  eligió en Retro Ajustes → Botones: el paquete del 13/11/2026 llevó los suyos de PlayStation (✕ y ○ cambiados) a los
+  sticks nuevos; la 1.30.4 quita ese archivo una vez donde nadie lo tocó (`Setup.dropPackPsxButtons`). NES de
+  fábrica: ✕/△ = A (saltar), ○/□ = B (correr), como lo usa el usuario.
 - **Publicar:** `node stick/publish-stick.mjs` sube a la versión «stick» RetroArch, los núcleos
   (`node android/cores/fetch-cores.mjs` y `./gradlew :cores:assembleDebug` antes), la configuración y el launcher, y
   `setup.json` al final. `android/publish-update.mjs` publica el launcher en Drive y también aquí: todos los sticks
@@ -212,15 +223,32 @@ Debe ser **idempotente** (se puede ejecutar varias veces) y hacer:
 Lo da el launcher propio (sección 8). Sustituye a Daijishō, que ya no se usa.
 
 ### 5.5 Arranque directo en el menú de juegos
-El launcher declara `android.intent.category.HOME`, así que el stick arranca en él y el botón Home vuelve a él.
-- El launcher de Google ya está desactivado (`docs/dispositivo.md`). El actual es **FLauncher** (`me.efesser.flauncher`), que **se conserva** como salida de emergencia.
-- Fijar el launcher propio como Home por defecto:
+RetroStick puede ser la pantalla de inicio (el stick arranca en él y Home vuelve a él), pero **solo si se elige**: el
+filtro `HOME` está en el alias `HomeAlias` (`HomeApp.kt`), que el primer arranque apaga salvo que RetroStick ya fuera
+el inicio. Así, instalarlo no cambia el launcher de nadie ni hace que Android pregunte «¿qué launcher?» (1.30.1).
+- Se elige en Retro Ajustes → Inicio → «Pantalla de inicio» (enciende el alias y abre la ventana de Android); al
+  apagarlo, o si se sale de esa ventana sin elegir, el alias se apaga y vuelve el launcher de la tele.
+- Al actualizar desde una versión anterior, un Android 9 que tenía RetroStick como inicio puede preguntar una vez qué
+  launcher usar (lo que recordaba era `MainActivity`): elegir RetroStick → «Siempre».
+- En el stick del administrador el launcher de Google está desactivado (`docs/dispositivo.md`) y **FLauncher**
+  (`me.efesser.flauncher`) **se conserva** como salida de emergencia («Otras apps»).
+- Por ADB:
   ```bash
-  adb shell cmd package set-home-activity com.retrostick.launcher/.MainActivity   # ⚠️ VERIFICAR en Android 9
+  adb shell cmd package set-home-activity com.retrostick.launcher/.HomeAlias
   # Revertir a FLauncher:
   adb shell cmd package set-home-activity me.efesser.flauncher/.MainActivity
   ```
 - **Requisito previo:** desde la pestaña Retro Ajustes se puede abrir *Ajustes de Android* (`android.settings.SETTINGS`, verificado). Incluir el comando de reversión en `docs/` y en la salida del script.
+
+### 5.6 PlayStation de .bin/.cue a CHD
+- `node stick/psx-to-chd.mjs [--device <ip:5555>] [--dry-run]` convierte en el PC los `ROMs/psx/*.cue` del stick:
+  baja el .cue y sus pistas, hace el CHD con **chdman** (de MAME: `CHDMAN=<ruta>`, `stick/tools/chdman.exe` o en el
+  PATH), lo sube con el mismo nombre (partidas, estados y trucos siguen valiendo), cambia los `.m3u` y borra el .cue y
+  sus .bin del stick.
+- En la siguiente sincronización el launcher hace lo mismo en Drive (`DriveSync.replaceWithChd`, 1.30.0): los .bin/.cue
+  van a la papelera de Drive y sube el CHD, para no volver a bajarlos.
+- RetroShop ya baja en CHD todo lo que existe así (8.2k); solo vienen en .bin/.cue los juegos de PS1 en español que no
+  existen en CHD en ningún sitio.
 
 ---
 
@@ -434,6 +462,10 @@ Barra inferior: **Colección · Buscar · Subir · Partidas · Stick**.
   desactivar los logros (borra `ra.json`).
 - **Pantallas de inicio:** una fila por consola para subir la BIOS propia del usuario a `Retro/Config/bios` con el
   nombre que espera el emulador; avisa si no es una versión conocida (MD5 de Drive). Ver 8.2d.
+- **Cuenta** (administrador): usuarios de la webapp para amigos (`api/_users.ts`, Upstash Redis; contraseñas con
+  PBKDF2), que se registran solos con un **código de invitación** que el administrador crea, cambia o cierra. Cada
+  uno usa su propio Google Drive. `middleware.ts` no puede importar nada (importar `./api/_users` daba 500 en Vercel).
+- **Informes de sticks** (administrador): lo que manda cada stick con Retro Ajustes → Enviar informe (8.2b).
 
 ### 7.5 Portadas
 ```
@@ -482,12 +514,13 @@ https://raw.githubusercontent.com/libretro-thumbnails/<Sistema>/master/Named_Box
 ### 8.1 Stack
 - **Kotlin**, una sola Activity, **Views nativas sin Leanback ni Compose** (lo más ligero para 1 GB de RAM y Mali-450; el diseño es propio).
 - Paquete `com.retrostick.launcher`. `minSdk 26` (fuentes como recurso), `targetSdk 28`. Se instala por sideload, así que se puede apuntar a 28 y usar almacenamiento heredado en Android 9.
-- `AndroidManifest`: categorías `HOME` + `DEFAULT` (pantalla de inicio), `LEANBACK_LAUNCHER` + `LAUNCHER`, banner de TV (320×180), `uses-feature android.software.leanback required=false`, `touchscreen required=false`.
+- `AndroidManifest`: `LEANBACK_LAUNCHER` + `LAUNCHER`; `HOME` + `DEFAULT` en el alias `HomeAlias` (5.5); banner de TV (320×180), `uses-feature android.software.leanback required=false`, `touchscreen required=false`.
 - Compilación en local con `./gradlew assembleDebug` (JDK 17). Sin GitHub Actions (descartado, ver fase 4).
 
 ### 8.2 Pantalla de inicio (maqueta `docs/maquetas/inicio.html`)
 - **Cabecera:** marca, mando conectado (`InputDevice` con `SOURCE_GAMEPAD`), estado de sincronización (hora del último cambio en `/Partidas`, o "sin sincronizar"), Wi-Fi y hora.
-- **Pestañas de consola** (GB, GBC, GBA, PS1) con su logo y el número de juegos en `/ROMs/<c>`. La última es **Retro Ajustes**. Se cambia con L1/R1 o con izquierda/derecha.
+- **Pestañas:** «Seguir jugando» (los últimos jugados de todas las consolas; △/Y quita uno) y una por consola con su logo y el número de juegos en `/ROMs/<c>`; cuáles y en qué orden, en Retro Ajustes → Inicio (8.2h). Retro Ajustes se abre con + / Options o con ⚙ arriba. Se cambia con L1/R1. **L2** busca en todos tus juegos (`HomeSearch`).
+- Después de los juegos del stick salen los de la colección de Drive («Drive»), que se pasan al stick desde su ficha (`DriveCollection`).
 - **Juego seleccionado:** portada grande, nombre (No-Intro sin la parte entre paréntesis), consola y región.
   - *Última partida:* fecha del `.srm`/`.state.auto` en `/Partidas`.
   - *Tiempo jugado:* registro de tiempo de RetroArch (`content_runtime_log`). ⚠️ VERIFICAR la ruta y el formato en la 1.22.2.
@@ -510,8 +543,8 @@ https://raw.githubusercontent.com/libretro-thumbnails/<Sistema>/master/Named_Box
 - **Portadas:** libretro-thumbnails (misma regla que la PWA, 7.5), con caché en disco y tarjeta de degradado si no hay portada o no hay red.
 
 ### 8.2b Pestaña Retro Ajustes
-Tarjetas grandes navegables con el mando, en 5 columnas (3 filas en la pantalla, sin desplazarse), con los
-emojis como iconos (decisión del usuario):
+Tarjetas grandes navegables con el mando, en 5 columnas, con los emojis como iconos (decisión del usuario). La
+cuarta fila no cabe en la pantalla: la cuadrícula se desplaza para que la tarjeta elegida se vea entera (1.30.2).
 
 | Botón | Acción |
 |---|---|
@@ -519,15 +552,16 @@ emojis como iconos (decisión del usuario):
 | 🔄 **Sincronizar ahora** | Conecta Google Drive (código) o lanza la sincronización. |
 | 📶 **Wi-Fi** | `Settings.ACTION_WIFI_SETTINGS` |
 | ⚙️ **Ajustes de Android** | `Settings.ACTION_SETTINGS` (salida de emergencia si se sustituyó el launcher) |
-| 💾 **Espacio** | Muestra el espacio libre (interno + USB si hay) y lo que ocupa `/ROMs` |
+| 💾 **Espacio** | Lo que ocupa cada consola y los juegos que más liberan (grandes y sin jugar hace tiempo), para quitarlos del stick: la ROM pasa a la colección de Drive y las partidas se quedan (`StorageActivity`). RetroShop lleva aquí si una descarga no cabe |
+| 🎛️ **Botones** | Qué hace cada botón en cada consola y cambiarlo (`ButtonsActivity`, 8.2m) |
 | 🕹️ **Mandos conectados** | Lista de `InputDevice` con fuente `SOURCE_GAMEPAD` |
 | 👾 **RetroArch** | Abre RetroArch (su menú y ajustes) |
 | 📱 **Otras apps** | Abre FLauncher |
-| ☁️ **Cuenta de Drive** | Muestra el correo conectado; permite desconectar. |
+| ☁️ **Cuenta de Drive** | Muestra el correo conectado y permite desconectar; si el stick baja solo los juegos de `JugandoAhora` o los elige uno a uno (5.3); **Copia del stick** (8.2m) |
 | 🛒 **RetroShop** | La tienda (descargar juegos con el mando) |
 | ⬆️ **Actualizar launcher** | Ver 8.4 |
 | 🔊 **Sonidos** | Volumen de los sonidos del menú |
-| 🗂️ **Vista del inicio** | Carátulas o lista (también con Options) |
+| 🗂️ **Inicio** | Vista (carátulas o lista), pestañas y pantalla de inicio (8.2h) |
 | ✨ **Pantallas de inicio** | Cuántas BIOS hay; activarlas o desactivarlas (8.2d) |
 | 🏆 **Mis logros** | Perfil de RetroAchievements (8.2c) |
 | 📨 **Enviar informe** | Manda al administrador qué aparato es, versiones, cómo quedó la instalación, BIOS, mandos (y si sus botones se corrigen), espacio, cuentas (sin contraseñas) y los últimos avisos (`Report.kt` → `api/report.ts`, Upstash 30 días). El stick enseña un código; el administrador lo ve en la webapp, Stick → Informes de sticks |
@@ -580,7 +614,7 @@ En el inicio: **R2** abre los logros del juego, **▲** desde la estantería sub
 ### 8.2f Novedades (launcher 1.26)
 - `News.kt` tiene, por versión, 3–4 líneas de lo que trae. La primera vez que se abre el inicio tras actualizar,
   `NewsActivity` las enseña (nunca en un stick recién instalado). Retro Ajustes → Actualizar launcher las vuelve a
-  mostrar cuando ya está al día (Retro Ajustes tiene 15 tarjetas: no caben más sin desplazamiento).
+  mostrar cuando ya está al día.
 - **Al publicar una versión con algo que contar, añadir su `Release` en `News.RELEASES`.**
 
 ### 8.2j Traducciones al español (launcher 1.28)
@@ -613,6 +647,36 @@ En el inicio: **R2** abre los logros del juego, **▲** desde la estantería sub
 - La webapp solo añade todo esto para el launcher que lo entiende (`/api/shop?extras=1`); también Dragon Ball Z -
   Buu's Fury (USA) en la tienda de Game Boy Advance, desde otra colección (`EXTRAS` en `api/shop.ts`).
 
+### 8.2l RetroShop
+- Retro Ajustes → RetroShop (`ShopActivity`, `Shop.kt`): el catálogo de una colección de archive.org por consola
+  (`DEFAULT_COLLECTIONS` en `pwa/src/lib/recents.ts`), servido por la webapp (`api/shop.ts`, con el pase del stick
+  `x-stick-token`, que se consigue vinculando el stick con el QR desde la webapp): sin demos, una versión por título
+  (europea primero), discos juntos, con portada, géneros, nota y año de IGDB.
+- **Filtros** (fila sobre las portadas): Buscar (teclado propio), Mejor valorados / A–Z / Más nuevos, Género,
+  «Para dos» (`pwa/scripts/build-players.ts`) y **↺ Restablecer** (lo devuelve todo a como estaba; atenuado si no hay
+  nada que quitar).
+- **Ficha:** descripción, idiomas («Traducción al español disponible», 8.2j), tráiler y capturas (la fila se desplaza
+  con el cursor) y los botones. Con varias versiones (8.2k), la línea de debajo dice lo que ocupa la que tiene el
+  cursor y si es **CHD** o **BIN/CUE**; arriba, el tamaño y el formato del juego. Los juegos de PS1 que llegan en zip
+  dicen lo que ocupan sus .bin/.cue (lo que baja el stick y ocupa el juego), no el zip.
+- **Descargas:** en cola, con su progreso en la ficha y en la barra de arriba; si se cortan, siguen donde se quedaron.
+  **Siguen mientras se juega** (1.30.3): un servicio en primer plano (`KeepAlive.kt`, con su notificación) evita que
+  Android cierre RetroStick por memoria al abrir el emulador; lo mismo al pasar un juego de Drive al stick. Al acabar,
+  el juego se copia a `JugandoAhora` en Drive. Si no cabe, lleva a Espacio.
+
+### 8.2m Otras pantallas
+- **Detalles** (□ en el inicio, `DetailsActivity`): Jugar / Continuar con la captura de cada guardado, tiempo jugado,
+  logros, partidas, «Lo he terminado» (🏆, `Finished.kt` → `Partidas/.stick/terminados.json`), Manual (PDF escaneado
+  de archive.org, `Manuals.kt` / `ManualActivity`), Trucos (8.2e), Idioma (8.2j) y Borrar.
+- **Vista en lista** (`HomeList.kt`): los juegos a la izquierda y la ficha completa a la derecha sobre su captura.
+- **Botones** (`ButtonsActivity`): por consola, qué hace cada botón y cambiarlo; se guarda como *remap* de carpeta de
+  contenido (`RetroArch/config/remaps/<núcleo>/<consola>.rmp`, jugadores 1–4), encima del del núcleo
+  (`stick/retroarch/remaps`). «Restablecer» lo borra. Create / − no se toca: es el botón de los atajos.
+- **Segundo mando** = jugador 2 (aviso al conectarlo).
+- **Copia del stick** (`Backup.kt`): ajustes del launcher, `retroarch.cfg`, la carpeta `config` (opciones, botones) y
+  los perfiles de mando, en un zip a `Retro/Copias` una vez por semana y a demanda; para dejar un stick nuevo o
+  reseteado como estaba. Sin juegos, partidas, BIOS ni sesiones.
+
 ### 8.2i Teles Android y gráficas modernas (launcher 1.27.1)
 - El asistente se ejecuta si falta la configuración de RetroStick (`RetroArch/config/FCEUmm/nes.cfg`), aunque
   RetroArch tenga su propio `retroarch.cfg`: en una Mi TV con Android 10 no se ejecutaba y todo salía en negro.
@@ -626,7 +690,7 @@ En el inicio: **R2** abre los logros del juego, **▲** desde la estantería sub
 
 ### 8.2h Retro Ajustes → Inicio (launcher 1.27)
 - Pantalla completa (`HomeSetupActivity`, diseño A de https://claude.ai/artifact/EhFhiHHwwGfyq7AXRmJ6Kp): a la izquierda
-  la vista (Carátulas / Lista) y «Usar RetroStick como pantalla de inicio»; a la derecha una tarjeta por pestaña con
+  la vista (Carátulas / Lista) y «Pantalla de inicio» (5.5: enciende o apaga `HomeAlias`); a la derecha una tarjeta por pestaña con
   su logo y sus juegos. [X] la enciende o la apaga; [△]/Y la levanta para moverla con la cruceta ([X] suelta, [O]
   deshace). «Seguir jugando» va siempre la primera. Se guarda al momento (`HomeTabs.kt`: `recentTab`,
   `hiddenConsoles`, `consoleOrder` en las preferencias `home`) y el inicio lo aplica al volver.
@@ -639,10 +703,13 @@ En el inicio: **R2** abre los logros del juego, **▲** desde la estantería sub
   fotogramas y se notaba retraso.
 - **Home durante un juego vuelve al juego** (`RetroArchCmd.kt`): Android se queda con Home (el del Pro Controller en
   Android 11, el del mando a distancia en todos), así que RetroStick, como pantalla de inicio, vuelve a poner
-  RetroArch delante y avisa de que el menú está en Captura (Switch) o PS (DualSense). RetroStick pide una vez ser la
-  pantalla de inicio; Retro Ajustes → Inicio → «Usar RetroStick como pantalla de inicio» lo cambia
-  con la ventana de Android (marcar: «¿Quieres establecer a RetroStick…?»; desmarcar: la de aplicación de inicio).
+  RetroArch delante y avisa de que el menú está en Captura (Switch) o PS (DualSense). Solo pasa si RetroStick es la
+  pantalla de inicio, que desde la 1.30.1 nunca se pide sola: se elige en Retro Ajustes → Inicio (5.5).
   Abrirse solo al encender (`BootReceiver`) solo funciona hasta Android 9 y sigue esa misma casilla.
+- **Qué códigos mandan los mandos** no depende de la versión de Android sino del aparato: el launcher pregunta al mando
+  si tiene `KEYCODE_BUTTON_C`, que solo da `Generic.kl` (botones en orden HID, como en Android 9); sin él son los
+  códigos estándar (`StickStatus.viaGenericKl`, `PadProfiles.standardCodes`). El Mi TV Stick con Android 11 (núcleo
+  5.4) manda el DualSense por `Generic.kl`; una tele con Android 10, con los estándar.
 - Al entrar a RetroStick (abrirlo o con Home) el cursor está en la pestaña de la consola, no en el juego.
   «Otras apps» abre FLauncher o, si no está, el launcher que haya. No se puede abrir el menú de RetroArch desde fuera:
   su versión de Android no trae órdenes por red, y un servicio de accesibilidad que captura Home rompe la cruceta.
@@ -661,15 +728,22 @@ Al abrir la app y periódicamente (WorkManager, cada 60 min), escribir `/storage
 La sincronización lo sube a `Retro/Partidas/.stick/` y la PWA lo lee. Permiso: `WRITE_EXTERNAL_STORAGE` (Android 9).
 
 ### 8.4 Actualizaciones del launcher
-El stick busca versiones nuevas en Drive (`Retro/Config/launcher`: `launcher.json` + `launcher.apk`) en cada sincronización y, si la hay, pregunta «Actualización del launcher · Instalar / Ahora no». También desde Ajustes → Actualizar launcher. Android siempre pide confirmar la instalación; la primera vez hay que permitir a RetroStick instalar apps.
+Cada stick busca versiones nuevas primero en la versión «stick» de GitHub (`launcher.json` + `launcher.apk`) y, si no,
+en Drive (`Retro/Config/launcher`), en cada sincronización; si la hay, pregunta «Actualización del launcher · Instalar /
+Ahora no». También desde Retro Ajustes → Actualizar launcher. Android siempre pide confirmar la instalación; la primera
+vez hay que permitir a RetroStick instalar apps.
 
-Publicar una versión (desde `android/`): subir `versionCode` en `app/build.gradle.kts` y
+Publicar una versión: subir `versionCode` y `versionName` en `android/app/build.gradle.kts`, añadir su `Release` en
+`News.kt` si hay algo que contar, y
 
 ```sh
-./gradlew assembleDebug && node publish-update.mjs
+cd android && JAVA_HOME=<JDK 17> ./gradlew assembleDebug
+node stick/publish-stick.mjs --launcher        # GitHub (todos los sticks)
 ```
 
-Usa el cliente OAuth del stick (`local.properties`); la primera vez muestra un código para aprobar en google.com/device y guarda el token en `android/.publish-token.json` (fuera de git). El APK nunca se publica en internet: lleva dentro el cliente OAuth y el repositorio es público.
+El usuario instala él las actualizaciones desde la tele: se publican, no se instalan por ADB.
+`android/publish-update.mjs` (Drive del administrador) usa el cliente OAuth del stick (`local.properties`) y guarda su
+token en `android/.publish-token.json` (fuera de git).
 
 ---
 
@@ -753,14 +827,19 @@ retrostick/
 ├── stick/
 │   ├── install.sh
 │   ├── install.ps1          # si el PC es Windows
-│   ├── uninstall-launcher-revert.sh
+│   ├── config-pack.mjs      # paquete de configuración para sticks nuevos (5.0)
+│   ├── publish-stick.mjs    # versión «stick» de GitHub: RetroArch, núcleos, configuración, launcher
+│   ├── psx-to-chd.mjs       # PS1 .bin/.cue → CHD (5.6)
 │   ├── retroarch/
 │   │   ├── retroarch.overrides.cfg
 │   │   ├── core-options/
 │   │   ├── autoconfig/
+│   │   ├── remaps/          # botones de RetroStick por núcleo
 │   │   └── overlays/
 │   └── apks/                # ignorado por git
-├── android/                 # RetroStick Launcher (Gradle)
+├── android/
+│   ├── app/                 # RetroStick Launcher (Gradle)
+│   └── cores/               # «RetroStick Núcleos» (núcleos como bibliotecas nativas)
 ├── pwa/
 │   ├── src/
 │   │   ├── lib/drive.ts
@@ -769,9 +848,12 @@ retrostick/
 │   │   ├── lib/covers.ts
 │   │   ├── screens/
 │   │   └── components/
-│   ├── scripts/build-db.ts
+│   ├── scripts/             # build-db, build-igdb, build-players, build-cheats, build-translations, build-psx-es
 │   ├── api/download.ts      # proxy Vercel para descargar de archive.org (CORS)
 │   ├── api/igdb.ts          # proxy Vercel para IGDB (ficha del juego, 7.7)
+│   ├── api/shop.ts          # catálogo de RetroShop (8.2l)
+│   ├── api/ra.ts            # RetroAchievements (8.2c)
+│   ├── api/report.ts        # informes de los sticks (Enviar informe)
 │   ├── public/db/           # generado en build
 │   └── vite.config.ts
 └── .github/workflows/
@@ -808,7 +890,9 @@ Tema oscuro únicamente (se usa en TV y de noche). En la TV, el foco se marca co
 | Problema | Solución |
 |---|---|
 | RetroArch no instala o no encuentra núcleos | Se ha instalado la versión de 64 bits: usar la de 32 bits (armeabi-v7a). |
-| Botones del DualSense o Pro Controller cambiados | Actualizar autoconfiguraciones; si persiste, autoconfig propio (6.5). |
+| ✕ y ○ cambiados en un juego | Retro Ajustes → Botones de esa consola → «Restablecer». Si pasa en todos los juegos: «Enviar informe» dice si el mando llega por `Generic.kl`; los botones crudos se ven con `adb shell getevent -lt` (8.2g, `docs/mandos.md`). |
+| ✕ y ○ cambiados en las pantallas de Android (ajustes, instalar apps) | Android no reconoce el DualSense y usa `Generic.kl` (□ confirma, ✕ es atrás). Sin root no se puede cambiar; RetroStick y los juegos lo corrigen. |
+| Una descarga de RetroShop se paraba al empezar a jugar | Android cerraba RetroStick por memoria; arreglado en la 1.30.3 (`KeepAlive`, 8.2l). |
 | Parpadeos en juegos de GB/GBA | Activar mezcla de fotogramas o interframe blending. |
 | Juego de PS1 no arranca | Probar con la BIOS del usuario en `system/`; revisar `.cue`/`.m3u`. |
 | Partida "perdida" | Revisar que `savefile_directory` apunta a `/Partidas/saves`; restaurar una revisión desde la PWA. |
