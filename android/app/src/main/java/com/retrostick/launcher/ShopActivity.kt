@@ -547,7 +547,8 @@ class ShopActivity : Activity() {
         val langs = Languages.of(g.file).ifEmpty { Languages.of(g.name) }
         // With several versions each says its own size (a CHD fan version can take half the original's .bin)
         val size = if (g.alternatives.isEmpty() || label == BACK) ""
-            else Formatter.formatShortFileSize(this, ShopDownloads.totalBytes(alt?.game ?: g)) + "  ·  "
+            else listOfNotNull(Formatter.formatShortFileSize(this, ShopDownloads.totalBytes(alt?.game ?: g)), discFormat(alt?.game ?: g))
+                .joinToString("  ·  ") + "  ·  "
         return size + when {
             g.alternatives.isEmpty() || label == BACK -> save
             alt == null && g.alternatives.all { it.kind == "mej" } -> "La versión española original, tal cual salió. $save"
@@ -701,6 +702,21 @@ class ShopActivity : Activity() {
     private fun coverProbe(g: ShopGame): Game {
         val name = g.name.replace(Regex("""\s*\(Disc \d+\)""", RegexOption.IGNORE_CASE), "")
         return Game(console, File(console.romDir, "$name.${g.file.substringAfterLast('.')}"))
+    }
+
+    /**
+     * How a disc game comes (PlayStation): «CHD», one compressed file per disc, or «BIN/CUE», the CD as it is (about
+     * twice the size). The Spanish compilation's zips hold a .cue and its .bin; the translations' zips hold .chd.
+     */
+    private fun discFormat(g: ShopGame): String? {
+        val names = g.parts.map { p -> if (p.unzip && p.saveAs == null) (if (p.item.startsWith("ps1-recopilatorio")) "x.cue" else "x.chd") else p.saveAs ?: p.file }
+            .ifEmpty { g.discs.map { it.first }.ifEmpty { listOf(g.file) } }
+        val ext = names.first().substringAfterLast('.').lowercase()
+        return when {
+            ext == "chd" -> "CHD"
+            ext == "cue" || ext == "bin" -> "BIN/CUE"
+            else -> null
+        }
     }
 
     /** Download size (all discs of a multi-disc game). */
@@ -981,7 +997,7 @@ class ShopActivity : Activity() {
             g.players.takeIf { it >= 2 }?.let { "$PLAYERS Hasta $it jugadores" },
         ).joinToString("   ·   "))
         val size = sizeOf(g)
-        fichaInfo.text = listOf(if (g.discs.size > 1) "${g.discs.size} discos · $size" else size, console.name, g.name).joinToString("   ·   ")
+        fichaInfo.text = listOfNotNull(if (g.discs.size > 1) "${g.discs.size} discos · $size" else size, discFormat(g), console.name, g.name).joinToString("   ·   ")
         // Languages of this release (from its file name), Spanish highlighted
         val langs = Languages.of(g.file).ifEmpty { Languages.of(g.name) }
         fichaLangs.visibility = if (langs.isEmpty()) View.GONE else View.VISIBLE
