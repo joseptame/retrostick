@@ -256,6 +256,8 @@ async function spanishPsx(
       for (const k of ['p', 'd', 'i', 'x'] as const) delete euro[k]
       Object.assign(euro, { t, n: r }, how)
       if (covers[n]) euro.c = covers[n]!
+      // Found by its Spanish title from now on too (its fan versions use it: «La Amenaza Fantasma»)
+      byKey.set(looseKey(t), euro)
       spanish.add(euro)
       return
     }

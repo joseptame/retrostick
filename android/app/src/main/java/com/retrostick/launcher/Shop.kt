@@ -370,7 +370,8 @@ object ShopDownloads {
         }
         val discs = plan.map { it.second }.filter { it.substringAfterLast('.').lowercase() in setOf("cue", "chd") }
         if (discs.size > 1) {
-            val m3u = discs.first().replace(Regex("""\s*\(Disc \d+\)""", RegexOption.IGNORE_CASE), "").substringBeforeLast('.') + ".m3u"
+            // «(Disc 1)», and fan ones' «(Disco 1 - Leon)»
+            val m3u = discs.first().replace(Regex("""\s*\(Disco? \d+[^)]*\)""", RegexOption.IGNORE_CASE), "").substringBeforeLast('.') + ".m3u"
             File(dir, m3u).writeText(discs.joinToString("\n", postfix = "\n"))
         }
     }
