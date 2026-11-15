@@ -58,6 +58,8 @@ for (const f of files(configRoot)) {
   cpSync(f, join(work, 'RetroArch/config', rel))
   kept++
 }
+// RetroStick's buttons per core are the repo's (stick/retroarch/remaps), whatever that stick has
+cpSync(join(here, 'retroarch', 'remaps'), join(work, 'RetroArch/config/remaps'), { recursive: true })
 cpSync(join(pulled, 'RetroArch/autoconfig'), join(work, 'RetroArch/autoconfig'), { recursive: true })
 cpSync(join(pulled, 'RetroArch/overlays/retrostick'), join(work, 'RetroArch/overlays/retrostick'), { recursive: true })
 

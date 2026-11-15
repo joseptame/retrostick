@@ -136,7 +136,7 @@ Archivos (los instala `install.ps1`):
 |---|---|---|
 | `stick/retroarch/remaps/Gambatte/Gambatte.rmp` | `RetroArch/config/remaps/Gambatte/` | ✕○ → A, □△ → B, L/R sin función, stick = cruceta |
 | `stick/retroarch/remaps/mGBA/mGBA.rmp` | `RetroArch/config/remaps/mGBA/` | ✕○ → A, □△ → B, L2/R2 sin función, stick = cruceta |
-| `stick/retroarch/remaps/FCEUmm/FCEUmm.rmp` | `RetroArch/config/remaps/FCEUmm/` | Como el mando original: ✕□ → B, ○△ → A, L/R sin función, stick = cruceta |
+| `stick/retroarch/remaps/FCEUmm/FCEUmm.rmp` | `RetroArch/config/remaps/FCEUmm/` | Como prefiere el usuario (2026-11-15): ✕△ → A (saltar), ○□ → B (correr), L/R sin función, stick = cruceta |
 | `stick/retroarch/remaps/Snes9x 2010/Snes9x 2010.rmp` | `RetroArch/config/remaps/Snes9x 2010/` | Botones como el mando de SNES, L2/R2 sin función, stick = cruceta |
 | `stick/retroarch/remaps/Genesis Plus GX/Genesis Plus GX.rmp` | `RetroArch/config/remaps/Genesis Plus GX/` | Botones del núcleo (□✕○ = A B C), L2/R2 sin función, stick = cruceta |
 | `stick/retroarch/remaps/Mupen64Plus-Next/Mupen64Plus-Next.rmp` | `RetroArch/config/remaps/Mupen64Plus-Next/` | Como el mando de N64: ✕ = A, ○ y □ = B (en el Pro: A = A, B = B), L2 = Z, stick derecho = botones C, R2 sin función |
