@@ -55,6 +55,11 @@ class TranslationsActivity : Activity() {
         }.start()
     }
 
+    /** «Original»: the languages its name says («(En,Fr,De)», or the region's: USA → Inglés) */
+    private val originalLanguages by lazy {
+        Languages.of(game.file.name).takeIf { it.isNotEmpty() }?.joinToString(", ") ?: "Tu juego tal cual"
+    }
+
     private fun show(list: List<Translations.Translation>) {
         options = listOf<Translations.Translation?>(null) + list
         val chosen = Translations.chosen(this, game)
@@ -176,7 +181,7 @@ class TranslationsActivity : Activity() {
             r.name.text = t?.name ?: "Original"
             r.sub.text = when {
                 t != null && busy == t.file -> "Descargando… ${if (t.size > 0) (busyDone * 100 / t.size).coerceAtMost(100) else 0} %"
-                t == null -> "Tu juego tal cual"
+                t == null -> originalLanguages
                 else -> t.details
             }
             r.name.setTextColor(getColor(if (t == null || t.complete) R.color.text else R.color.text_2))
