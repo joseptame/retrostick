@@ -31,7 +31,7 @@ class ShopActivity : Activity() {
     private enum class Sort(val label: String) { RATING("Mejor valorados"), NAME("A–Z"), YEAR("Más nuevos") }
 
     private val io = Executors.newSingleThreadExecutor()
-    /** Loose titles of this console with a Spanish fan translation (Translations): badge and ficha line */
+    /** Loose titles of this console with a Spanish fan translation (Translations): said in the ficha */
     private var translatable: Set<String> = emptySet()
     private val covers by lazy { CoverLoader(this) }
 
@@ -504,7 +504,7 @@ class ShopActivity : Activity() {
             // Which games have a Spanish translation (the list is fetched once a week, as Detalles does)
             Translations.refreshIndex(this, c)
             val titles = Translations.cachedTitles(this, c)
-            runOnUiThread { if (c == console) { translatable = titles; renderGrid() } }
+            runOnUiThread { if (c == console) translatable = titles }
         }
     }
 
@@ -622,7 +622,6 @@ class ShopActivity : Activity() {
                 job?.state == ShopDownloads.State.RUNNING -> badge(card, "${(job.progress * 100).toInt()} %", Color.WHITE)
                 job?.state == ShopDownloads.State.QUEUED -> badge(card, "En cola", Color.WHITE)
                 job?.state == ShopDownloads.State.ERROR -> badge(card, "Error", Color.parseColor("#F87171"))
-                hasTranslation(g) -> badge(card, "Traducción", getColor(R.color.ok))
                 else -> card.badge.visibility = View.GONE
             }
             val running = job?.state == ShopDownloads.State.RUNNING
@@ -936,14 +935,12 @@ class ShopActivity : Activity() {
             }
             // No Spanish of its own but a fan translation: said here, chosen after downloading (Detalles → Idioma)
             if (hasTranslation(g)) {
-                val n = Translations.cachedFor(this@ShopActivity, console, g.title, g.name)?.size ?: 0
-                if (n > 0) {
+                if (!Translations.cachedFor(this@ShopActivity, console, g.title, g.name).isNullOrEmpty()) {
                     append("   ·   ")
                     val start = length
-                    append(if (n == 1) "Hay 1 traducción al español" else "Hay $n traducciones al español")
+                    append("Traducción al español disponible")
                     setSpan(android.text.style.ForegroundColorSpan(getColor(R.color.ok)), start, length, 0)
                     setSpan(android.text.style.StyleSpan(Typeface.BOLD), start, length, 0)
-                    append(" (al descargarlo, elígela en Detalles → Idioma)")
                 }
             }
         }
