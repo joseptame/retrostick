@@ -539,13 +539,16 @@ class ShopActivity : Activity() {
 
     private fun altFor(g: ShopGame, label: String?) = g.alternatives.firstOrNull { altLabel(g, it) == label }
 
-    /** What the button under the cursor downloads, said below the buttons. */
+    /** What the button under the cursor downloads and its size, said below the buttons. */
     private fun choiceNote(g: ShopGame): String {
         val save = "Se guarda en el stick y se copia a tu Drive."
         val label = fichaLabels(DOWNLOAD).getOrNull(fichaButton)
         val alt = altFor(g, label)
         val langs = Languages.of(g.file).ifEmpty { Languages.of(g.name) }
-        return when {
+        // With several versions each says its own size (a CHD fan version can take half the original's .bin)
+        val size = if (g.alternatives.isEmpty() || label == BACK) ""
+            else Formatter.formatShortFileSize(this, ShopDownloads.totalBytes(alt?.game ?: g)) + "  ·  "
+        return size + when {
             g.alternatives.isEmpty() || label == BACK -> save
             alt == null && g.alternatives.all { it.kind == "mej" } -> "La versión española original, tal cual salió. $save"
             alt == null -> "El juego tal cual salió" + (if (langs.isEmpty()) "" else ", en ${langs.joinToString(", ").lowercase()}") + ". $save"
